@@ -1,0 +1,67 @@
+name: Build and Release .NET 8 Application
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build the project
+      run: dotnet publish -c Release -r win-x64 --self-contained -o ./output
+
+    - name: Archive binaries
+      run: |
+        mkdir dist
+        cp ./output/* dist/
+
+    - name: Upload binaries as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: winx64-binaries
+        path: dist/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest  # Alternativ kann auch 'windows-latest' genutzt werden
+
+    steps:
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+
+    - name: Upload binaries to Release
+      uses: actions/upload-release-asset@v2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/
+        asset_name: deovrScraper-win-x64.zip
+        asset_content_type: application/zip
+
+    - name: Zip binaries
+      run: |
+        zip -r deovrScraper-win-x64.zip dist/*
