@@ -1,9 +1,10 @@
 @inherits LayoutComponentBase
 
 <div class="d-flex">
-    <img src="~/logo.png" />
 
-    <div class="sidebar bg-light p-3" style="min-width: 200px; min-height: 100vh;">
+    <div class="sidebar bg-light p-3" style="min-width: 200px; min-height: 100vh; display: flex;    flex-direction: column;    align-items: center;">
+        <img class="logo mb-4" src="logo.png" />
+
         <NavMenu />
     </div>
 
@@ -25,8 +26,12 @@
         width: 100%;
     }
 
-    .dropdown-menu .inner.show{
+    .dropdown-menu .inner.show {
         max-height: 33vh;
         overflow-y: auto;
+    }
+
+    .logo {
+        max-width: 128px;
     }
 </style>
