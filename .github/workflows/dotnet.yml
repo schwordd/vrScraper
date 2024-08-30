@@ -12,11 +12,16 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Fetch all history including tags
 
     - name: Set up Git
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
+
+    - name: Fetch all tags
+      run: git fetch --tags
 
     - name: Determine next version
       id: vars
@@ -26,7 +31,7 @@ jobs:
         echo "Latest tag: $LATEST_TAG"
         
         if [ "$LATEST_TAG" = "v0.0.0" ]; then
-          NEXT_VERSION="v1.0.0"
+          NEXT_VERSION="1.0.0"
         else
           VERSION_PARTS=(${LATEST_TAG//v/ })
           VERSION_PARTS=(${VERSION_PARTS//./ })
@@ -36,10 +41,10 @@ jobs:
 
           # Increment the PATCH version until a unique tag is found
           PATCH=$((PATCH + 1))
-          NEXT_VERSION="v$MAJOR.$MINOR.$PATCH"
+          NEXT_VERSION="$MAJOR.$MINOR.$PATCH"
           while git rev-parse "v$NEXT_VERSION" >/dev/null 2>&1; do
             PATCH=$((PATCH + 1))
-            NEXT_VERSION="v$MAJOR.$MINOR.$PATCH"
+            NEXT_VERSION="$MAJOR.$MINOR.$PATCH"
           done
         fi
 
@@ -65,4 +70,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
-        gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}"
+        gh release create v${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release v${{ env.NEXT_VERSION }}" --notes "Automated release for version v${{ env.NEXT_VERSION }}"
