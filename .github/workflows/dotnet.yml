@@ -51,7 +51,8 @@ jobs:
 
     - name: Create ZIP archive
       run: |
-        ZIP_NAME="release_${{ env.NEXT_VERSION }}.zip"
+        ARCHITECTURE="x64"
+        ZIP_NAME="deovrScraper_${ARCHITECTURE}_v${{ env.NEXT_VERSION }}.zip"
         zip -r $ZIP_NAME ./dist/*
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
