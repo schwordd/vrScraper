@@ -53,10 +53,13 @@ jobs:
         echo "Determined next version: $NEXT_VERSION"
         echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
 
-    - name: Update version file
+    - name: Commit updated version file
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Use PAT instead of the default GITHUB_TOKEN
       run: |
-        echo "Updating version file..."
-        echo "$NEXT_VERSION" > VERSION
+        git add VERSION
+        git commit -m "Update version to $NEXT_VERSION"
+        git push origin master
 
     - name: Commit updated version file
       run: |
