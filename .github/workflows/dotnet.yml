@@ -68,7 +68,8 @@ jobs:
       run: |
         mkdir -p dist
         cp -r ./output/* dist/
-
+        echo "Files in dist after copying:"
+        ls -al dist/
 
     - name: List files in dist (build job)
       run: |
@@ -103,8 +104,10 @@ jobs:
     - name: Create ZIP archive
       run: |
         ZIP_NAME="release_${{ env.NEXT_VERSION }}_${{ env.ARCHITECTURE }}.zip"
-        echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+        echo "ZIP_NAME=$ZIP_NAME"
         zip -r $ZIP_NAME ./dist/*
+        echo "Created ZIP file:"
+        ls -al $ZIP_NAME
 
     - name: Set up GitHub CLI
       run: sudo apt-get install -y gh
