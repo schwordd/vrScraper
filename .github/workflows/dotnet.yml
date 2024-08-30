@@ -120,6 +120,15 @@ jobs:
         ls -al $ZIP_NAME
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
+    - name: Verify ZIP archive creation
+      run: |
+        if [ -f "${{ env.ZIP_NAME }}" ]; then
+          echo "ZIP archive successfully created."
+        else
+          echo "Error: ZIP archive was not created."
+          exit 1
+        fi
+
     - name: Set up GitHub CLI
       run: |
         echo "Installing GitHub CLI..."
@@ -130,5 +139,10 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
         echo "Creating GitHub release..."
+        echo "Attempting to release ${{ env.ZIP_NAME }} with title 'Release ${{ env.NEXT_VERSION }}'"
         RELEASE_RESPONSE=$(gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}" 2>&1)
         echo "Release creation response: $RELEASE_RESPONSE"
+        if echo "$RELEASE_RESPONSE" | grep -q "HTTP 422"; then
+          echo "Error: Release creation failed due to an existing tag or other issue."
+          exit 1
+        fi
