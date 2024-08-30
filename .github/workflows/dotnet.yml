@@ -108,6 +108,7 @@ jobs:
         zip -r $ZIP_NAME ./dist/*
         echo "Created ZIP file:"
         ls -al $ZIP_NAME
+        echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
     - name: Set up GitHub CLI
       run: sudo apt-get install -y gh
