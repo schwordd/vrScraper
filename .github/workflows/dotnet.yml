@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,78 +41,22 @@ jobs:
         echo "Determined next version: $NEXT_VERSION"
         echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
 
-    - name: Determine architecture
-      run: |
-        echo "Determining architecture..."
-        ARCHITECTURE=$(uname -m)
-        echo "Architecture: $ARCHITECTURE"
-        echo "ARCHITECTURE=$ARCHITECTURE" >> $GITHUB_ENV
-
-    - name: Create Tag using GitHub API via curl
-      run: |
-        echo "Creating tag ${{ env.NEXT_VERSION }}..."
-        curl -X POST -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
-        -d '{"ref":"refs/tags/${{ env.NEXT_VERSION }}","sha":"${{ github.sha }}"}' \
-        https://api.github.com/repos/${{ github.repository }}/git/refs
-
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '8.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Build the project
-      run: dotnet publish -c Release -r win-x64 --self-contained -o ./output
-
-    - name: Archive binaries
-      run: |
-        mkdir -p dist
-        cp -r ./output/* dist/
-
-    - name: Upload binaries as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: winx64-binaries
-        path: dist/
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Download binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: winx64-binaries
-        path: ./dist/
+    - name: Build and Publish the project
+      run: dotnet publish -c Release -r win-x64 --self-contained -o ./dist
 
     - name: Create ZIP archive
       run: |
-        ZIP_NAME="release_${{ env.NEXT_VERSION }}_${{ env.ARCHITECTURE }}.zip"
+        ZIP_NAME="release_${{ env.NEXT_VERSION }}.zip"
         zip -r $ZIP_NAME ./dist/*
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-
-    - name: Verify ZIP archive creation
-      run: |
-        if [ -f "${{ env.ZIP_NAME }}" ]; then
-          echo "ZIP archive successfully created."
-        else
-          echo "Error: ZIP archive was not created."
-          exit 1
-        fi
-
-    - name: Set up GitHub CLI
-      run: sudo apt-get install -y gh
 
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
-        RELEASE_RESPONSE=$(gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}" 2>&1)
-        echo "Release creation response: $RELEASE_RESPONSE"
-        if echo "$
+        gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}"
