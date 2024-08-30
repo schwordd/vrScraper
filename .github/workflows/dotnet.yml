@@ -63,7 +63,9 @@ jobs:
       run: |
         ARCHITECTURE="win-x64"
         ZIP_NAME="deovrScraper_${ARCHITECTURE}_v${{ env.NEXT_VERSION }}.zip"
-        zip -r $ZIP_NAME ./dist/*
+        cd dist
+        zip -r ../$ZIP_NAME ./*
+        cd ..
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
     - name: Create GitHub Release
