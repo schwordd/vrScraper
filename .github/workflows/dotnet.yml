@@ -21,6 +21,7 @@ jobs:
     - name: Determine next version
       id: vars
       run: |
+        echo "Determining the latest tag..."
         LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
         echo "Latest tag: $LATEST_TAG"
         
@@ -37,21 +38,24 @@ jobs:
           NEXT_VERSION="v$MAJOR.$MINOR.$PATCH"
         fi
 
-        echo "Next version: $NEXT_VERSION"
+        echo "Determined next version: $NEXT_VERSION"
         echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
 
     - name: Determine architecture
       id: arch
       run: |
+        echo "Determining architecture..."
         ARCHITECTURE=$(uname -m)
         echo "Architecture: $ARCHITECTURE"
         echo "ARCHITECTURE=$ARCHITECTURE" >> $GITHUB_ENV
 
     - name: Create Tag using GitHub API via curl
       run: |
-        curl -X POST -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+        echo "Creating tag ${{ env.NEXT_VERSION }}..."
+        TAG_RESPONSE=$(curl -X POST -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
         -d '{"ref":"refs/tags/${{ env.NEXT_VERSION }}","sha":"${{ github.sha }}"}' \
-        https://api.github.com/repos/${{ github.repository }}/git/refs
+        https://api.github.com/repos/${{ github.repository }}/git/refs 2>&1)
+        echo "Tag creation response: $TAG_RESPONSE"
 
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v3
@@ -59,13 +63,18 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: |
+        echo "Restoring dependencies..."
+        dotnet restore
 
     - name: Build the project
-      run: dotnet publish -c Release -r win-x64 --self-contained -o ./output
+      run: |
+        echo "Building the project..."
+        dotnet publish -c Release -r win-x64 --self-contained -o ./output
 
     - name: Archive binaries
       run: |
+        echo "Archiving binaries..."
         mkdir -p dist
         cp -r ./output/* dist/
         echo "Files in dist after copying:"
@@ -103,6 +112,7 @@ jobs:
 
     - name: Create ZIP archive
       run: |
+        echo "Creating ZIP archive..."
         ZIP_NAME="release_${{ env.NEXT_VERSION }}_${{ env.ARCHITECTURE }}.zip"
         echo "ZIP_NAME=$ZIP_NAME"
         zip -r $ZIP_NAME ./dist/*
@@ -111,11 +121,14 @@ jobs:
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
     - name: Set up GitHub CLI
-      run: sudo apt-get install -y gh
+      run: |
+        echo "Installing GitHub CLI..."
+        sudo apt-get install -y gh
 
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
         echo "Creating GitHub release..."
-        gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}"
+        RELEASE_RESPONSE=$(gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}" 2>&1)
+        echo "Release creation response: $RELEASE_RESPONSE"
