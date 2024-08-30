@@ -3,10 +3,10 @@ name: Build and Release .NET 8 Application
 on:
   push:
     branches:
-      - master  # Anstatt main, verwende master
+      - master  # Verwende master branch
   pull_request:
     branches:
-      - master  # Anstatt main, verwende master
+      - master
   workflow_dispatch:
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
 
     - name: Archive binaries
       run: |
-        mkdir dist
+        mkdir -p dist
         cp ./output/* dist/
 
     - name: Upload binaries as artifact
@@ -51,7 +51,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: winx64-binaries
-        path: ./binaries/  # Definiere ein klares Zielverzeichnis
+        path: ./  # Lade das Artefakt im aktuellen Verzeichnis herunter
 
     - name: Set up GitHub CLI
       run: sudo apt-get install -y gh
@@ -60,4 +60,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create ${{ github.ref_name }} "./binaries/*" --title "Release ${{ github.ref_name }}" --notes "Automated release for ${{ github.ref_name }}"
+        gh release create ${{ github.ref_name }} "./dist/*" --title "Release ${{ github.ref_name }}" --notes "Automated release for ${{ github.ref_name }}"
