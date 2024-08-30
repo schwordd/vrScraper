@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'VERSION'  # Ignore commits that only change the VERSION file
 
 jobs:
   release:
@@ -50,6 +52,17 @@ jobs:
 
         echo "Determined next version: $NEXT_VERSION"
         echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
+
+    - name: Update version file
+      run: |
+        echo "Updating version file..."
+        echo "$NEXT_VERSION" > VERSION
+
+    - name: Commit updated version file
+      run: |
+        git add VERSION
+        git commit -m "Update version to $NEXT_VERSION"
+        git push origin master
 
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v3
