@@ -1,0 +1,242 @@
+@page "/tabs"
+
+@using deovrScraper.DB.Models
+@using deovrScraper.Services
+@using Blzr.BootstrapSelect
+@using System.Text.Json
+
+@inject ITabService TabService
+@inject IVideoService VideoService
+
+<h3>Manage Tabs</h3>
+
+<button class="btn btn-primary btn-sm mb-2" @onclick="AddNewTab">
+    <i class="bi bi-plus-lg"></i> Add New Tab
+</button>
+
+<div class="row">
+    @if (AvailableTabs != null && AvailableTabs.Any())
+    {
+        foreach (var tab in AvailableTabs.OrderBy(t => t.Order))
+        {
+            <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
+                <div class="card p-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        @if (!IsDefaultTab(tab))
+                        {
+                            @if (!tab.IsEditing)
+                            {
+                                <div class="d-flex align-items-center">
+                                    <h6 class="card-title mb-1 me-1" style="min-height:32px; display: flex; align-items: center;">
+                                        @tab.Name
+                                    </h6>
+                                    <button class="btn btn-link btn-sm p-0 ml-1" style="margin-left: 4px;" @onclick="() => StartEditing(tab)">
+                                        <i class="bi bi-pencil" style="font-size: 0.85rem;"></i>
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control form-control-sm ml-auto me-1" style="flex-grow: 1; min-width: 120px;" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
+                                <button class="btn btn-sm btn-outline-secondary ml-2 me-1" @onclick="() => StopEditing(tab)">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            }
+                        }
+                        else
+                        {
+                            <h6 class="card-title mb-1" style="min-height:32px;">@tab.Name</h6>
+                        }
+
+                        @if (tab.Type != "DEFAULT")
+                        {
+                            <button class="btn btn-sm btn-outline-danger ml-2" @onclick="() => DeleteTab(tab.Id)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        }
+                    </div>
+
+                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                        <label class="mr-2">Active</label>
+                        <input type="checkbox" class="form-check-input form-check-sm ml-auto" disabled="@IsDefaultTab(tab)" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
+                    </div>
+                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                        <label class="mr-2">Order</label>
+                        <input type="number" class="form-control form-control-sm input-sm ml-auto" style="width: 140px;" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" disabled="@IsDefaultTab(tab)" />
+                    </div>
+
+                    <!-- Tag Whitelist -->
+                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                        <label class="mr-2">Tag WL</label>
+                        <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                                         TextField="@((item) => item.Name)"
+                                         ValueField="@((item) => item.Name)"
+                                         ShowSearch="true"
+                                         TType="IEnumerable<string>"
+                                         @bind-Value="tab.TagWhitelistList"
+                                         Disabled="@IsDefaultTab(tab)" />
+                    </div>
+
+                    <!-- Tag Blacklist -->
+                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                        <label class="mr-2">Tag BL</label>
+                        <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                                         TextField="@((item) => item.Name)"
+                                         ValueField="@((item) => item.Name)"
+                                         ShowSearch="true"
+                                         TType="IEnumerable<string>"
+                                         @bind-Value="tab.TagBlacklistList"
+                                         Disabled="@IsDefaultTab(tab)" />
+                    </div>
+
+                    <!-- Actress Whitelist -->
+                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                        <label class="mr-2">Act WL</label>
+                        <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
+                                         TextField="@((item) => item.Name)"
+                                         ValueField="@((item) => item.Name)"
+                                         ShowSearch="true"
+                                         TType="IEnumerable<string>"
+                                         @bind-Value="tab.ActressWhitelistList"
+                                         Disabled="@IsDefaultTab(tab)" />
+                    </div>
+
+                    <!-- Actress Blacklist -->
+                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                        <label class="mr-2">Act BL</label>
+                        <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
+                                         TextField="@((item) => item.Name)"
+                                         ValueField="@((item) => item.Name)"
+                                         ShowSearch="true"
+                                         TType="IEnumerable<string>"
+                                         @bind-Value="tab.ActressBlacklistList"
+                                         Disabled="@IsDefaultTab(tab)" />
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(IsDefaultTab(tab) || !tab.IsDirty)">
+                            <i class="bi bi-floppy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <p>No tabs available.</p>
+    }
+</div>
+
+@code {
+    private List<DbDeoVrTab> AvailableTabs { get; set; } = new();
+    private List<DbTag> AvailableTags { get; set; } = new();
+    private List<DbStar> AvailableActresses { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTabs();
+        await LoadTags();
+        await LoadActresses();
+    }
+
+    private async Task LoadTabs()
+    {
+        AvailableTabs = await this.TabService.GetAllTabs();
+    }
+
+    private async Task LoadTags()
+    {
+        AvailableTags = (await VideoService.GetTagInfos()).Select(x => x.Tag).ToList();
+    }
+
+    private async Task LoadActresses()
+    {
+        AvailableActresses = (await VideoService.GetActorInfos()).Select(x => x.Star).ToList();
+    }
+
+    private async Task AddNewTab()
+    {
+        var newTab = new DbDeoVrTab
+            {
+                Name = "New Tab",
+                Type = "CUSTOM",
+                Active = true,
+                Order = AvailableTabs.Count + 1,
+                TagWhitelist = "[]",  // Leeres JSON-Array
+                ActressWhitelist = "[]",
+                TagBlacklist = "[]",
+                ActressBlacklist = "[]",
+                VideoWhitelist = "[]",
+                VideoBlacklist = "[]"
+            };
+
+        await TabService.AddTab(newTab);
+        await LoadTabs();
+    }
+
+    private async Task DeleteTab(long id)
+    {
+        var tabToDelete = AvailableTabs.FirstOrDefault(t => t.Id == id);
+
+        if (tabToDelete != null && tabToDelete.Type != "DEFAULT")
+        {
+            await TabService.DeleteTab(id);
+            await LoadTabs();
+        }
+    }
+
+    private async Task SaveTab(DbDeoVrTab tab)
+    {
+        await TabService.UpdateTab(tab);
+        tab.IsDirty = false;
+        tab.IsEditing = false;  // Beenden des Bearbeitungsmodus nach dem Speichern
+        await LoadTabs();
+    }
+
+    private bool IsDefaultTab(DbDeoVrTab tab)
+    {
+        return tab.Type == "DEFAULT";
+    }
+
+    private void MarkTabDirty(DbDeoVrTab tab)
+    {
+        tab.IsDirty = true;
+    }
+
+    private void OnInputChanged(ChangeEventArgs e, DbDeoVrTab tab, string propertyName)
+    {
+        var value = e.Value?.ToString();
+
+        switch (propertyName)
+        {
+            case nameof(tab.Order):
+                if (int.TryParse(value, out var order))
+                {
+                    tab.Order = order;
+                }
+                break;
+        }
+
+        MarkTabDirty(tab);
+    }
+
+    private void OnCheckboxChanged(ChangeEventArgs e, DbDeoVrTab tab)
+    {
+        if (bool.TryParse(e.Value!.ToString(), out var isChecked))
+        {
+            tab.Active = isChecked;
+            MarkTabDirty(tab);
+        }
+    }
+
+    private void StartEditing(DbDeoVrTab tab)
+    {
+        tab.IsEditing = true;
+    }
+
+    private void StopEditing(DbDeoVrTab tab)
+    {
+        tab.IsEditing = false;
+    }
+}

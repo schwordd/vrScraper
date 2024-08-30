@@ -1,0 +1,20 @@
+@page "/"
+
+@using deovrScraper.Components
+@using deovrScraper.DB.Models
+@using deovrScraper.Services
+@inject IEpornerScraper Scraper
+
+<h2>DeoVRScraper</h2>
+
+<div class="mt-3">
+    <ScrapingTools />
+</div>
+
+<div class="mt-3">
+    <TagOverview />
+</div>
+
+<div class="mt-3">
+    <ActorOverview />
+</div>

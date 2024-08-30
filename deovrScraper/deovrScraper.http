@@ -1,0 +1,6 @@
+@deovrScraper_HostAddress = http://localhost:5285
+
+GET {{deovrScraper_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
