@@ -52,7 +52,8 @@ jobs:
     - name: Create Git Tag
       run: |
         git tag ${{ env.NEXT_VERSION }}
-        git push https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git ${{ env.NEXT_VERSION }}
+        git show-ref  # Überprüfe, ob der Tag existiert
+        git push https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git refs/tags/${{ env.NEXT_VERSION }}
 
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v3
