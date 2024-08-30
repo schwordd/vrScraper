@@ -67,7 +67,8 @@ jobs:
     - name: Archive binaries
       run: |
         mkdir -p dist
-        cp ./output/* dist/
+        cp -r ./output/* dist/
+
 
     - name: List files in dist (build job)
       run: |
