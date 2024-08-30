@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-latest  # Beachte, dass dieser Job unter Windows läuft
 
     steps:
     - name: Checkout repository
@@ -36,7 +36,7 @@ jobs:
     - name: List files in dist (build job)
       run: |
         echo "Listing files in dist/ directory after build:"
-        ls -al dist/
+        Get-ChildItem -Path dist
 
     - name: Upload binaries as artifact
       uses: actions/upload-artifact@v3
