@@ -47,16 +47,11 @@ jobs:
         echo "Architecture: $ARCHITECTURE"
         echo "ARCHITECTURE=$ARCHITECTURE" >> $GITHUB_ENV
 
-    - name: Create Tag using GitHub API
-      uses: actions/github-script@v6
-      with:
-        script: |
-          github.rest.git.createRef({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            ref: 'refs/tags/${{ env.NEXT_VERSION }}',
-            sha: context.sha
-          })
+    - name: Create Tag using GitHub API via curl
+      run: |
+        curl -X POST -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+        -d '{"ref":"refs/tags/${{ env.NEXT_VERSION }}","sha":"${{ github.sha }}"}' \
+        https://api.github.com/repos/${{ github.repository }}/git/refs
 
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v3
