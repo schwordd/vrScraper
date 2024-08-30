@@ -3,10 +3,10 @@ name: Build and Release .NET 8 Application
 on:
   push:
     branches:
-      - master
+      - master  # Anstatt main, verwende master
   pull_request:
     branches:
-      - master
+      - master  # Anstatt main, verwende master
   workflow_dispatch:
 
 jobs:
@@ -51,6 +51,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: winx64-binaries
+        path: ./binaries/  # Definiere ein klares Zielverzeichnis
 
     - name: Set up GitHub CLI
       run: sudo apt-get install -y gh
@@ -59,4 +60,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create ${{ github.ref_name }} "./winx64-binaries/*" --title "Release ${{ github.ref_name }}" --notes "Automated release for ${{ github.ref_name }}"
+        gh release create ${{ github.ref_name }} "./binaries/*" --title "Release ${{ github.ref_name }}" --notes "Automated release for ${{ github.ref_name }}"
