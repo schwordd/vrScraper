@@ -32,6 +32,11 @@ jobs:
       run: |
         mkdir -p dist
         cp ./output/* dist/
+      
+    - name: List files in dist (build job)
+      run: |
+        echo "Listing files in dist/ directory after build:"
+        ls -al dist/
 
     - name: Upload binaries as artifact
       uses: actions/upload-artifact@v3
@@ -51,7 +56,12 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: winx64-binaries
-        path: ./  # Lade das Artefakt im aktuellen Verzeichnis herunter
+        path: ./dist/  # Lade das Artefakt in das `dist` Verzeichnis herunter
+
+    - name: List files in dist (release job)
+      run: |
+        echo "Listing files in dist/ directory after download:"
+        ls -al dist/
 
     - name: Set up GitHub CLI
       run: sudo apt-get install -y gh
@@ -60,4 +70,5 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        echo "Creating GitHub release..."
         gh release create ${{ github.ref_name }} "./dist/*" --title "Release ${{ github.ref_name }}" --notes "Automated release for ${{ github.ref_name }}"
