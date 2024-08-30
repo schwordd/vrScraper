@@ -22,7 +22,7 @@ jobs:
       id: vars
       run: |
         echo "Determining the latest tag..."
-        LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
         echo "Latest tag: $LATEST_TAG"
         
         if [ "$LATEST_TAG" = "v0.0.0" ]; then
@@ -35,11 +35,12 @@ jobs:
           PATCH=${VERSION_PARTS[2]}
 
           # Increment the PATCH version until a unique tag is found
-          while git rev-parse "v$MAJOR.$MINOR.$PATCH" >/dev/null 2>&1; do
-            PATCH=$((PATCH + 1))
-          done
-
+          PATCH=$((PATCH + 1))
           NEXT_VERSION="v$MAJOR.$MINOR.$PATCH"
+          while git rev-parse "v$NEXT_VERSION" >/dev/null 2>&1; do
+            PATCH=$((PATCH + 1))
+            NEXT_VERSION="v$MAJOR.$MINOR.$PATCH"
+          done
         fi
 
         echo "Determined next version: $NEXT_VERSION"
@@ -55,7 +56,7 @@ jobs:
 
     - name: Create ZIP archive
       run: |
-        ARCHITECTURE="x64"
+        ARCHITECTURE="win-x64"
         ZIP_NAME="deovrScraper_${ARCHITECTURE}_v${{ env.NEXT_VERSION }}.zip"
         zip -r $ZIP_NAME ./dist/*
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
