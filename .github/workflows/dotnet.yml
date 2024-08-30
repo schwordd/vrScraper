@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'VERSION'  # Ignore commits that only change the VERSION file
+      - 'deovrScraper/VERSION'  # Ignore commits that only change the VERSION file in deovrScraper
 
 jobs:
   release:
@@ -56,13 +56,13 @@ jobs:
     - name: Update version file
       run: |
         echo "Updating version file..."
-        echo "$NEXT_VERSION" > VERSION
+        echo "$NEXT_VERSION" > deovrScraper/VERSION
 
     - name: Commit updated version file
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Use PAT instead of the default GITHUB_TOKEN
       run: |
-        git add VERSION
+        git add deovrScraper/VERSION
         git commit -m "Update version to $NEXT_VERSION"
         git push origin master
 

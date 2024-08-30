@@ -7,7 +7,6 @@ namespace deovrScraper.Common
     public string? LogPath { get; set; } = null;
     public int Port { get; set; } = 5000;
     public string Ip { get; set; } = "192.168.0.100";
-    public string DataDir { get; set; }
     public string ConnectionString { get; set; }
   }
 }

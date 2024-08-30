@@ -13,7 +13,7 @@ using System.Net;
 
 namespace deovrScraper.Services
 {
-  public class EpornerScraper(ILogger<EpornerScraper> logger, IServiceProvider serviceProvider, IConfiguration config, IVideoService vs) : IEpornerScraper
+  public class EpornerScraper(ILogger<EpornerScraper> logger, IServiceProvider serviceProvider, IVideoService vs) : IEpornerScraper
   {
     public bool ScrapingInProgress => this._scrapingInprogress;
 
@@ -120,9 +120,6 @@ namespace deovrScraper.Services
 
         logger.LogInformation($"{newInsertions.Count} new videos found and added to database");
 
-        var dataDirPath = config["DataDir"]!;
-        Directory.CreateDirectory(dataDirPath);
-
         logger.LogInformation($"Parsing details (tags and artists) of {newInsertions.Count} new videos...this will take a while");
 
         for (var i = 0; i < newInsertions.Count; i++)
@@ -130,11 +127,6 @@ namespace deovrScraper.Services
           this._scrapingStatus = $"Parse Details: {i + 1} / {newInsertions.Count}";
           logger.LogInformation(this._scrapingStatus);
           await ParseDetails(newInsertions[i], context);
-          if (newInsertions[i].Thumbnail != null)
-          {
-            //await GetThumb(newInsertions[i].Thumbnail!, Path.Combine(dataDirPath, $"{newInsertions[i].Site}_{newInsertions[i].SiteVideoId}.jpg"));
-          }
-
           Thread.Sleep(100);
         }
 
@@ -313,81 +305,6 @@ namespace deovrScraper.Services
         }
       }
     }
-
-    /*
-    public async Task GetMissingThumbs()
-    {
-      using var scope = serviceProvider.CreateScope();
-      var context = scope.ServiceProvider.GetRequiredService<DeovrScraperContext>();
-
-      var missingThumbs = await context.VideoItems.ToListAsync();
-
-      var dataDirPath = config["DataDir"]!;
-
-      missingThumbs = missingThumbs.Where(video => File.Exists(Path.Combine(dataDirPath, $"{video.Site}_{video.SiteVideoId}.jpg")) == false).ToList();
-
-      for (var i = 0; i < missingThumbs.Count; i++)
-      {
-        var videoItem = missingThumbs[i];
-        logger.LogInformation(message: $"Get missing thumb: {i + 1} / {missingThumbs.Count}");
-        try
-        {
-          await GetThumb(videoItem.Thumbnail!, Path.Combine(dataDirPath, $"{videoItem.Site}_{videoItem.SiteVideoId}.jpg"));
-        }
-        catch (Exception ex)
-        {
-          logger.LogWarning($"Error loading thumb {videoItem.Id}");
-          logger.LogError(ex.ToString());
-        }
-        finally{
-        }
-      }
-    }
-    */
-
-    /*
-    public async Task GetMissingThumbsParallel()
-    {
-      using var scope = serviceProvider.CreateScope();
-      var context = scope.ServiceProvider.GetRequiredService<DeovrScraperContext>();
-
-      var missingThumbs = await context.VideoItems.ToListAsync();
-
-      var dataDirPath = config["DataDir"]!;
-
-      missingThumbs = missingThumbs.Where(video => !File.Exists(Path.Combine(dataDirPath, $"{video.Site}_{video.SiteVideoId}.jpg"))).ToList();
-
-      var tasks = new List<Task>();
-      var semaphore = new SemaphoreSlim(100); // Erlaubt maximal 100 parallele Aufgaben
-
-      foreach (var videoItem in missingThumbs)
-      {
-        await semaphore.WaitAsync();
-
-        var task = Task.Run(async () =>
-        {
-          try
-          {
-            await GetThumb(videoItem.Thumbnail!, Path.Combine(dataDirPath, $"{videoItem.Site}_{videoItem.SiteVideoId}.jpg"));
-            logger.LogInformation(message: $"Get missing thumb for video: {videoItem.SiteVideoId}");
-          }
-          catch (Exception ex)
-          {
-            logger.LogWarning($"Error loading thumb {videoItem.Id}");
-            logger.LogError(ex.ToString());
-          }
-          finally
-          {
-            semaphore.Release();
-          }
-        });
-
-        tasks.Add(task);
-      }
-
-      await Task.WhenAll(tasks);
-    }
-    */
 
     private List<VideoItem> ParseVideoItems(HtmlNodeCollection? nodes, string baseUrl)
     {

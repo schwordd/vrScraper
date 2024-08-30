@@ -9,6 +9,7 @@ using Serilog.Filters;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace deovrScraper
@@ -26,7 +27,7 @@ namespace deovrScraper
   / / / / _ \/ __ \ | / / ___/\__ \/ ___/ ___/ __ `/ __ \/ _ \/ ___/
  / /_/ /  __/ /_/ / |/ / /   ___/ / /__/ /  / /_/ / /_/ /  __/ /    
 /_____/\___/\____/|___/_/   /____/\___/_/   \__,_/ .___/\___/_/     
-                                                /_/    v{Version}
+                                                /_/    v{GetVersion()}
 
 ";
       Console.WriteLine(logo);
@@ -206,6 +207,24 @@ namespace deovrScraper
       catch (Exception ex)
       {
         Log.Error("Failed to open browser: {Error}", ex.Message);
+      }
+    }
+
+    public static string GetVersion()
+    {
+      var assembly = Assembly.GetExecutingAssembly();
+      var resourceName = "deovrScraper.VERSION";
+
+      if (assembly == null) throw new Exception("Could not determine ExecutingAssembly");
+
+      using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
+      {
+        if (stream == null) throw new Exception($"Could not load ManifestResourceStream for {resourceName}");
+
+        using (StreamReader reader = new StreamReader(stream))
+        {
+          return reader.ReadToEnd();
+        }
       }
     }
   }
