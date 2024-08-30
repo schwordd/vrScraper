@@ -34,7 +34,11 @@ jobs:
           MINOR=${VERSION_PARTS[1]}
           PATCH=${VERSION_PARTS[2]}
 
-          PATCH=$((PATCH + 1))
+          # Increment the PATCH version until a unique tag is found
+          while git rev-parse "v$MAJOR.$MINOR.$PATCH" >/dev/null 2>&1; do
+            PATCH=$((PATCH + 1))
+          done
+
           NEXT_VERSION="v$MAJOR.$MINOR.$PATCH"
         fi
 
