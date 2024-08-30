@@ -17,6 +17,7 @@ jobs:
       run: |
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
+        git remote set-url origin https://${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
 
     - name: Determine next version
       id: vars
@@ -79,3 +80,39 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: winx64-binaries
+        path: dist/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest  # Alternativ kann auch 'windows-latest' genutzt werden
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Download binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: winx64-binaries
+        path: ./dist/  # Lade das Artefakt in das `dist` Verzeichnis herunter
+
+    - name: List files in dist (release job)
+      run: |
+        echo "Listing files in dist/ directory after download:"
+        ls -al dist/
+
+    - name: Create ZIP archive
+      run: |
+        ZIP_NAME="release_${{ env.NEXT_VERSION }}_${{ env.ARCHITECTURE }}.zip"
+        echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+        zip -r $ZIP_NAME ./dist/*
+
+    - name: Set up GitHub CLI
+      run: sudo apt-get install -y gh
+
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Verwende PAT_TOKEN statt des standardmäßigen GITHUB_TOKEN
+      run: |
+        echo "Creating GitHub release..."
+        gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}"
