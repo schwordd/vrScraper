@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'deovrScraper/VERSION'  # Ignore commits that only change the VERSION file in deovrScraper
+      - 'deovrScraper/VERSION'  # Ignore commits that only change the VERSION file
 
 jobs:
   release:
@@ -73,6 +73,15 @@ jobs:
 
     - name: Build and Publish the project
       run: dotnet publish -c Release -r win-x64 --self-contained -o ./dist
+
+    - name: Remove appsettings.Development.json
+      run: |
+        if [ -f "./dist/appsettings.Development.json" ]; then
+          rm ./dist/appsettings.Development.json
+          echo "Removed appsettings.Development.json"
+        else
+          echo "No appsettings.Development.json found, skipping removal"
+        fi
 
     - name: Create ZIP archive
       run: |
