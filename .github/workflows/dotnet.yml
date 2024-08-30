@@ -22,7 +22,7 @@ jobs:
       id: vars
       run: |
         echo "Determining the latest tag..."
-        LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null || echo "v0.0.0")
+        LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "v0.0.0")
         echo "Latest tag: $LATEST_TAG"
         
         if [ "$LATEST_TAG" = "v0.0.0" ]; then
@@ -42,7 +42,6 @@ jobs:
         echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
 
     - name: Determine architecture
-      id: arch
       run: |
         echo "Determining architecture..."
         ARCHITECTURE=$(uname -m)
@@ -52,10 +51,9 @@ jobs:
     - name: Create Tag using GitHub API via curl
       run: |
         echo "Creating tag ${{ env.NEXT_VERSION }}..."
-        TAG_RESPONSE=$(curl -X POST -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+        curl -X POST -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
         -d '{"ref":"refs/tags/${{ env.NEXT_VERSION }}","sha":"${{ github.sha }}"}' \
-        https://api.github.com/repos/${{ github.repository }}/git/refs 2>&1)
-        echo "Tag creation response: $TAG_RESPONSE"
+        https://api.github.com/repos/${{ github.repository }}/git/refs
 
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v3
@@ -63,27 +61,15 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: |
-        echo "Restoring dependencies..."
-        dotnet restore
+      run: dotnet restore
 
     - name: Build the project
-      run: |
-        echo "Building the project..."
-        dotnet publish -c Release -r win-x64 --self-contained -o ./output
+      run: dotnet publish -c Release -r win-x64 --self-contained -o ./output
 
     - name: Archive binaries
       run: |
-        echo "Archiving binaries..."
         mkdir -p dist
         cp -r ./output/* dist/
-        echo "Files in dist after copying:"
-        ls -al dist/
-
-    - name: List files in dist (build job)
-      run: |
-        echo "Listing files in dist/ directory after build:"
-        ls -al dist/
 
     - name: Upload binaries as artifact
       uses: actions/upload-artifact@v3
@@ -105,19 +91,10 @@ jobs:
         name: winx64-binaries
         path: ./dist/
 
-    - name: List files in dist (release job)
-      run: |
-        echo "Listing files in dist/ directory after download:"
-        ls -al dist/
-
     - name: Create ZIP archive
       run: |
-        echo "Creating ZIP archive..."
-        ZIP_NAME="release_${NEXT_VERSION}_${ARCHITECTURE}.zip"
-        echo "ZIP_NAME=$ZIP_NAME"
+        ZIP_NAME="release_${{ env.NEXT_VERSION }}_${{ env.ARCHITECTURE }}.zip"
         zip -r $ZIP_NAME ./dist/*
-        echo "Created ZIP file:"
-        ls -al $ZIP_NAME
         echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
     - name: Verify ZIP archive creation
@@ -130,19 +107,12 @@ jobs:
         fi
 
     - name: Set up GitHub CLI
-      run: |
-        echo "Installing GitHub CLI..."
-        sudo apt-get install -y gh
+      run: sudo apt-get install -y gh
 
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
-        echo "Creating GitHub release..."
-        echo "Attempting to release ${{ env.ZIP_NAME }} with title 'Release ${{ env.NEXT_VERSION }}'"
         RELEASE_RESPONSE=$(gh release create ${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release ${{ env.NEXT_VERSION }}" --notes "Automated release for version ${{ env.NEXT_VERSION }}" 2>&1)
         echo "Release creation response: $RELEASE_RESPONSE"
-        if echo "$RELEASE_RESPONSE" | grep -q "HTTP 422"; then
-          echo "Error: Release creation failed due to an existing tag or other issue."
-          exit 1
-        fi
+        if echo "$
