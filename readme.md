@@ -47,3 +47,4 @@ To add a new migration, run:
 
 ```bash
 dotnet ef migrations add [##NAME-ME##] -o ./DB/Migrations
+
