@@ -5,10 +5,11 @@ Follow these steps to set up and run the DeoVrScraper on Windows and VR headsets
 ## 1) Running on Windows
 
 1. **Download and Extract:**
-   - Download the latest release and extract it to a folder.
+   - Download the latest release .zip and extract it to a folder.
 
 2. **Configure Settings:**
    - Edit `appsettings.json` to set the IP and Port.
+   - The IP has to match the IP of your PC
 
 3. **Launch the Application:**
    - Run `deovrScraper.exe`.
@@ -25,10 +26,10 @@ Follow these steps to set up and run the DeoVrScraper on Windows and VR headsets
 ## 2) Running on a VR Headset
 
 1. **Install DeoVr:**
-   - Install the DeoVr App on your VR headset.
+   - Install the DeoVr App on your VR headset from the app store (e.g. Occulus Store)
 
 2. **Connect to DeoVrScraper:**
-   - Open DeoVr and navigate to `http://[IP]:[PORT]`.
+   - Open DeoVr App on your VR device and browse to `http://[IP]:[PORT]`.
 
 ## Updating DeoVrScraper
 
