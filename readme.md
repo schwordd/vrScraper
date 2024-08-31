@@ -11,7 +11,7 @@ Follow these steps to set up and run the DeoVrScraper on Windows and VR headsets
    - Edit `appsettings.json` to set the IP and Port.
 
 3. **Launch the Application:**
-   - Run `deovrscraper.exe`.
+   - Run `deovrScraper.exe`.
 
 4. **Access the Interface:**
    - Open your browser and go to `http://[IP]:[PORT]`.
