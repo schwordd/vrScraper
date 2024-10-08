@@ -30,6 +30,7 @@ Follow these steps to set up and run the DeoVrScraper on Windows and VR headsets
 
 2. **Connect to DeoVrScraper:**
    - Open DeoVr App on your VR device and browse to `http://[IP]:[PORT]`.
+   - If this does show the default webserver view instead of the gallery then try this one `http://[IP]:[PORT]/deovr`
 
 ## Updating DeoVrScraper
 
