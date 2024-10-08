@@ -57,6 +57,42 @@ namespace deovrScraper.Controllers
 
               tabs.Add((t.Name, list2));
             }
+            else if (t.Name == "Random")
+            {
+              var list3 = allItems.OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list3));
+            }
+            else if (t.Name == "Fav")
+            {
+              var list4 = allItems.Where(x => x.Favorite == true).OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list4));
+            }
+            else if (t.Name == "Liked")
+            {
+              var list4 = allItems.Where(x => x.Liked == true).OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list4));
+            }
 
             break;
 
@@ -89,13 +125,32 @@ namespace deovrScraper.Controllers
             foreach (var item in videoWl!)
               matchingItems = matchingItems.Where(a => a.Id != Convert.ToInt64(item));
 
-            var list = matchingItems.OrderByDescending(a => Convert.ToInt32(a.SiteVideoId)).Take(500).Select(item => new
-            {
-              title = item.Title,
-              videoLength = (int)(item.Duration.TotalSeconds),
-              thumbnailUrl = $"{item.Thumbnail}",
-              video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
-            }).ToList<dynamic>();
+            //var list = matchingItems.OrderByDescending(a => Convert.ToInt32(a.SiteVideoId)).Take(500).Select(item => new
+            //{
+            //  title = item.Title,
+            //  videoLength = (int)(item.Duration.TotalSeconds),
+            //  thumbnailUrl = $"{item.Thumbnail}",
+            //  video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+            //}).ToList<dynamic>();
+
+            var k = 16000; // Tuning-Parameter, der angepasst werden kann
+            var averageRating = matchingItems.Average(a => a.Rating); // Berechnung des durchschnittlichen Ratings
+            var averageViews = matchingItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
+
+            var list = matchingItems
+                .OrderByDescending(a =>
+                    ((a.Views!.Value / (double)(a.Views.Value + k)) * a.Rating!.Value) +
+                    ((k / (double)(a.Views.Value + k)) * averageRating)
+                )
+                .Take(500)
+                .Select(item => new
+                {
+                  title = item.Title,
+                  videoLength = (int)(item.Duration.TotalSeconds),
+                  thumbnailUrl = $"{item.Thumbnail}",
+                  video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+                })
+                .ToList<dynamic>();
 
             tabs.Add((t.Name, list));
 
@@ -118,6 +173,8 @@ namespace deovrScraper.Controllers
 
       var foundVideo = await context.VideoItems.Where(v => v.Id == videoId).FirstOrDefaultAsync();
       if (foundVideo == null) return NotFound();
+
+      videoService.SetPlayedVideo(foundVideo);
 
       VideoSource? source = null;
       source = await scraper.GetSource(foundVideo, context);

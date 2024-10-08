@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using deovrScraper.DB;
 
@@ -10,9 +11,11 @@ using deovrScraper.DB;
 namespace deovrScraper.DB.Migrations
 {
     [DbContext(typeof(DeovrScraperContext))]
-    partial class DeovrScraperContextModelSnapshot : ModelSnapshot
+    [Migration("20240924215051_VideoStatistics")]
+    partial class VideoStatistics
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.8");
@@ -141,19 +144,10 @@ namespace deovrScraper.DB.Migrations
                     b.Property<string>("DataVp")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("Disliked")
-                        .HasColumnType("INTEGER");
-
                     b.Property<TimeSpan>("Duration")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("Favorite")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("IsVr")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("Liked")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Link")

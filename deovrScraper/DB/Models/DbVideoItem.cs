@@ -1,4 +1,4 @@
-﻿using deovrScraper.Misc;
+using deovrScraper.Misc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 
@@ -37,6 +37,12 @@ namespace deovrScraper.DB.Models
 
     public bool ParsedDetails { get; set; }
 
+    public long PlayCount { get; set; }
+    public TimeSpan PlayDurationEst { get; set; }
+
+    public bool Liked { get; set; }
+    public bool Disliked { get; set; }
+    public bool Favorite { get; set; }
   }
 
 }

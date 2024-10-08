@@ -1,0 +1,93 @@
+@page "/live"
+
+@using deovrScraper.DB.Models
+@using deovrScraper.Services
+@inject IVideoService VideoService
+@using Blzr.BootstrapSelect
+
+@if (LiveVideo != null)
+{
+    <div class="video-item">
+        <img src="@LiveVideo.Thumbnail" alt="@LiveVideo.Title" />
+        <h3>@LiveVideo.Title</h3>
+
+        <div class="rate-buttons">
+            <button class="@(LiveVideo.Liked || LiveVideo.Favorite ? "btn btn-success btn-block active" : "btn btn-success btn-block")" @onclick="Like">Like</button>
+            <button class="@(LiveVideo.Favorite ? "btn btn-secondary btn-block active" : "btn btn-secondary btn-block")" @onclick="Fav">Fav</button>
+            <button class="@(LiveVideo.Disliked ? "btn btn-danger btn-block active" : "btn btn-danger btn-block")" @onclick="Dislike">Dislike</button>
+        </div>
+    </div>
+}
+
+@code {
+
+    public DbVideoItem? LiveVideo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        this.LiveVideo = this.VideoService.CurrentLiveVideo;
+        this.VideoService.OnLiveVideoChanged += (s, e) =>
+        {
+            this.LiveVideo = e.Video;
+            InvokeAsync(StateHasChanged);
+        };
+    }
+
+    private void Like()
+    {
+        if (this.LiveVideo == null) return;
+        this.LiveVideo = this.VideoService.LikeVideo(this.LiveVideo);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Dislike()
+    {
+        if (this.LiveVideo == null) return;
+        this.LiveVideo = this.VideoService.DislikeVideo(this.LiveVideo);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Fav()
+    {
+        if (this.LiveVideo == null) return;
+        this.LiveVideo = this.VideoService.FavVideo(this.LiveVideo);
+        InvokeAsync(StateHasChanged);
+    }
+}
+
+<style>
+
+    .video-item {
+        position: absolute;
+        right: 25px;
+        bottom: 25px;
+    }
+
+    .rate-buttons {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+        .rate-buttons button.btn {
+            padding-right: 32px;
+        }
+
+            .rate-buttons button.btn:before {
+                content: ' ✓'; /* Fügt einen Haken nach dem Button-Text hinzu */
+                font-size: 1.0rem; /* Größe des Hakens anpassen */
+                color: white; /* Farbe des Hakens */
+                margin-right: 10px; /* Abstand zwischen Button-Text und Haken */
+                vertical-align: middle; /* Vertikale Ausrichtung, damit es sich mit dem Text ausrichtet */
+                opacity: 0;
+            }
+
+            .rate-buttons button.btn.active:before {
+                content: ' ✓'; /* Fügt einen Haken nach dem Button-Text hinzu */
+                font-size: 1.0rem; /* Größe des Hakens anpassen */
+                color: white; /* Farbe des Hakens */
+                margin-right: 10px; /* Abstand zwischen Button-Text und Haken */
+                vertical-align: middle; /* Vertikale Ausrichtung, damit es sich mit dem Text ausrichtet */
+                opacity: 1;
+            }
+</style>
