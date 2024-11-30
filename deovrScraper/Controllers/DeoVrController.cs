@@ -17,7 +17,7 @@ namespace deovrScraper.Controllers
 {
   [Route("[controller]")]
   [ApiController]
-  public class DeoVrController(ILogger<DeoVrController> logger, IEpornerScraper scraper, DeovrScraperContext context, IVideoService videoService, IConfiguration config) : ControllerBase
+  public class DeoVrController(ILogger<DeoVrController> logger, IEpornerScraper scraper, DeovrScraperContext context, IVideoService videoService, IConfiguration config, ISettingService settings) : ControllerBase
   {
     // GET: <DeoVrController>
     [HttpGet]
@@ -26,6 +26,11 @@ namespace deovrScraper.Controllers
     {
       var tabs = new List<(string Name, List<dynamic> List)>();
       var allItems = await videoService.GetVideoItems();
+
+      //global tag blacklist
+      var setting = await settings.GetSetting("TagBlacklist");
+      var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
+      allItems = allItems.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
 
       var tabConfigs = await context.Tabs.Where(t => t.Active).OrderBy(t => t.Order).ToListAsync();
       tabConfigs.ForEach(t =>
@@ -83,7 +88,7 @@ namespace deovrScraper.Controllers
             }
             else if (t.Name == "Liked")
             {
-              var list4 = allItems.Where(x => x.Liked == true).OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new
+              var list5 = allItems.Where(x => x.Liked == true).OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new
               {
                 title = item.Title,
                 videoLength = (int)(item.Duration.TotalSeconds),
@@ -91,7 +96,39 @@ namespace deovrScraper.Controllers
                 video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
               }).ToList<dynamic>();
 
-              tabs.Add((t.Name, list4));
+              tabs.Add((t.Name, list5));
+            }
+            else if (t.Name == "Playtime")
+            {
+              var list6 = allItems.OrderByDescending(a => a.PlayDurationEst).Where(a => a.PlayDurationEst > TimeSpan.FromSeconds(20)).Take(500).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list6));
+            }
+            else if (t.Name == "Unwatched")
+            {
+              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
+              var k1 = 16000; // Tuning-Parameter, der angepasst werden kann
+              var averageRating1 = allItems.Average(a => a.Rating); // Berechnung des durchschnittlichen Ratings
+              var averageViews1 = allItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
+
+              var list7 = allUnwatched.OrderByDescending(a =>
+                      ((a.Views!.Value / (double)(a.Views.Value + k1)) * a.Rating!.Value) +
+                      ((k1 / (double)(a.Views.Value + k1)) * averageRating1)
+                  ).Take(500).Select(item => new
+                  {
+                    title = item.Title,
+                    videoLength = (int)(item.Duration.TotalSeconds),
+                    thumbnailUrl = $"{item.Thumbnail}",
+                    video_url = $"http://{config["Ip"]}:{config["Port"]}/deovr/detail/{item.Id}"
+                  }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list7));
             }
 
             break;
@@ -171,7 +208,8 @@ namespace deovrScraper.Controllers
     {
       logger.LogInformation("Detail query for {videoId}", videoId);
 
-      var foundVideo = await context.VideoItems.Where(v => v.Id == videoId).FirstOrDefaultAsync();
+      //var foundVideo = await context.VideoItems.Where(v => v.Id == videoId).FirstOrDefaultAsync();
+      var foundVideo = await videoService.GetVideoById(videoId);
       if (foundVideo == null) return NotFound();
 
       videoService.SetPlayedVideo(foundVideo);

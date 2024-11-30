@@ -2,6 +2,22 @@ namespace deovrScraper.DB.Seed
 {
   public static class DbDefaults
   {
+    public static void SeedDefaultSettings(DeovrScraperContext db)
+    {
+      var defaultSettings = db.Settings.ToList();
+
+      if (defaultSettings.Exists(a => a.Key == "TagBlacklist") == false)
+      {
+        db.Settings.Add(new Models.DbSetting()
+        {
+          Key = "TagBlacklist",
+          Type = "System.String",
+          Value = "[]"
+        });
+      }
+
+      db.SaveChanges();
+    }
     public static void SeedDefaultTabs(DeovrScraperContext db)
     {
       var defaultTabs = db.Tabs.Where(a => a.Type == "DEFAULT").ToList();
@@ -115,6 +131,50 @@ namespace deovrScraper.DB.Seed
       {
         var tab = db.Tabs.Where(a => a.Name == "Liked").FirstOrDefault();
         tab!.Order = -60;
+      }
+
+      if (defaultTabs.Exists(a => a.Name == "Playtime") == false)
+      {
+        db.Tabs.Add(new Models.DbDeoVrTab()
+        {
+          Type = "DEFAULT",
+          Name = "Playtime",
+          Active = true,
+          Order = -50,
+          ActressBlacklist = "[]",
+          ActressWhitelist = "[]",
+          TagBlacklist = "[]",
+          TagWhitelist = "[]",
+          VideoBlacklist = "[]",
+          VideoWhitelist = "[]"
+        });
+      }
+      else
+      {
+        var tab = db.Tabs.Where(a => a.Name == "Playtime").FirstOrDefault();
+        tab!.Order = -50;
+      }
+
+      if (defaultTabs.Exists(a => a.Name == "Unwatched") == false)
+      {
+        db.Tabs.Add(new Models.DbDeoVrTab()
+        {
+          Type = "DEFAULT",
+          Name = "Unwatched",
+          Active = true,
+          Order = -40,
+          ActressBlacklist = "[]",
+          ActressWhitelist = "[]",
+          TagBlacklist = "[]",
+          TagWhitelist = "[]",
+          VideoBlacklist = "[]",
+          VideoWhitelist = "[]"
+        });
+      }
+      else
+      {
+        var tab = db.Tabs.Where(a => a.Name == "Unwatched").FirstOrDefault();
+        tab!.Order = -40;
       }
 
       db.SaveChanges();

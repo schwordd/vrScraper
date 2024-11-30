@@ -55,10 +55,13 @@ namespace deovrScraper.Services
               nextRecordValid = true;
             else if (count == 0)
             {
+              nextRecordValid = true;
               //unchanged
             }
 
-            logger.LogInformation("Removed {0} from list. Next record is {1}", count, nextRecordValid ? "valid" : "invalid");
+            if (count > 0)
+              logger.LogInformation("Removed {0} from list. Next record is {1}", count, nextRecordValid ? "valid" : "invalid");
+
           }
           Thread.Sleep(2000);
         }
@@ -68,6 +71,11 @@ namespace deovrScraper.Services
     public Task<List<DbVideoItem>> GetVideoItems()
     {
       return Task.FromResult(videoItems);
+    }
+
+    public Task<DbVideoItem> GetVideoById(long id)
+    {
+      return Task.FromResult(videoItems.Where(a => a.Id == id).Single());
     }
 
     public async Task<List<(DbTag Tag, long Count)>> GetTagInfos()
@@ -186,11 +194,11 @@ namespace deovrScraper.Services
     {
       vid.Favorite = !vid.Favorite;
 
-      if(vid.Favorite == true)
+      if (vid.Favorite == true)
       {
         vid.Disliked = false;
         vid.Liked = true;
-      }      
+      }
 
       return UpdateLikeDisklikeFav(vid);
     }
@@ -214,5 +222,7 @@ namespace deovrScraper.Services
 
       return vid;
     }
+
+
   }
 }

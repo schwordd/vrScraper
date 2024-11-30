@@ -9,5 +9,6 @@ namespace deovrScraper.DB
     public DbSet<DbStar> Stars { get; set; }
     public DbSet<DbTag> Tags { get; set; }
     public DbSet<DbDeoVrTab> Tabs { get; set; }
+    public DbSet<DbSetting> Settings { get; set; }
   }
 }

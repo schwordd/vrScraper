@@ -86,6 +86,7 @@ namespace deovrScraper
       builder.Services.AddSingleton<IVideoService, VideoService>();
       builder.Services.AddSingleton<IEpornerScraper, EpornerScraper>();
       builder.Services.AddSingleton<ITabService, TabService>();
+      builder.Services.AddSingleton<ISettingService, SettingService>();
       builder.Services.AddBootstrapSelect();
 
 
@@ -120,6 +121,7 @@ namespace deovrScraper
         context.Database.Migrate();
 
         //seeding
+        DbDefaults.SeedDefaultSettings(context);
         DbDefaults.SeedDefaultTabs(context);
       }
 
@@ -140,6 +142,9 @@ namespace deovrScraper
 
 
       // Retrieve the service from the DI container and call the method
+      var settingService = app.Services.GetRequiredService<ISettingService>();
+      settingService.Initialize();
+
       var videoService = app.Services.GetRequiredService<IVideoService>();
       videoService.Initialize();
 

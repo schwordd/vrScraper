@@ -42,6 +42,19 @@ namespace deovrScraper.DB.Models
       }
     }
 
+    [NotMapped]
+    public string TagWhitelistDisplayString
+    {
+      get
+      {
+        var list = string.IsNullOrEmpty(TagWhitelist) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(TagWhitelist) ?? new List<string>();
+        return string.Join(", ", list);
+      }
+      set
+      {
+      }
+    }
+
     [Required]
     public string ActressWhitelist { get; set; }
 
@@ -53,6 +66,19 @@ namespace deovrScraper.DB.Models
       {
         ActressWhitelist = JsonSerializer.Serialize(value);
         this.IsDirty = true;
+      }
+    }
+
+    [NotMapped]
+    public string ActressWhitelistDisplayString
+    {
+      get
+      {
+        var list = string.IsNullOrEmpty(ActressWhitelist) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(ActressWhitelist) ?? new List<string>();
+        return string.Join(", ", list);
+      }
+      set
+      {
       }
     }
 
@@ -70,6 +96,19 @@ namespace deovrScraper.DB.Models
       }
     }
 
+    [NotMapped]
+    public string TagBlacklistDisplayString
+    {
+      get
+      {
+        var list = string.IsNullOrEmpty(TagBlacklist) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(TagBlacklist) ?? new List<string>();
+        return string.Join(", ", list);
+      }
+      set
+      {
+      }
+    }
+
     [Required]
     public string ActressBlacklist { get; set; }
 
@@ -81,6 +120,19 @@ namespace deovrScraper.DB.Models
       {
         ActressBlacklist = JsonSerializer.Serialize(value);
         this.IsDirty = true;
+      }
+    }
+
+    [NotMapped]
+    public string ActressBlacklistDisplayString
+    {
+      get
+      {
+        var list = string.IsNullOrEmpty(ActressBlacklist) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(ActressBlacklist) ?? new List<string>();
+        return string.Join(", ", list);
+      }
+      set
+      {
       }
     }
 

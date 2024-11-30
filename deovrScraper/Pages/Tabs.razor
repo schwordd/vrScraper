@@ -11,14 +11,28 @@
 <h3>Manage Tabs</h3>
 
 <button class="btn btn-primary btn-sm mb-2" @onclick="AddNewTab">
-    <i class="bi bi-plus-lg"></i> Add New Tab
+    <i class="bi bi-plus-lg"></i> Add new user defined tab
 </button>
 
 <div class="row">
     @if (AvailableTabs != null && AvailableTabs.Any())
     {
+
+        bool lastTabWasDefault = true; // Initialzustand annehmen, dass der erste Tab ein DefaultTab sein könnte
+
+        <h5>Default Tabs</h5>
+
         foreach (var tab in AvailableTabs.OrderBy(t => t.Order))
         {
+            // Check for transition from IsDefaultTab == true to false
+            if (lastTabWasDefault && !IsDefaultTab(tab))
+            {
+                // Insert the div here when the transition occurs
+                <div class="w-100 my-2"></div> <!-- New row starts here -->
+
+                <h5>User Defined Tabs</h5>
+            }
+
             <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
                 <div class="@(IsDefaultTab(tab) ? "card p-2 default" : "card p-2")">
                     <div class="d-flex justify-content-between align-items-center">
@@ -58,68 +72,107 @@
 
                     <div class="form-group mb-1 d-flex justify-content-between align-items-center">
                         <label class="mr-2">Active</label>
-                        <input type="checkbox" class="form-check-input form-check-sm ml-auto" disabled="@IsDefaultTab(tab)" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
+                        <input type="checkbox" class="form-check-input form-check-sm ml-auto" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
                     </div>
-                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                        <label class="mr-2">Order</label>
-                        <input type="number" class="form-control form-control-sm input-sm ml-auto" style="width: 140px;" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" disabled="@IsDefaultTab(tab)" />
-                    </div>
+                    @if (!IsDefaultTab(tab))
+                    {
+                      <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                          <label class="mr-2">Order</label>
+                          <input type="number" min="0" class="form-control form-control-sm input-sm ml-auto" style="width: 140px;" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" disabled="@IsDefaultTab(tab)" />
+                      </div>
+                    }
 
-                    <!-- Tag Whitelist -->
-                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                        <label class="mr-2">Tag WL</label>
-                        <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
-                                         TextField="@((item) => item.Name)"
-                                         ValueField="@((item) => item.Name)"
-                                         ShowSearch="true"
-                                         TType="IEnumerable<string>"
-                                         @bind-Value="tab.TagWhitelistList"
-                                         Disabled="@IsDefaultTab(tab)" />
-                    </div>
+                    @if (tab.IsEditing)
+                    {
+                        <!-- Tag Whitelist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Tag WL</label>
+                            <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                                             TextField="@((item) => item.Name)"
+                                             ValueField="@((item) => item.Name)"
+                                             ShowSearch="true"
+                                             TType="IEnumerable<string>"
+                                             @bind-Value="tab.TagWhitelistList"
+                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
+                        </div>
 
-                    <!-- Tag Blacklist -->
-                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                        <label class="mr-2">Tag BL</label>
-                        <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
-                                         TextField="@((item) => item.Name)"
-                                         ValueField="@((item) => item.Name)"
-                                         ShowSearch="true"
-                                         TType="IEnumerable<string>"
-                                         @bind-Value="tab.TagBlacklistList"
-                                         Disabled="@IsDefaultTab(tab)" />
-                    </div>
+                        <!-- Tag Blacklist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Tag BL</label>
+                            <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                                             TextField="@((item) => item.Name)"
+                                             ValueField="@((item) => item.Name)"
+                                             ShowSearch="true"
+                                             TType="IEnumerable<string>"
+                                             @bind-Value="tab.TagBlacklistList"
+                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
+                        </div>
 
-                    <!-- Actress Whitelist -->
-                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                        <label class="mr-2">Act WL</label>
-                        <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
-                                         TextField="@((item) => item.Name)"
-                                         ValueField="@((item) => item.Name)"
-                                         ShowSearch="true"
-                                         TType="IEnumerable<string>"
-                                         @bind-Value="tab.ActressWhitelistList"
-                                         Disabled="@IsDefaultTab(tab)" />
-                    </div>
+                        <!-- Actress Whitelist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Act WL</label>
+                            <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
+                                             TextField="@((item) => item.Name)"
+                                             ValueField="@((item) => item.Name)"
+                                             ShowSearch="true"
+                                             TType="IEnumerable<string>"
+                                             @bind-Value="tab.ActressWhitelistList"
+                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
+                        </div>
 
-                    <!-- Actress Blacklist -->
-                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                        <label class="mr-2">Act BL</label>
-                        <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
-                                         TextField="@((item) => item.Name)"
-                                         ValueField="@((item) => item.Name)"
-                                         ShowSearch="true"
-                                         TType="IEnumerable<string>"
-                                         @bind-Value="tab.ActressBlacklistList"
-                                         Disabled="@IsDefaultTab(tab)" />
-                    </div>
+                        <!-- Actress Blacklist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Act BL</label>
+                            <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
+                                             TextField="@((item) => item.Name)"
+                                             ValueField="@((item) => item.Name)"
+                                             ShowSearch="true"
+                                             TType="IEnumerable<string>"
+                                             @bind-Value="tab.ActressBlacklistList"
+                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
+                        </div>
+                    }
+                    else if (tab.IsEditing == false && IsDefaultTab(tab) == false)
+                    {
+                        <!-- Tag Whitelist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Tag WL</label>
+                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagWhitelistDisplayString" />
+                        </div>
+
+                        <!-- Tag Blacklist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Tag BL</label>
+                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagBlacklistDisplayString" />
+                        </div>
+
+                        <!-- Actress Whitelist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Act WL</label>
+                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressWhitelistDisplayString" />
+                        </div>
+
+                        <!-- Actress Blacklist -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Act BL</label>
+                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressBlacklistDisplayString" />
+                        </div>
+                    }
+                    else
+                    {
+                        //nope
+                    }
 
                     <div class="d-flex justify-content-end">
-                        <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(IsDefaultTab(tab) || !tab.IsDirty)">
+                        <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
                             <i class="bi bi-floppy"></i>
                         </button>
                     </div>
                 </div>
             </div>
+
+            // Update the lastTabWasDefault value for the next iteration
+            lastTabWasDefault = IsDefaultTab(tab);
         }
     }
     else
@@ -129,6 +182,11 @@
 </div>
 
 @code {
+
+
+    private List<DbTag> AvailableTagsFake { get; set; } = new();
+    private List<DbStar> AvailableActressesFake { get; set; } = new();
+
     private List<DbDeoVrTab> AvailableTabs { get; set; } = new();
     private List<DbTag> AvailableTags { get; set; } = new();
     private List<DbStar> AvailableActresses { get; set; } = new();
@@ -244,5 +302,11 @@
 <style>
     .card.p-2.default {
         opacity: 0.6;
+    }
+
+    .fake-select {
+        width: 220px;
+        background-color: var(--bs-btn-bg);
+        text-align: left;
     }
 </style>

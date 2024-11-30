@@ -8,6 +8,7 @@ namespace deovrScraper.Services
   {
     Task Initialize();
     Task<List<DbVideoItem>> GetVideoItems();
+    Task<DbVideoItem> GetVideoById(long id);
     Task<List<(DbTag Tag, long Count)>> GetTagInfos();
     Task<List<(DbStar Star, long Count)>> GetActorInfos();
 

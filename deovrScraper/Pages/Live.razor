@@ -8,8 +8,33 @@
 @if (LiveVideo != null)
 {
     <div class="video-item">
-        <img src="@LiveVideo.Thumbnail" alt="@LiveVideo.Title" />
-        <h3>@LiveVideo.Title</h3>
+
+        @if (LiveVideo.Tags != null)
+        {
+            <div class="tag-container">
+                @foreach (var tag in LiveVideo.Tags)
+                {
+                    <button type="button" class="btn btn-primary tag-pill">
+                        @tag.Name
+                    </button>
+                }
+            </div>
+        }
+
+        @if (LiveVideo.Stars != null)
+        {
+            <div class="star-container">
+                @foreach (var star in LiveVideo.Stars)
+                {
+                    <button type="button" class="btn btn-primary star-pill">
+                        @star.Name
+                    </button>
+                }
+            </div>
+        }
+
+        <img class="live-image" src="@LiveVideo.Thumbnail" alt="@LiveVideo.Title" />
+        <h3 class="live-title">@LiveVideo.Title</h3>
 
         <div class="rate-buttons">
             <button class="@(LiveVideo.Liked || LiveVideo.Favorite ? "btn btn-success btn-block active" : "btn btn-success btn-block")" @onclick="Like">Like</button>
@@ -61,12 +86,22 @@
         position: absolute;
         right: 25px;
         bottom: 25px;
+        display: flex;
+        flex-direction: column;
+        width: auto;
+        align-items: flex-end;
+    }
+
+    .live-image {
+        max-width: 320px;
     }
 
     .rate-buttons {
         display: flex;
         flex-direction: row;
         justify-content: space-between;
+        min-width: 320px;
+        margin: 8px 0px 8px 0px;
     }
 
         .rate-buttons button.btn {
@@ -90,4 +125,39 @@
                 vertical-align: middle; /* Vertikale Ausrichtung, damit es sich mit dem Text ausrichtet */
                 opacity: 1;
             }
+
+    .tag-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 8px 0px 8px 0px;
+        opacity: 0.5;
+    }
+
+    .tag-pill {
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        display: inline-block;
+        white-space: nowrap;
+    }
+
+
+    .star-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 8px 0px 8px 0px;
+        opacity: 0.5;
+    }
+
+    .star-pill {
+        background-color: #ff7bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        display: inline-block;
+        white-space: nowrap;
+    }
 </style>

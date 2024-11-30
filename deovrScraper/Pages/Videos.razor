@@ -1,8 +1,12 @@
 @page "/videos"
 
+@using Newtonsoft.Json
 @using deovrScraper.DB.Models
 @using deovrScraper.Services
+
 @inject IVideoService VideoService
+@inject ISettingService SettingService
+
 @using Blzr.BootstrapSelect
 
 <div class="filters">
@@ -21,11 +25,32 @@
         <div class="video-item">
             <img src="@item.Thumbnail" alt="@item.Title" />
             <h3>@item.Title</h3>
+            <div class="tag-container">
+                @if (item.Stars != null)
+                {
+                    @foreach (var starInfo in item.Stars)
+                    {
+                        <button type="button" class="btn btn-primary star-pill">
+                            @starInfo.Name
+                        </button>
+                    }
+                }
+
+                @if (item.Tags != null)
+                {
+                    @foreach (var tagInfo in item.Tags)
+                    {
+                        <button type="button" class="btn btn-primary tag-pill">
+                            @tagInfo.Name
+                        </button>
+                    }
+                }
+            </div>
         </div>
     }
 </div>
 
-<div class="d-flex justify-content-between align-items-center">
+<div class="d-flex justify-content-between align-items-center footer">
     <div>
         <button class="btn btn-primary me-2" @onclick="PreviousPage" disabled="@IsFirstPage">
             <i class="bi bi-chevron-left"></i> Previous
@@ -116,6 +141,12 @@
     private async Task LoadVideos()
     {
         VideoItems = await VideoService.GetVideoItems();
+
+        //global tag blacklist
+        var setting = await SettingService.GetSetting("TagBlacklist");
+        var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
+        VideoItems = VideoItems.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
+
         CurrentPage = 1; // Nach dem Laden der Videos zur ersten Seite wechseln
     }
 
@@ -221,4 +252,35 @@
         .pagination select {
             margin-left: 10px;
         }
+
+
+    .tag-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+
+    .tag-pill {
+        background-color: #007bff;
+        color: white;
+        padding: 3px 3px;
+        border-radius: 8px;
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 10px;
+    }
+
+    .star-pill {
+        background-color: #ff7bff;
+        color: white;
+        padding: 3px 3px;
+        border-radius: 8px;
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 10px;
+    }
+
+    .footer{
+        margin-top: 16px;
+    }
 </style>
