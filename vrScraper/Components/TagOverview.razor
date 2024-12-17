@@ -1,0 +1,55 @@
+@using vrScraper.DB.Models
+@using vrScraper.Services
+@inject IVideoService Videos
+
+<h4>
+    Tags
+    <span class="badge rounded-pill text-bg-light">@tagInfos.Count</span>
+</h4>
+@if (tagInfos != null)
+{
+    <div class="tag-container">
+        @foreach (var tagInfo in tagInfos)
+        {
+            <button type="button" class="btn btn-primary tag-pill">
+                @tagInfo.Tag.Name <span class="badge text-bg-secondary">@tagInfo.Count</span>
+            </button>
+        }
+
+    </div>
+}
+else
+{
+    <p>Loading...</p>
+}
+
+@code {
+    private List<(DbTag Tag, long Count)> tagInfos = new List<(DbTag Tag, long Count)>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTagInfos();
+    }
+
+    private async Task LoadTagInfos()
+    {
+        tagInfos = await Videos.GetTagInfos();
+    }
+}
+
+<style>
+    .tag-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .tag-pill {
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        display: inline-block;
+        white-space: nowrap;
+    }
+</style>

@@ -1,0 +1,69 @@
+@page "/settings"
+
+@using System.Text.Json
+@using vrScraper.DB.Models
+@using Blzr.BootstrapSelect
+@using vrScraper.Services
+
+@inject IVideoService VideoService
+@inject ISettingService SettingService
+
+<h3>Settings</h3>
+
+<!-- Tag Blacklist -->
+<div class="form-group settings-form">
+    <label class="mr-2">Global Tag Blacklist</label>
+    <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                     TextField="@((item) => item.Name)"
+                     ValueField="@((item) => item.Name)"
+                     ShowSearch="true"
+                     TType="IEnumerable<string>"
+                     @bind-Value="TagBlacklist" />
+</div>
+
+@code {
+    private List<DbTag> AvailableTags { get; set; } = new();
+    private List<DbSetting> AllSettings { get; set; } = new();
+
+    public IEnumerable<string> TagBlacklist
+    {
+        get
+        {
+            var s = AllSettings.Single(s => s.Key == "TagBlacklist");
+            return JsonSerializer.Deserialize<List<string>>(s.Value)!;
+        }
+
+        set
+        {
+            var s = AllSettings.Single(s => s.Key == "TagBlacklist");
+            s.Value = JsonSerializer.Serialize(value);
+            this.SettingService.UpdateSetting(s);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTags();
+        await LoadSettings();
+    }
+
+    private async Task LoadTags()
+    {
+        AvailableTags = (await VideoService.GetTagInfos()).Select(x => x.Tag).ToList();
+    }
+
+    private async Task LoadSettings()
+    {
+        AllSettings = (await SettingService.GetAllSettings()).ToList();
+    }
+}
+
+<style>
+    .settings-form {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 450px;
+    }
+
+</style>

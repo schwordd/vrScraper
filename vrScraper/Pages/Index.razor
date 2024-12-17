@@ -1,0 +1,21 @@
+@page "/"
+
+@using vrScraper.Components
+@using vrScraper.DB.Models
+@using vrScraper.Services
+@inject IEpornerScraper Scraper
+
+<h3>Home</h3>
+
+
+<div class="mt-3">
+    <ScrapingTools />
+</div>
+
+<div class="mt-3">
+    <TagOverview />
+</div>
+
+<div class="mt-3">
+    <ActorOverview />
+</div>

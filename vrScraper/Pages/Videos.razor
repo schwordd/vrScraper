@@ -1,0 +1,286 @@
+@page "/videos"
+
+@using Newtonsoft.Json
+@using vrScraper.DB.Models
+@using vrScraper.Services
+
+@inject IVideoService VideoService
+@inject ISettingService SettingService
+
+@using Blzr.BootstrapSelect
+
+<div class="filters">
+    <label class="selectlabel" for="tags">Tags:</label>
+    <BootstrapSelect IsMultiple="true" TItem="(DbTag Tag, long Count)" Data="@AvailableTags" TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
+                     ValueField="@((item) => item.Tag.Name)" ShowSearch="true" TType="IEnumerable<string>" @bind-Value="@SelectedTagValues" />
+
+    <label class="selectlabel" for="actresses">Actresses:</label>
+    <BootstrapSelect IsMultiple="true" TItem="(DbStar Star, long Count)" Data="@AvailableActresses" TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
+                     ValueField="@((item) => item.Star.Name)" ShowSearch="true" TType="IEnumerable<string>" @bind-Value="@SelectedActressesValues" />
+</div>
+
+<div class="video-gallery">
+    @foreach (var item in PagedItems)
+    {
+        <div class="video-item">
+            <img src="@item.Thumbnail" alt="@item.Title" />
+            <h3>@item.Title</h3>
+            <div class="tag-container">
+                @if (item.Stars != null)
+                {
+                    @foreach (var starInfo in item.Stars)
+                    {
+                        <button type="button" class="btn btn-primary star-pill">
+                            @starInfo.Name
+                        </button>
+                    }
+                }
+
+                @if (item.Tags != null)
+                {
+                    @foreach (var tagInfo in item.Tags)
+                    {
+                        <button type="button" class="btn btn-primary tag-pill">
+                            @tagInfo.Name
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div class="d-flex justify-content-between align-items-center footer">
+    <div>
+        <button class="btn btn-primary me-2" @onclick="PreviousPage" disabled="@IsFirstPage">
+            <i class="bi bi-chevron-left"></i> Previous
+        </button>
+        <button class="btn btn-primary" @onclick="NextPage" disabled="@IsLastPage">
+            Next <i class="bi bi-chevron-right"></i>
+        </button>
+    </div>
+    <div>
+        <span>Page @CurrentPage of @TotalPages</span>
+    </div>
+    <div>
+        <select class="form-select" @onchange="PageSizeChanged" style="width: auto;">
+            <option value="10" selected="@IsSelected(10)">10</option>
+            <option value="20" selected="@IsSelected(20)">20</option>
+            <option value="30" selected="@IsSelected(30)">30</option>
+            <option value="40" selected="@IsSelected(40)">40</option>
+            <option value="50" selected="@IsSelected(50)">50</option>
+            <option value="100" selected="@IsSelected(100)">100</option>
+        </select>
+    </div>
+</div>
+
+
+@code {
+
+    public List<string> _selectedTags = new List<string>();
+    public IEnumerable<string> SelectedTagValues
+    {
+        get
+        {
+            return this._selectedTags;
+        }
+        set
+        {
+            this._selectedTags = value.ToList();
+            OnTagsChanged(this._selectedTags);
+        }
+    }
+
+    public List<string> _selectedActresses = new List<string>();
+    public IEnumerable<string> SelectedActressesValues
+    {
+        get
+        {
+            return this._selectedActresses;
+        }
+        set
+        {
+            this._selectedActresses = value.ToList();
+            OnActressesChanged(this._selectedActresses);
+        }
+    }
+
+    private int CurrentPage { get; set; } = 1;
+    private int PageSize { get; set; } = 30;
+
+    private List<DbVideoItem> VideoItems = new List<DbVideoItem>();
+    private List<DbVideoItem> FilteredItems => VideoItems
+        .Where(v => (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
+                    (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))))
+        .OrderByDescending(a => Convert.ToInt32(a.SiteVideoId))
+        .ToList();
+
+    private List<DbTag> AllTags { get { return this.AvailableTags.Select(x => x.Tag).ToList(); } }
+    private List<DbStar> AllStars { get { return this.AvailableActresses.Select(x => x.Star).ToList(); } }
+
+    private List<(DbTag Tag, long Count)> AvailableTags { get; set; } = new();
+    private List<(DbStar Star, long Count)> AvailableActresses { get; set; } = new();
+
+    private HashSet<string> SelectedTags { get; set; } = new();
+    private HashSet<string> SelectedActresses { get; set; } = new();
+
+    private List<DbVideoItem> PagedItems => FilteredItems.Skip((CurrentPage - 1) * PageSize).Take(PageSize).ToList();
+
+    private int TotalPages => (int)Math.Ceiling(FilteredItems.Count / (double)PageSize);
+
+    private bool IsFirstPage => CurrentPage == 1;
+    private bool IsLastPage => CurrentPage == TotalPages;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVideos();
+        await LoadTags();
+        await LoadActresses();
+    }
+
+    private async Task LoadVideos()
+    {
+        VideoItems = await VideoService.GetVideoItems();
+
+        //global tag blacklist
+        var setting = await SettingService.GetSetting("TagBlacklist");
+        var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
+        VideoItems = VideoItems.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
+
+        CurrentPage = 1; // Nach dem Laden der Videos zur ersten Seite wechseln
+    }
+
+    private async Task LoadTags()
+    {
+        AvailableTags = await this.VideoService.GetTagInfos();
+    }
+
+    private async Task LoadActresses()
+    {
+        AvailableActresses = await this.VideoService.GetActorInfos();
+    }
+
+    private void OnTagsChanged(IEnumerable<string> e)
+    {
+        SelectedTags = e.ToHashSet();
+        CurrentPage = 1;
+    }
+
+    private void OnActressesChanged(IEnumerable<string> e)
+    {
+        SelectedActresses = e.ToHashSet();
+        CurrentPage = 1;
+    }
+
+    private void NextPage()
+    {
+        if (CurrentPage < TotalPages)
+        {
+            CurrentPage++;
+        }
+    }
+
+    private void PreviousPage()
+    {
+        if (CurrentPage > 1)
+        {
+            CurrentPage--;
+        }
+    }
+
+    private void PageSizeChanged(ChangeEventArgs e)
+    {
+        if (e == null || e.Value == null) return;
+        var val = e.Value.ToString();
+        if (val == null) return;
+
+
+        PageSize = int.Parse(val);
+        CurrentPage = 1; // Zur ersten Seite wechseln, wenn die PageSize geändert wird
+    }
+
+    private bool IsSelected(int size)
+    {
+        return PageSize == size;
+    }
+}
+
+<style>
+
+    .selectlabel {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .filters {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 20px;
+    }
+
+    .video-gallery {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 10px;
+    }
+
+    .video-item {
+        text-align: center;
+    }
+
+        .video-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .video-item h3 {
+            font-size: 14px;
+            margin-top: 5px;
+            color: #333;
+        }
+
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+        .pagination select {
+            margin-left: 10px;
+        }
+
+
+    .tag-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+
+    .tag-pill {
+        background-color: #007bff;
+        color: white;
+        padding: 3px 3px;
+        border-radius: 8px;
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 10px;
+    }
+
+    .star-pill {
+        background-color: #ff7bff;
+        color: white;
+        padding: 3px 3px;
+        border-radius: 8px;
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 10px;
+    }
+
+    .footer{
+        margin-top: 16px;
+    }
+</style>
