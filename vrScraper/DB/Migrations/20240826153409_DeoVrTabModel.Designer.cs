@@ -50,7 +50,7 @@ namespace vrScraper.DB.Migrations
                     b.ToTable("DbTagDbVideoItem");
                 });
 
-            modelBuilder.Entity("vrScraper.DB.Models.DbDeoVrTab", b =>
+            modelBuilder.Entity("vrScraper.DB.Models.DbVrTab", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()

@@ -6,7 +6,7 @@ namespace vrScraper.Services
 {
   public class TabService(ILogger<TabService> logger, IServiceProvider serviceProvider) : ITabService
   {
-    private List<DbDeoVrTab> tabs = new List<DbDeoVrTab>();
+    private List<DbVrTab> tabs = new List<DbVrTab>();
 
     public async Task Initialize()
     {
@@ -16,12 +16,12 @@ namespace vrScraper.Services
       logger.LogInformation("{c} Vr tabs loaded", this.tabs.Count);
     }
 
-    public Task<List<DbDeoVrTab>> GetAllTabs()
+    public Task<List<DbVrTab>> GetAllTabs()
     {
       return Task.FromResult(tabs);
     }
 
-    public async Task AddTab(DbDeoVrTab newTab)
+    public async Task AddTab(DbVrTab newTab)
     {
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
@@ -48,7 +48,7 @@ namespace vrScraper.Services
       }
     }
 
-    public async Task UpdateTab(DbDeoVrTab tab)
+    public async Task UpdateTab(DbVrTab tab)
     {
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();

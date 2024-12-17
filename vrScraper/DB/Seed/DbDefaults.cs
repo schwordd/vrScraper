@@ -25,7 +25,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Latest") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Latest",
@@ -47,7 +47,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Rating") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Rating",
@@ -69,7 +69,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Random") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Random",
@@ -91,7 +91,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Fav") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Fav",
@@ -113,7 +113,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Liked") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Liked",
@@ -135,7 +135,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Playtime") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Playtime",
@@ -157,7 +157,7 @@ namespace vrScraper.DB.Seed
 
       if (defaultTabs.Exists(a => a.Name == "Unwatched") == false)
       {
-        db.Tabs.Add(new Models.DbDeoVrTab()
+        db.Tabs.Add(new Models.DbVrTab()
         {
           Type = "DEFAULT",
           Name = "Unwatched",

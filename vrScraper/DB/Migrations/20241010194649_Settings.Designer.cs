@@ -50,7 +50,7 @@ namespace vrScraper.DB.Migrations
                     b.ToTable("DbTagDbVideoItem");
                 });
 
-            modelBuilder.Entity("vrScraper.DB.Models.DbDeoVrTab", b =>
+            modelBuilder.Entity("vrScraper.DB.Models.DbVrTab", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -241,13 +241,13 @@ namespace vrScraper.DB.Migrations
 
             modelBuilder.Entity("DbTagDbVideoItem", b =>
                 {
-                    b.HasOne("deovrScraper.DB.Models.DbTag", null)
+                    b.HasOne("vrScraper.DB.Models.DbTag", null)
                         .WithMany()
                         .HasForeignKey("TagsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("deovrScraper.DB.Models.DbVideoItem", null)
+                    b.HasOne("vrScraper.DB.Models.DbVideoItem", null)
                         .WithMany()
                         .HasForeignKey("VideosId")
                         .OnDelete(DeleteBehavior.Cascade)

@@ -5,10 +5,10 @@ namespace vrScraper.Services
   public interface ITabService
   {
     Task Initialize();
-    Task<List<DbDeoVrTab>> GetAllTabs();
-    Task AddTab(DbDeoVrTab newTab);
+    Task<List<DbVrTab>> GetAllTabs();
+    Task AddTab(DbVrTab newTab);
     Task DeleteTab(long id);
-    Task UpdateTab(DbDeoVrTab tab);
+    Task UpdateTab(DbVrTab tab);
 
   }
 }

@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'deovrScraper/VERSION'  # Ignore commits that only change the VERSION file
+      - 'vrScraper/VERSION'  # Ignore commits that only change the VERSION file
 
 jobs:
   release:
@@ -56,13 +56,13 @@ jobs:
     - name: Update version file
       run: |
         echo "Updating version file..."
-        echo "$NEXT_VERSION" > deovrScraper/VERSION
+        echo "$NEXT_VERSION" > vrScraper/VERSION
 
     - name: Commit updated version file
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Use PAT instead of the default GITHUB_TOKEN
       run: |
-        git add deovrScraper/VERSION
+        git add vrScraper/VERSION
         git commit -m "Update version to $NEXT_VERSION"
         git push origin master
 
@@ -86,7 +86,7 @@ jobs:
     - name: Create ZIP archive
       run: |
         ARCHITECTURE="win-x64"
-        ZIP_NAME="deovrScraper_${ARCHITECTURE}_v${{ env.NEXT_VERSION }}.zip"
+        ZIP_NAME="vrScraper_${ARCHITECTURE}_v${{ env.NEXT_VERSION }}.zip"
         cd dist
         zip -r ../$ZIP_NAME ./*
         cd ..

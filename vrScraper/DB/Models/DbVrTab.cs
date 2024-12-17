@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace vrScraper.DB.Models
 {
-  public class DbDeoVrTab
+  public class DbVrTab
   {
     [NotMapped]
     public bool IsDirty { get; set; } = false;

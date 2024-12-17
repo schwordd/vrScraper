@@ -8,7 +8,7 @@ namespace vrScraper.DB
     public DbSet<DbVideoItem> VideoItems { get; set; }
     public DbSet<DbStar> Stars { get; set; }
     public DbSet<DbTag> Tags { get; set; }
-    public DbSet<DbDeoVrTab> Tabs { get; set; }
+    public DbSet<DbVrTab> Tabs { get; set; }
     public DbSet<DbSetting> Settings { get; set; }
   }
 }
