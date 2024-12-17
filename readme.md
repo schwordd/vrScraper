@@ -2,6 +2,9 @@
 
 Follow these steps to set up and run the VrScraper on Windows and VR headsets.
 
+## IMPORTANT UDPATE NOTICE!
+   - When updating from a version < 1.0.15 rename your database file from `deovrscraper.db` to `vrscraper.db`
+
 ## 1) Running on Windows
 
 1. **Download and Extract:**
