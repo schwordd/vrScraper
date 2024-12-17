@@ -52,7 +52,7 @@ namespace deovrScraper.Controllers
             }
             else if (t.Name == "Rating")
             {
-              var list2 = allItems.OrderByDescending(v => v.Rating).ThenByDescending(v => v.Views).Take(500).Select(item => new
+              var list2 = allItems.OrderByDescending(v => v.SiteRating).ThenByDescending(v => v.Views).Take(500).Select(item => new
               {
                 title = item.Title,
                 videoLength = (int)(item.Duration.TotalSeconds),
@@ -114,11 +114,11 @@ namespace deovrScraper.Controllers
             {
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
               var k1 = 16000; // Tuning-Parameter, der angepasst werden kann
-              var averageRating1 = allItems.Average(a => a.Rating); // Berechnung des durchschnittlichen Ratings
+              var averageRating1 = allItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
               var averageViews1 = allItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
 
               var list7 = allUnwatched.OrderByDescending(a =>
-                      ((a.Views!.Value / (double)(a.Views.Value + k1)) * a.Rating!.Value) +
+                      ((a.Views!.Value / (double)(a.Views.Value + k1)) * a.SiteRating!.Value) +
                       ((k1 / (double)(a.Views.Value + k1)) * averageRating1)
                   ).Take(500).Select(item => new
                   {
@@ -171,12 +171,12 @@ namespace deovrScraper.Controllers
             //}).ToList<dynamic>();
 
             var k = 16000; // Tuning-Parameter, der angepasst werden kann
-            var averageRating = matchingItems.Average(a => a.Rating); // Berechnung des durchschnittlichen Ratings
+            var averageRating = matchingItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
             var averageViews = matchingItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
 
             var list = matchingItems
                 .OrderByDescending(a =>
-                    ((a.Views!.Value / (double)(a.Views.Value + k)) * a.Rating!.Value) +
+                    ((a.Views!.Value / (double)(a.Views.Value + k)) * a.SiteRating!.Value) +
                     ((k / (double)(a.Views.Value + k)) * averageRating)
                 )
                 .Take(500)

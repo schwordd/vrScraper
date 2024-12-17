@@ -1,10 +1,6 @@
 using deovrScraper.DB.Models;
 using deovrScraper.DB;
-using deovrScraper.Services.ParsingModels;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
-using deovrScraper.Pages;
-using System;
 
 namespace deovrScraper.Services
 {

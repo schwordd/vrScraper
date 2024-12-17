@@ -22,7 +22,7 @@ namespace deovrScraper.DB.Models
     public string Title { get; set; }
 
     public TimeSpan Duration { get; set; }
-    public double? Rating { get; set; }
+    public double? SiteRating { get; set; }
     public long? Views { get; set; }
     public string? Uploader { get; set; }
     public string? Link { get; set; }
@@ -30,6 +30,8 @@ namespace deovrScraper.DB.Models
     public string? Quality { get; set; }
     public bool IsVr { get; set; }
     public string? DataVp { get; set; }
+
+    public DateTime? AddedUTC { get; set; }
 
     public virtual List<DbTag> Tags { get; set; }
 
@@ -43,6 +45,7 @@ namespace deovrScraper.DB.Models
     public bool Liked { get; set; }
     public bool Disliked { get; set; }
     public bool Favorite { get; set; }
+    public double? LocalRating { get; set; }
   }
 
 }

@@ -1,9 +1,6 @@
 using deovrScraper.DB;
 using deovrScraper.DB.Models;
-using deovrScraper.Services.ParsingModels;
 using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
-using System;
 
 namespace deovrScraper.Services
 {

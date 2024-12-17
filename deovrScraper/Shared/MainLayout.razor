@@ -3,13 +3,16 @@
 <div class="d-flex">
 
     <div class="sidebar bg-light p-3" style="min-width: 200px; min-height: 100vh; display: flex;    flex-direction: column;    align-items: center;">
+
         <img class="logo mb-4" src="logo.png" />
 
         <NavMenu />
+
+        <a class="version" href="https://github.com/schwordd/deovrScraper" target="_blank"><span>@Program.GetVersion()</span></a>
     </div>
 
-    <div class="main flex-grow-1" style="min-height: 100vh;">
-        <div class="content px-4 py-4">
+    <div class="main flex-grow-1" style="height: 100vh; overflow:hidden;">
+        <div class="content px-4">
             @Body
         </div>
     </div>
@@ -31,7 +34,27 @@
         overflow-y: auto;
     }
 
+    .title {
+        margin-top: 16px;
+    }
+
     .logo {
         max-width: 128px;
+    }
+
+    .content {
+        overflow-y: auto;
+        padding-top: 20px;
+    }
+
+    .version {
+        position: absolute;
+        bottom: 8px;
+        font-size: 16px;
+        opacity: 0.2;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        font-weight: bold;
     }
 </style>

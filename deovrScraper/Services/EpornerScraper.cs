@@ -1,15 +1,10 @@
-using System.Xml.Linq;
-using System;
 using HtmlAgilityPack;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System.Text;
 using RestSharp;
 using deovrScraper.DB;
 using deovrScraper.DB.Models;
 using Microsoft.EntityFrameworkCore;
 using deovrScraper.Services.ParsingModels;
-using System.Net;
 
 namespace deovrScraper.Services
 {
@@ -104,12 +99,13 @@ namespace deovrScraper.Services
             IsVr = item.IsVr,
             Link = item.Link,
             Quality = item.Quality,
-            Rating = item.Rating,
+            SiteRating = item.Rating,
             Thumbnail = item.Thumbnail,
             Title = item.Title ?? string.Empty,
             Uploader = item.Uploader,
             Views = item.Views,
-            ParsedDetails = false
+            ParsedDetails = false,
+            AddedUTC = DateTime.UtcNow
           };
 
           context.VideoItems.Add(dbVideoItem);
@@ -139,17 +135,6 @@ namespace deovrScraper.Services
         logger.LogError(ex, "Error while scraping.");
       }
     }
-
-    /*
-    private async Task GetThumb(string thumbUrl, string thumbPath)
-    {
-      using (HttpClient client = new HttpClient())
-      {
-        byte[] imageBytes = await client.GetByteArrayAsync(thumbUrl);
-        await File.WriteAllBytesAsync(thumbPath, imageBytes);
-      }
-    }
-    */
 
     private async Task<List<VideoItem>> ScrapeSinglePage(string url)
     {

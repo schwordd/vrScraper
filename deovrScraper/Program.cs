@@ -161,7 +161,7 @@ namespace deovrScraper
       app.Run();
     }
 
-    private static Serilog.ILogger SetupDefaultLogger()
+    private static Serilog.Core.Logger SetupDefaultLogger()
     {
       var template = "[{Timestamp:yyyy.MM.dd HH:mm:ss.fff}] {Level:u3} {SourceContext}: {Message:lj}{NewLine}{Exception}";
 
@@ -222,15 +222,12 @@ namespace deovrScraper
 
       if (assembly == null) throw new Exception("Could not determine ExecutingAssembly");
 
-      using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
-      {
-        if (stream == null) throw new Exception($"Could not load ManifestResourceStream for {resourceName}");
+      using Stream? stream = assembly.GetManifestResourceStream(resourceName);
 
-        using (StreamReader reader = new StreamReader(stream))
-        {
-          return reader.ReadToEnd();
-        }
-      }
+      if (stream == null) throw new Exception($"Could not load ManifestResourceStream for {resourceName}");
+
+      using StreamReader reader = new(stream);
+      return reader.ReadToEnd();
     }
   }
 }

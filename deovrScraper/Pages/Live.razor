@@ -50,6 +50,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await Task.FromResult(0);
+
         this.LiveVideo = this.VideoService.CurrentLiveVideo;
         this.VideoService.OnLiveVideoChanged += (s, e) =>
         {
