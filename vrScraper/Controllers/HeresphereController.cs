@@ -164,11 +164,15 @@ namespace vrScraper.Controllers
 
       if (model.NeedsMediaSource)
       {
-        videoService.SetPlayedVideo(foundVideo);
         source = await scraper.GetSource(foundVideo, context);
 
         if (source == null)
+        {
+          logger.LogInformation("Unable to get source for {videoId}", videoId);
           return NotFound();
+        }          
+
+        videoService.SetPlayedVideo(foundVideo);
       }
 
       if (model.IsFavorite.HasValue)

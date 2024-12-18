@@ -138,6 +138,10 @@ namespace vrScraper.Services
               currentVideo.PlayCount += 1;
               context.SaveChanges();
 
+              var memVid = this.GetVideoById(currentVideo.Id).GetAwaiter().GetResult();
+              memVid.PlayCount = currentVideo.PlayCount;
+              memVid.PlayDurationEst = currentVideo.PlayDurationEst;
+
               logger.LogInformation("Added PlayCount {0} and PlayDuration {1} for video {2}", currentVideo.PlayCount, currentVideo.PlayDurationEst, currentVideo.Id);
             }
           }
