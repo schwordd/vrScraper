@@ -7,24 +7,27 @@
 
 ### Windows
 1. **Download & Extract:**  
-   Download the latest release (.zip) and extract it.
-2. **Configure Port:**  
+   Download the latest [Release](https://github.com/schwordd/vrScraper/releases) (.zip) and extract it.
+2. **(Optional) Configure Port:**  
    Edit `appsettings.json` to set the `Port`.
 3. **Start Service:**  
    Run `vrScraper.exe`.
 4. **Access Web UI:**  
    Open `http://[YOUR-IP]:[PORT]` in your browser.
 5. **Scrape & Refresh:**  
-   Start the scraper and reload the page as needed.
+   Start the scraper and scrape a few pages, reload the page as needed when finished.
 6. **Keep Running:**  
-   Leave the application open for continuous service.
+   Leave the application open.
 
 ### Linux
 **(TODO)**
 
+### Docker
+**(TODO)**
+
 ## 2. Connecting a VR Headset
 
-### Recommended: HereSphere
+### HereSphere (Recommended)
 1. **Install HereSphere:**  
    Install from your VR store (e.g., Meta Store).
 2. **Connect to VrScraper:**  
