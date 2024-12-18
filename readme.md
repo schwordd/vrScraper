@@ -9,7 +9,7 @@
 1. **Download & Extract:**  
    Download the latest [Release](https://github.com/schwordd/vrScraper/releases) (.zip) and extract it.
 2. **(Optional) Configure Port:**  
-   Edit `appsettings.json` to set the `Port`.
+   Edit `appsettings.json` to set a `Port` differrent than 5001 (default).
 3. **Start Service:**  
    Run `vrScraper.exe`.
 4. **Access Web UI:**  
