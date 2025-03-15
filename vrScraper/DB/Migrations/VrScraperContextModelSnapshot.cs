@@ -119,6 +119,9 @@ namespace vrScraper.DB.Migrations
                     b.Property<TimeSpan>("Duration")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ErrorCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("Favorite")
                         .HasColumnType("INTEGER");
 

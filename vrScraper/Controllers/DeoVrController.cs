@@ -131,6 +131,19 @@ namespace vrScraper.Controllers
 
               tabs.Add((t.Name, list7));
             }
+            else if (t.Name == "Latest Unwatched")
+            {
+              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
+              var list8 = allUnwatched.OrderByDescending(v => Convert.ToInt32(v.SiteVideoId)).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"{BaseUrl}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list8));
+            }
 
             break;
 

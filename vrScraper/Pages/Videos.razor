@@ -1,57 +1,32 @@
 @page "/videos"
 
 @using Newtonsoft.Json
+@using vrScraper.DB
 @using vrScraper.DB.Models
 @using vrScraper.Services
 
 @inject IVideoService VideoService
 @inject ISettingService SettingService
+@inject IEpornerScraper scraper
+@inject VrScraperContext context
 
 @using Blzr.BootstrapSelect
 
-<div class="filters">
-    <label class="selectlabel" for="tags">Tags:</label>
-    <BootstrapSelect IsMultiple="true" TItem="(DbTag Tag, long Count)" Data="@AvailableTags" TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
-                     ValueField="@((item) => item.Tag.Name)" ShowSearch="true" TType="IEnumerable<string>" @bind-Value="@SelectedTagValues" />
+<div style="min-height: 75vh;">
 
-    <label class="selectlabel" for="actresses">Actresses:</label>
-    <BootstrapSelect IsMultiple="true" TItem="(DbStar Star, long Count)" Data="@AvailableActresses" TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
-                     ValueField="@((item) => item.Star.Name)" ShowSearch="true" TType="IEnumerable<string>" @bind-Value="@SelectedActressesValues" />
-</div>
+    <div class="filters">
+        <label class="selectlabel" for="tags">Total items: @TotalItems</label>
 
-<div class="video-gallery">
-    @foreach (var item in PagedItems)
-    {
-        <div class="video-item">
-            <img src="@item.Thumbnail" alt="@item.Title" />
-            <h3>@item.Title</h3>
-            <div class="tag-container">
-                @if (item.Stars != null)
-                {
-                    @foreach (var starInfo in item.Stars)
-                    {
-                        <button type="button" class="btn btn-primary star-pill">
-                            @starInfo.Name
-                        </button>
-                    }
-                }
+        <label class="selectlabel" for="tags">Tags:</label>
+        <BootstrapSelect IsMultiple="true" TItem="(DbTag Tag, long Count)" Data="@AvailableTags" TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
+                         ValueField="@((item) => item.Tag.Name)" ShowSearch="true" TType="IEnumerable<string>" @bind-Value="@SelectedTagValues" />
 
-                @if (item.Tags != null)
-                {
-                    @foreach (var tagInfo in item.Tags)
-                    {
-                        <button type="button" class="btn btn-primary tag-pill">
-                            @tagInfo.Name
-                        </button>
-                    }
-                }
-            </div>
-        </div>
-    }
-</div>
+        <label class="selectlabel" for="actresses">Actresses:</label>
+        <BootstrapSelect IsMultiple="true" TItem="(DbStar Star, long Count)" Data="@AvailableActresses" TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
+                         ValueField="@((item) => item.Star.Name)" ShowSearch="true" TType="IEnumerable<string>" @bind-Value="@SelectedActressesValues" />
+    </div>
 
-<div class="d-flex justify-content-between align-items-center footer">
-    <div>
+    <div class="pager">
         <button class="btn btn-primary me-2" @onclick="PreviousPage" disabled="@IsFirstPage">
             <i class="bi bi-chevron-left"></i> Previous
         </button>
@@ -62,18 +37,65 @@
     <div>
         <span>Page @CurrentPage of @TotalPages</span>
     </div>
-    <div>
-        <select class="form-select" @onchange="PageSizeChanged" style="width: auto;">
-            <option value="10" selected="@IsSelected(10)">10</option>
-            <option value="20" selected="@IsSelected(20)">20</option>
-            <option value="30" selected="@IsSelected(30)">30</option>
-            <option value="40" selected="@IsSelected(40)">40</option>
-            <option value="50" selected="@IsSelected(50)">50</option>
-            <option value="100" selected="@IsSelected(100)">100</option>
-        </select>
-    </div>
-</div>
 
+    <div class="video-gallery">
+        @foreach (var item in PagedItems)
+        {
+            <div class="video-item">
+@*                 <button class="btn btn-primary" @onclick="() => GetSource(item)">LoadSource</button>
+ *@
+                <img src="@item.Thumbnail" alt="@item.Title" />
+                <h3>@item.Title</h3>
+                <div class="tag-container">
+                    @if (item.Stars != null)
+                    {
+                        @foreach (var starInfo in item.Stars)
+                        {
+                            <button type="button" class="btn btn-primary star-pill">
+                                @starInfo.Name
+                            </button>
+                        }
+                    }
+
+                    @if (item.Tags != null)
+                    {
+                        @foreach (var tagInfo in item.Tags)
+                        {
+                            <button type="button" class="btn btn-primary tag-pill">
+                                @tagInfo.Name
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center footer">
+        <div class="pager">
+            <button class="btn btn-primary me-2" @onclick="PreviousPage" disabled="@IsFirstPage">
+                <i class="bi bi-chevron-left"></i> Previous
+            </button>
+            <button class="btn btn-primary" @onclick="NextPage" disabled="@IsLastPage">
+                Next <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+        <div>
+            <span>Page @CurrentPage of @TotalPages</span>
+        </div>
+        <div>
+            <select class="form-select" @onchange="PageSizeChanged" style="width: auto;">
+                <option value="10" selected="@IsSelected(10)">10</option>
+                <option value="20" selected="@IsSelected(20)">20</option>
+                <option value="30" selected="@IsSelected(30)">30</option>
+                <option value="40" selected="@IsSelected(40)">40</option>
+                <option value="50" selected="@IsSelected(50)">50</option>
+                <option value="100" selected="@IsSelected(100)">100</option>
+            </select>
+        </div>
+    </div>
+
+</div>
 
 @code {
 
@@ -105,6 +127,17 @@
         }
     }
 
+    public async void GetSource(DbVideoItem item)
+    {
+        var foundVideo = await VideoService.GetVideoById(item.Id);
+        if (foundVideo == null) return;
+
+        VideoSource? source = null;
+        source = await scraper.GetSource(foundVideo, context);
+    }
+
+    public int TotalItems { get { return this.FilteredItems.Count; } }
+
     private int CurrentPage { get; set; } = 1;
     private int PageSize { get; set; } = 30;
 
@@ -112,7 +145,7 @@
     private List<DbVideoItem> FilteredItems => VideoItems
         .Where(v => (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
                     (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))))
-        .OrderByDescending(a => Convert.ToInt32(a.SiteVideoId))
+        .OrderByDescending(a => a.Id)
         .ToList();
 
     private List<DbTag> AllTags { get { return this.AvailableTags.Select(x => x.Tag).ToList(); } }
@@ -280,7 +313,7 @@
         font-size: 10px;
     }
 
-    .footer{
+    .footer {
         margin-top: 16px;
     }
 </style>

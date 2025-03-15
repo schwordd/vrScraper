@@ -177,6 +177,28 @@ namespace vrScraper.DB.Seed
         tab!.Order = -40;
       }
 
+      if (defaultTabs.Exists(a => a.Name == "Latest Unwatched") == false)
+      {
+        db.Tabs.Add(new Models.DbVrTab()
+        {
+          Type = "DEFAULT",
+          Name = "Latest Unwatched",
+          Active = true,
+          Order = -30,
+          ActressBlacklist = "[]",
+          ActressWhitelist = "[]",
+          TagBlacklist = "[]",
+          TagWhitelist = "[]",
+          VideoBlacklist = "[]",
+          VideoWhitelist = "[]"
+        });
+      }
+      else
+      {
+        var tab = db.Tabs.Where(a => a.Name == "Latest Unwatched").FirstOrDefault();
+        tab!.Order = -30;
+      }
+
       db.SaveChanges();
     }
   }

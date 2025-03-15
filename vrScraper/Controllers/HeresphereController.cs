@@ -81,6 +81,12 @@ namespace vrScraper.Controllers
 
               tabs.Add((t.Name, list7));
             }
+            else if (t.Name == "Latest Unwatched")
+            {
+              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
+              var list8 = allUnwatched.OrderByDescending(v => Convert.ToInt32(v.SiteVideoId)).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
+              tabs.Add((t.Name, list8));
+            }
 
             break;
 

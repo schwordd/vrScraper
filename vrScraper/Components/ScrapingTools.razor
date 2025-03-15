@@ -17,6 +17,14 @@
     <div class="pe-2">
         <button class="btn btn-primary" @onclick="Scrape">Scrape</button>
     </div>
+
+    <div class="pe-2">
+        <button class="btn btn-primary" @onclick="Rescrape">Rescrape</button>
+    </div>
+
+    <div class="pe-2">
+        <button class="btn btn-primary" @onclick="RemoveDead">RemoveDead</button>
+    </div>
 </div>
 
 @if (scrapingStatus != string.Empty)
@@ -40,6 +48,18 @@
     private void Scrape(MouseEventArgs e)
     {
         this.Scraper.StartScraping(startPage, count);
+        scrapingStatus = "Starting...";
+        StartStatusUpdates();
+    }
+
+    private void Rescrape(MouseEventArgs e)
+    {
+        this.Scraper.ReparseInformations();
+    }
+
+    private void RemoveDead(MouseEventArgs e)
+    {
+        this.Scraper.StartRemoveByDeadPicture();
         scrapingStatus = "Starting...";
         StartStatusUpdates();
     }

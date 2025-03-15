@@ -8,10 +8,12 @@ namespace vrScraper.Services
   {
     void Initialize();
 
-    Task<(VideoPlayerSettings PlayerSettings, List<string> Tags, List<string> Stars)> GetDetails(DbVideoItem item);
+    Task<(VideoPlayerSettings PlayerSettings, List<string> Tags, List<string> Stars, AdditionalVideoDetails VideoDetails)> GetDetails(DbVideoItem item);
     Task<Quality?> GetBestVideoQuality(DbVideoItem item, VideoPlayerSettings settings);
     Task<VideoSource?> GetSource(DbVideoItem item, VrScraperContext context);
     Task ParseMissingInformations();
+    Task ReparseInformations();
+    void StartRemoveByDeadPicture();
     void StartScraping(int start, int count);
     bool ScrapingInProgress { get; }
     string ScrapingStatus { get; }

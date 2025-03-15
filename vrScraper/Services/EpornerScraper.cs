@@ -5,6 +5,10 @@ using vrScraper.DB;
 using vrScraper.DB.Models;
 using Microsoft.EntityFrameworkCore;
 using vrScraper.Services.ParsingModels;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using System.Globalization;
 
 namespace vrScraper.Services
 {
@@ -16,6 +20,7 @@ namespace vrScraper.Services
 
     private bool _scrapingInprogress = false;
     private string _scrapingStatus = string.Empty;
+    private static readonly string[] separator = ["\r\n", "\r", "\n"];
 
     public void Initialize()
     {
@@ -31,6 +36,20 @@ namespace vrScraper.Services
       Task.Run(async () =>
       {
         await this.ScrapeEporner("https://www.eporner.com/cat/vr-porn", start, count);
+        this._scrapingInprogress = false;
+        this._scrapingStatus = string.Empty;
+      });
+    }
+
+    public void StartRemoveByDeadPicture()
+    {
+      if (this._scrapingInprogress) return;
+
+      this._scrapingInprogress = true;
+
+      Task.Run(async () =>
+      {
+        await this.RemoveDeadByPicture();
         this._scrapingInprogress = false;
         this._scrapingStatus = string.Empty;
       });
@@ -147,17 +166,54 @@ namespace vrScraper.Services
       return videoItems;
     }
 
-    public async Task<(VideoPlayerSettings PlayerSettings, List<string> Tags, List<string> Stars)> GetDetails(DbVideoItem item)
+    public async Task<(VideoPlayerSettings PlayerSettings, List<string> Tags, List<string> Stars, AdditionalVideoDetails VideoDetails)> GetDetails(DbVideoItem item)
     {
       var web = new HtmlWeb();
       var doc = await web.LoadFromWebAsync(item.Link);
 
-      var lines = doc.ParsedText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList(); ;
+      var lines = doc.ParsedText.Split(separator, StringSplitOptions.None).ToList(); ;
       var videoInfos = lines.Where(a => a.StartsWith("EP.video.player.")).ToList();
       var settings = ParseVideoPlayerSettings(videoInfos);
 
       var pStars = doc.DocumentNode.SelectNodes("//li[contains(@class, 'vit-pornstar')]");
       var categories = doc.DocumentNode.SelectNodes("//li[contains(@class, 'vit-category')]");
+      var vitTag = doc.DocumentNode.SelectNodes("//li[contains(@class, 'vit-tag')]");
+      var jsonNodes = doc.DocumentNode.SelectNodes("//script[@type='application/ld+json']");
+
+      var videoDetails = new AdditionalVideoDetails();
+
+      if (jsonNodes != null)
+      {
+        foreach (var node in jsonNodes)
+        {
+          // JSON parsen
+          var jsonObject = JsonDocument.Parse(node.InnerText);
+
+          // Prüfen, ob @type = "VideoObject" existiert
+          if (jsonObject.RootElement.TryGetProperty("@type", out var typeProperty) && typeProperty.GetString() == "VideoObject")
+          {
+            jsonObject.RootElement.TryGetProperty("name", out var nameCandidate);
+            videoDetails.Name = nameCandidate.GetString();
+
+            jsonObject.RootElement.TryGetProperty("bitrate", out var bitrateCandidate);
+            videoDetails.Bitrate = bitrateCandidate.GetString();
+
+            jsonObject.RootElement.TryGetProperty("width", out var widthCandidate);
+            videoDetails.Width = Convert.ToUInt16(widthCandidate.GetString());
+
+            jsonObject.RootElement.TryGetProperty("height", out var heightCandidate);
+            videoDetails.Height = Convert.ToUInt16(heightCandidate.GetString());
+
+            jsonObject.RootElement.TryGetProperty("description", out var descriptionCandidate);
+            videoDetails.Description = descriptionCandidate.GetString();
+
+            jsonObject.RootElement.TryGetProperty("uploadDate", out var uploadDateCandidate);
+
+            if (uploadDateCandidate.GetString() != null)
+              videoDetails.UploadDate = DateTime.ParseExact(uploadDateCandidate.GetString()!, "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+          }
+        }
+      }
 
       var stars = new List<string>();
       var tags = new List<string>();
@@ -178,7 +234,7 @@ namespace vrScraper.Services
         }
       }
 
-      return (settings, tags, stars);
+      return (settings, tags, stars, videoDetails);
     }
 
     public async Task<Quality?> GetBestVideoQuality(DbVideoItem item, VideoPlayerSettings settings)
@@ -211,10 +267,27 @@ namespace vrScraper.Services
 
     public async Task<VideoSource?> GetSource(DbVideoItem video, VrScraperContext context)
     {
-      var details = await this.GetDetails(video);
-      var quality = await this.GetBestVideoQuality(video, details.PlayerSettings);
+      var (PlayerSettings, Tags, Stars, VideoDetails) = await this.GetDetails(video);
+      var quality = await this.GetBestVideoQuality(video, PlayerSettings);
 
-      if (quality == null) return null;
+      if (quality == null)
+      {
+        var dbItem = await context.VideoItems.Where(v => v.Id == video.Id).FirstAsync();
+
+        if (dbItem.ErrorCount == null)
+        {
+          dbItem.ErrorCount = 1;
+        }
+        else
+        {
+          dbItem.ErrorCount++;
+        }
+
+        await context.SaveChangesAsync();
+        video.ErrorCount = dbItem.ErrorCount;
+
+        return null;
+      }
 
       var source = new VideoSource
       {
@@ -232,9 +305,9 @@ namespace vrScraper.Services
 
     public async Task ParseDetails(DbVideoItem video, VrScraperContext context)
     {
-      var details = await this.GetDetails(video);
+      var (PlayerSettings, Tags, Stars, VideoDetails) = await this.GetDetails(video);
 
-      foreach (var starParsed in details.Stars.Distinct().ToList())
+      foreach (var starParsed in Stars.Distinct().ToList())
       {
         var star = await context.Stars.Where(s => s.Name == starParsed).FirstOrDefaultAsync();
         if (star == null)
@@ -244,13 +317,20 @@ namespace vrScraper.Services
           star.Videos = [];
         }
 
-        if (star.Videos == null)
-          star.Videos = [];
+        star.Videos ??= [];
 
-        star.Videos.Add(video);
+        if (star.Videos.Any(s => s.Id == video.Id))
+        {
+          //logger.LogInformation("Star {s} already exists for video {v}", star.Name, video.Id);
+        }
+        else
+        {
+          star.Videos.Add(video);
+          logger.LogInformation("Star {s} added for video {v}", star.Name, video.Id);
+        }
       }
 
-      foreach (var tagParsed in details.Tags.Distinct().ToList())
+      foreach (var tagParsed in Tags.Distinct().ToList())
       {
         var tag = await context.Tags.Where(s => s.Name == tagParsed).FirstOrDefaultAsync();
         if (tag == null)
@@ -259,10 +339,25 @@ namespace vrScraper.Services
           context.Tags.Add(tag);
         }
 
-        if (tag.Videos == null)
-          tag.Videos = [];
+        tag.Videos ??= [];
 
-        tag.Videos.Add(video);
+        if (tag.Videos.Any(s => s.Id == video.Id))
+        {
+          //logger.LogInformation("Tag {t} already exists for video {v}", tag.Name, video.Id);
+        }
+        else
+        {
+          tag.Videos.Add(video);
+          logger.LogInformation("Tag {s} added for video {v}", tag.Name, video.Id);
+        }
+      }
+
+      if (string.IsNullOrWhiteSpace(VideoDetails.Name) == false && VideoDetails.Name != video.Title)
+      {
+        var old = video.Title;
+        video.Title = VideoDetails.Name;
+
+        logger.LogInformation("Title set to {v}. Previous title was {o}", video.Title, old);
       }
 
       video.ParsedDetails = true;
@@ -290,6 +385,79 @@ namespace vrScraper.Services
         }
       }
     }
+
+    public async Task ReparseInformations()
+    {
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+      var items = await context.VideoItems.Include(a => a.Stars).Include(a => a.Tags).OrderBy(a => a.Id).ToListAsync();
+      for (var i = 0; i < items.Count; i++)
+      {
+        var videoItem = items[i];
+        logger.LogInformation(message: $"Reparse details: {i + 1} / {items.Count}");
+        try
+        {
+          await ParseDetails(items[i], context);
+        }
+        catch (Exception ex)
+        {
+          logger.LogWarning($"Error scraping VideoItem {videoItem.Id}");
+          logger.LogError(ex.ToString());
+        }
+        finally
+        {
+          Thread.Sleep(100);
+        }
+      }
+    }
+
+    public async Task RemoveDeadByPicture()
+    {
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+      var httpClient = new HttpClient();
+
+      var items = await context.VideoItems.OrderByDescending(a => a.Id).Skip(8000).Take(2000).ToListAsync();
+      var semaphore = new SemaphoreSlim(10); // Maximal 10 gleichzeitige Requests
+      var totalCount = items.Count;
+      var processedCount = 0; // Fortschritt
+
+      await Parallel.ForEachAsync(items, async (item, token) =>
+      {
+        await semaphore.WaitAsync(token);
+        try
+        {
+          var res = await httpClient.GetAsync(item.Thumbnail, token);
+          if (!res.IsSuccessStatusCode && res.StatusCode == System.Net.HttpStatusCode.NotFound)
+          {
+            item.ErrorCount = (item.ErrorCount ?? 0) + 1;
+          }
+          else if (!res.IsSuccessStatusCode)
+          {
+
+          }
+        }
+        catch (Exception ex)
+        {
+          logger.LogWarning($"Error loading image of {item.Id}");
+          logger.LogError(ex.ToString());
+        }
+        finally
+        {
+          var currentCount = Interlocked.Increment(ref processedCount);
+          if (currentCount % 10 == 0 || currentCount == totalCount) // Log alle 10 Elemente
+          {
+            this._scrapingStatus = $"Processed {currentCount}/{totalCount} items...";
+          }
+          semaphore.Release();
+        }
+      });
+
+      var itemChangedCount = await context.SaveChangesAsync();
+      logger.LogInformation($"Finished processing. Updated {itemChangedCount} items.");
+    }
+
 
     private List<VideoItem> ParseVideoItems(HtmlNodeCollection? nodes, string baseUrl)
     {

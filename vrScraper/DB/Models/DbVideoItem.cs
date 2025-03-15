@@ -46,6 +46,8 @@ namespace vrScraper.DB.Models
     public bool Disliked { get; set; }
     public bool Favorite { get; set; }
     public double? LocalRating { get; set; }
+
+    public int? ErrorCount { get; set; }
   }
 
 }

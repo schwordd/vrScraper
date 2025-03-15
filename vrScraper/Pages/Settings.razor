@@ -10,15 +10,19 @@
 
 <h3>Settings</h3>
 
-<!-- Tag Blacklist -->
-<div class="form-group settings-form">
-    <label class="mr-2">Global Tag Blacklist</label>
-    <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
-                     TextField="@((item) => item.Name)"
-                     ValueField="@((item) => item.Name)"
-                     ShowSearch="true"
-                     TType="IEnumerable<string>"
-                     @bind-Value="TagBlacklist" />
+<div style="min-height: 75vh;">
+
+    <!-- Tag Blacklist -->
+    <div class="form-group settings-form">
+        <label class="mr-2">Global Tag Blacklist</label>
+        <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                         TextField="@((item) => item.Name)"
+                         ValueField="@((item) => item.Name)"
+                         ShowSearch="true"
+                         TType="IEnumerable<string>"
+                         @bind-Value="TagBlacklist" />
+    </div>
+
 </div>
 
 @code {
