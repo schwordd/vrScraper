@@ -224,6 +224,22 @@ namespace vrScraper.Services
       return vid;
     }
 
+    public async Task DeleteVideo(long id)
+    {
+      var video = await GetVideoById(id);
+      if (video == null) return;
+
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+      context.VideoItems.Remove(video);
+      await context.SaveChangesAsync();
+
+      // Entferne das Video auch aus dem Cache
+      videoItems.RemoveAll(v => v.Id == id);
+
+      logger.LogInformation($"Video with ID {id} deleted");
+    }
 
   }
 }

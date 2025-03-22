@@ -55,6 +55,20 @@ namespace vrScraper.Services
       });
     }
 
+    public void StartDeleteErrorItems()
+    {
+      if (this._scrapingInprogress) return;
+
+      this._scrapingInprogress = true;
+
+      Task.Run(async () =>
+      {
+        await this.DeleteErrorItems();
+        this._scrapingInprogress = false;
+        this._scrapingStatus = string.Empty;
+      });
+    }
+
     private async Task ScrapeEporner(string url, int startIndex, int pages = 10)
     {
       var totalList = new List<VideoItem>();
@@ -458,6 +472,38 @@ namespace vrScraper.Services
       logger.LogInformation($"Finished processing. Updated {itemChangedCount} items.");
     }
 
+    private async Task DeleteErrorItems()
+    {
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+      var errorItems = await context.VideoItems
+          .Where(v => v.ErrorCount > 0)
+          .ToListAsync();
+
+      var totalCount = errorItems.Count;
+      var currentCount = 0;
+
+      foreach (var item in errorItems)
+      {
+        currentCount++;
+        this._scrapingStatus = $"Deleting items with errors: {currentCount}/{totalCount}";
+        context.VideoItems.Remove(item);
+
+        if (currentCount % 100 == 0)
+        {
+          await context.SaveChangesAsync();
+        }
+      }
+
+      await context.SaveChangesAsync();
+      logger.LogInformation($"Deleted {totalCount} items with errors");
+
+      // Zeige den finalen Status für 10 Sekunden
+      this._scrapingStatus = $"✓ Successfully deleted {totalCount} items with errors";
+      await Task.Delay(10000); // 10 Sekunden warten
+      this._scrapingStatus = string.Empty;
+    }
 
     private List<VideoItem> ParseVideoItems(HtmlNodeCollection? nodes, string baseUrl)
     {

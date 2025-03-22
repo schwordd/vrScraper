@@ -89,28 +89,6 @@ namespace vrScraper.DB.Seed
         tab!.Order = -80;
       }
 
-      if (defaultTabs.Exists(a => a.Name == "Fav") == false)
-      {
-        db.Tabs.Add(new Models.DbVrTab()
-        {
-          Type = "DEFAULT",
-          Name = "Fav",
-          Active = true,
-          Order = -70,
-          ActressBlacklist = "[]",
-          ActressWhitelist = "[]",
-          TagBlacklist = "[]",
-          TagWhitelist = "[]",
-          VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
-        });
-      }
-      else
-      {
-        var tab = db.Tabs.Where(a => a.Name == "Fav").FirstOrDefault();
-        tab!.Order = -70;
-      }
-
       if (defaultTabs.Exists(a => a.Name == "Liked") == false)
       {
         db.Tabs.Add(new Models.DbVrTab()

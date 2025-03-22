@@ -23,7 +23,11 @@
     </div>
 
     <div class="pe-2">
-        <button class="btn btn-primary" @onclick="RemoveDead">RemoveDead</button>
+        <button class="btn btn-primary" @onclick="RemoveDead">Check Dead Thumbnails</button>
+    </div>
+
+    <div class="pe-2">
+        <button class="btn btn-danger" @onclick="DeleteErrorItems">Delete Items With Errors</button>
     </div>
 </div>
 
@@ -64,6 +68,13 @@
         StartStatusUpdates();
     }
 
+    private void DeleteErrorItems(MouseEventArgs e)
+    {
+        this.Scraper.StartDeleteErrorItems();
+        scrapingStatus = "Starting...";
+        StartStatusUpdates();
+    }
+
     private void StartStatusUpdates()
     {
         timer?.Change(TimeSpan.Zero, TimeSpan.FromMilliseconds(500));
@@ -91,10 +102,17 @@
         timer?.Dispose();
     }
 }
-<style>
 
+<style>
     .scraper {
         display: flex;
         align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .status {
+        color: #666;
+        font-style: italic;
     }
 </style>

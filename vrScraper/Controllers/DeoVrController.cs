@@ -75,18 +75,6 @@ namespace vrScraper.Controllers
 
               tabs.Add((t.Name, list3));
             }
-            else if (t.Name == "Fav")
-            {
-              var list4 = allItems.Where(x => x.Favorite == true).OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new
-              {
-                title = item.Title,
-                videoLength = (int)(item.Duration.TotalSeconds),
-                thumbnailUrl = $"{item.Thumbnail}",
-                video_url = $"{BaseUrl}/deovr/detail/{item.Id}"
-              }).ToList<dynamic>();
-
-              tabs.Add((t.Name, list4));
-            }
             else if (t.Name == "Liked")
             {
               var list5 = allItems.Where(x => x.Liked == true).OrderBy(a => Guid.NewGuid()).Take(500).Select(item => new

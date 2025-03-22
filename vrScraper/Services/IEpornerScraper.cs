@@ -15,6 +15,7 @@ namespace vrScraper.Services
     Task ReparseInformations();
     void StartRemoveByDeadPicture();
     void StartScraping(int start, int count);
+    void StartDeleteErrorItems();
     bool ScrapingInProgress { get; }
     string ScrapingStatus { get; }
   }

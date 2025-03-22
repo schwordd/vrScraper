@@ -49,12 +49,6 @@ namespace vrScraper.Controllers
 
               tabs.Add((t.Name, list3));
             }
-            else if (t.Name == "Fav")
-            {
-              var list4 = allItems.Where(x => x.Favorite == true).OrderBy(a => Guid.NewGuid()).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-              tabs.Add((t.Name, list4));
-            }
             else if (t.Name == "Liked")
             {
               var list5 = allItems.Where(x => x.Liked == true).OrderBy(a => Guid.NewGuid()).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
@@ -176,7 +170,7 @@ namespace vrScraper.Controllers
         {
           logger.LogInformation("Unable to get source for {videoId}", videoId);
           return NotFound();
-        }          
+        }
 
         videoService.SetPlayedVideo(foundVideo);
       }
