@@ -12,7 +12,11 @@ WORKDIR "/src/vrScraper"
 RUN dotnet build "vrScraper.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "vrScraper.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "vrScraper.csproj" -c Release -o /app/publish \
+    /p:RuntimeIdentifier=linux-x64 \
+    /p:PublishSingleFile=false \
+    /p:SelfContained=false \
+    /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
