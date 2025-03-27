@@ -80,16 +80,60 @@
     </div>
 
     <div class="content-wrapper">
-        <div class="pager">
-            <button class="btn btn-primary me-2" @onclick="PreviousPage" disabled="@IsFirstPage">
-                <i class="bi bi-chevron-left"></i> Previous
-            </button>
-            <button class="btn btn-primary" @onclick="NextPage" disabled="@IsLastPage">
-                Next <i class="bi bi-chevron-right"></i>
-            </button>
-        </div>
-        <div>
-            <span>Page @CurrentPage of @TotalPages</span>
+        <div class="pager-info">
+            <div class="pager">
+                <button class="btn btn-sm btn-outline-primary" @onclick="PreviousPage" disabled="@IsFirstPage">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+
+                @{
+                    const int maxVisiblePages = 5;
+                    var startPage = Math.Max(1, CurrentPage - maxVisiblePages / 2);
+                    var endPage = Math.Min(TotalPages, startPage + maxVisiblePages - 1);
+
+                    if (startPage > 1)
+                    {
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(1)">1</button>
+                        if (startPage > 2)
+                        {
+                            <span class="page-ellipsis">...</span>
+                        }
+                    }
+
+                    @for (int i = startPage; i <= endPage; i++)
+                    {
+                        var pageNumber = i;
+                        <button class="btn btn-sm @(pageNumber == CurrentPage ? "btn-primary" : "btn-outline-primary")"
+                                @onclick="() => GoToPage(pageNumber)">
+                            @pageNumber
+                        </button>
+                    }
+
+                    if (endPage < TotalPages)
+                    {
+                        if (endPage < TotalPages - 1)
+                        {
+                            <span class="page-ellipsis">...</span>
+                        }
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(TotalPages)">@TotalPages</button>
+                    }
+                }
+
+                <button class="btn btn-sm btn-outline-primary" @onclick="NextPage" disabled="@IsLastPage">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+            <div class="page-size">
+                <select class="form-select form-select-sm" @onchange="PageSizeChanged">
+                    <option value="10" selected="@IsSelected(10)">10</option>
+                    <option value="20" selected="@IsSelected(20)">20</option>
+                    <option value="30" selected="@IsSelected(30)">30</option>
+                    <option value="40" selected="@IsSelected(40)">40</option>
+                    <option value="50" selected="@IsSelected(50)">50</option>
+                    <option value="100" selected="@IsSelected(100)">100</option>
+                </select>
+                <span class="text-muted small">per page</span>
+            </div>
         </div>
 
         <div class="video-gallery">
@@ -130,20 +174,47 @@
             }
         </div>
 
-        <div class="d-flex justify-content-between align-items-center footer">
+        <div class="pager-info">
             <div class="pager">
-                <button class="btn btn-primary me-2" @onclick="PreviousPage" disabled="@IsFirstPage">
-                    <i class="bi bi-chevron-left"></i> Previous
+                <button class="btn btn-sm btn-outline-primary" @onclick="PreviousPage" disabled="@IsFirstPage">
+                    <i class="bi bi-chevron-left"></i>
                 </button>
-                <button class="btn btn-primary" @onclick="NextPage" disabled="@IsLastPage">
-                    Next <i class="bi bi-chevron-right"></i>
+
+                @{
+                    if (startPage > 1)
+                    {
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(1)">1</button>
+                        if (startPage > 2)
+                        {
+                            <span class="page-ellipsis">...</span>
+                        }
+                    }
+
+                    @for (int i = startPage; i <= endPage; i++)
+                    {
+                        var pageNumber = i;
+                        <button class="btn btn-sm @(pageNumber == CurrentPage ? "btn-primary" : "btn-outline-primary")"
+                                @onclick="() => GoToPage(pageNumber)">
+                            @pageNumber
+                        </button>
+                    }
+
+                    if (endPage < TotalPages)
+                    {
+                        if (endPage < TotalPages - 1)
+                        {
+                            <span class="page-ellipsis">...</span>
+                        }
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(TotalPages)">@TotalPages</button>
+                    }
+                }
+
+                <button class="btn btn-sm btn-outline-primary" @onclick="NextPage" disabled="@IsLastPage">
+                    <i class="bi bi-chevron-right"></i>
                 </button>
             </div>
-            <div>
-                <span>Page @CurrentPage of @TotalPages</span>
-            </div>
-            <div>
-                <select class="form-select" @onchange="PageSizeChanged" style="width: auto;">
+            <div class="page-size">
+                <select class="form-select form-select-sm" @onchange="PageSizeChanged">
                     <option value="10" selected="@IsSelected(10)">10</option>
                     <option value="20" selected="@IsSelected(20)">20</option>
                     <option value="30" selected="@IsSelected(30)">30</option>
@@ -151,6 +222,7 @@
                     <option value="50" selected="@IsSelected(50)">50</option>
                     <option value="100" selected="@IsSelected(100)">100</option>
                 </select>
+                <span class="text-muted small">per page</span>
             </div>
         </div>
     </div>
@@ -201,24 +273,63 @@
     private int PageSize { get; set; } = 30;
 
     private List<DbVideoItem> VideoItems = new List<DbVideoItem>();
-    private string CurrentSortOption { get; set; } = "latest";
+    private string _currentSortOption = "latest";
 
-    private bool ShowOnlyLiked { get; set; } = false;
-    private bool ShowOnlyUnwatched { get; set; } = false;
+    private bool _showOnlyLiked;
+    private bool _showOnlyUnwatched;
     private Random rng = new Random();
 
-    private List<DbVideoItem> FilteredItems => VideoItems
-        .Where(v => (!ShowOnlyLiked || v.Liked) &&
-                    (!ShowOnlyUnwatched || v.PlayCount == 0) &&
-                    (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
-                    (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))))
-        .OrderByDescending(v => CurrentSortOption switch
+    public bool ShowOnlyLiked
+    {
+        get => _showOnlyLiked;
+        set
         {
-            "latest" => v.Id,
+            if (_showOnlyLiked != value)
+            {
+                _showOnlyLiked = value;
+                CurrentPage = 1; // Reset page on filter change
+            }
+        }
+    }
+
+    public bool ShowOnlyUnwatched
+    {
+        get => _showOnlyUnwatched;
+        set
+        {
+            if (_showOnlyUnwatched != value)
+            {
+                _showOnlyUnwatched = value;
+                CurrentPage = 1; // Reset page on filter change
+            }
+        }
+    }
+
+    public string CurrentSortOption
+    {
+        get => _currentSortOption;
+        set
+        {
+            if (_currentSortOption != value)
+            {
+                _currentSortOption = value;
+                CurrentPage = 1; // Reset page on sort change
+            }
+        }
+    }
+
+    private List<DbVideoItem> FilteredItems => VideoItems
+        .Where(v => (!_showOnlyLiked || v.Liked) &&
+                (!_showOnlyUnwatched || v.PlayCount == 0) &&
+                (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
+                (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))))
+        .OrderByDescending(v => _currentSortOption switch
+        {
+            "latest" => Convert.ToInt32(v.SiteVideoId),
             "rating" => v.SiteRating ?? 0,
-            "random" => rng.Next(), // Zufällige Sortierung
+            "random" => rng.Next(),
             "playtime" => v.PlayDurationEst.TotalSeconds,
-            _ => v.Id
+            _ => Convert.ToInt32(v.SiteVideoId)
         })
         .ToList();
 
@@ -280,13 +391,13 @@
     private void OnTagsChanged(IEnumerable<string> e)
     {
         SelectedTags = e.ToHashSet();
-        CurrentPage = 1;
+        CurrentPage = 1; // Reset page on filter change
     }
 
     private void OnActressesChanged(IEnumerable<string> e)
     {
         SelectedActresses = e.ToHashSet();
-        CurrentPage = 1;
+        CurrentPage = 1; // Reset page on filter change
     }
 
     private void NextPage()
@@ -311,9 +422,8 @@
         var val = e.Value.ToString();
         if (val == null) return;
 
-
         PageSize = int.Parse(val);
-        CurrentPage = 1; // Zur ersten Seite wechseln, wenn die PageSize geändert wird
+        CurrentPage = 1; // Reset page on page size change
     }
 
     private bool IsSelected(int size)
@@ -358,15 +468,49 @@
 
         await VideoService.DeleteVideo(videoId);
 
-        // Aktualisiere die Listen
-        await LoadVideos();
-        await LoadTags();
-        await LoadActresses();
-
-        // Wenn die aktuelle Seite jetzt leer ist, gehe zur vorherigen Seite
-        if (PagedItems.Count == 0 && CurrentPage > 1)
+        // Entferne das Video direkt aus der lokalen Liste
+        var videoToRemove = VideoItems.FirstOrDefault(v => v.Id == videoId);
+        if (videoToRemove != null)
         {
-            CurrentPage--;
+            VideoItems.Remove(videoToRemove);
+
+            // Aktualisiere die Tag- und Star-Zähler
+            foreach (var tag in videoToRemove.Tags)
+            {
+                var tagInfo = AvailableTags.FirstOrDefault(t => t.Tag.Id == tag.Id);
+                if (tagInfo.Count > 0)
+                {
+                    var index = AvailableTags.IndexOf(tagInfo);
+                    AvailableTags[index] = (tagInfo.Tag, tagInfo.Count - 1);
+                }
+            }
+
+            foreach (var star in videoToRemove.Stars)
+            {
+                var starInfo = AvailableActresses.FirstOrDefault(s => s.Star.Id == star.Id);
+                if (starInfo.Count > 0)
+                {
+                    var index = AvailableActresses.IndexOf(starInfo);
+                    AvailableActresses[index] = (starInfo.Star, starInfo.Count - 1);
+                }
+            }
+
+            // Wenn die aktuelle Seite leer ist, gehe zur vorherigen Seite
+            if (PagedItems.Count == 0 && CurrentPage > 1)
+            {
+                CurrentPage--;
+            }
+
+            // Erzwinge ein UI-Update
+            StateHasChanged();
+        }
+    }
+
+    private void GoToPage(int page)
+    {
+        if (page >= 1 && page <= TotalPages)
+        {
+            CurrentPage = page;
         }
     }
 }
@@ -666,5 +810,49 @@
 
     .delete-btn i {
         font-size: 14px;
+    }
+
+    .pager-info {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 8px 0;
+    }
+
+    .pager {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .page-size {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .page-size select {
+        width: 70px;
+    }
+
+    .pager .btn {
+        min-width: 32px;
+        height: 32px;
+        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .page-ellipsis {
+        color: #6c757d;
+        margin: 0 2px;
+        user-select: none;
+        font-size: 12px;
+    }
+
+    .text-muted.small {
+        font-size: 12px;
     }
 </style>

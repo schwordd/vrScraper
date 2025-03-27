@@ -2,29 +2,41 @@
 @using vrScraper.Services
 @inject IVideoService Videos
 
-<h4>
-    Tags
-    <span class="badge rounded-pill text-bg-light">@tagInfos.Count</span>
-</h4>
-@if (tagInfos != null)
-{
-    <div class="tag-container">
-        @foreach (var tagInfo in tagInfos)
-        {
-            <button type="button" class="btn btn-primary tag-pill">
-                @tagInfo.Tag.Name <span class="badge text-bg-secondary">@tagInfo.Count</span>
-            </button>
-        }
-
+<div class="card mt-2">
+    <div class="card-header" @onclick="ToggleCollapse" style="cursor: pointer;">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi @(isCollapsed ? "bi-caret-right-fill" : "bi-caret-down-fill")"></i>
+                Tags
+                <span class="badge rounded-pill text-bg-light">@tagInfos.Count</span>
+            </h5>
+        </div>
     </div>
-}
-else
-{
-    <p>Loading...</p>
-}
+
+    <div class="@(isCollapsed ? "collapse" : "")">
+        <div class="card-body">
+            @if (tagInfos != null)
+            {
+                <div class="tag-container">
+                    @foreach (var tagInfo in tagInfos)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary tag-pill">
+                            @tagInfo.Tag.Name <span class="badge text-bg-secondary">@tagInfo.Count</span>
+                        </button>
+                    }
+                </div>
+            }
+            else
+            {
+                <p>Loading...</p>
+            }
+        </div>
+    </div>
+</div>
 
 @code {
     private List<(DbTag Tag, long Count)> tagInfos = new List<(DbTag Tag, long Count)>();
+    private bool isCollapsed = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -34,6 +46,11 @@ else
     private async Task LoadTagInfos()
     {
         tagInfos = await Videos.GetTagInfos();
+    }
+
+    private void ToggleCollapse()
+    {
+        isCollapsed = !isCollapsed;
     }
 }
 

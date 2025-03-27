@@ -2,29 +2,41 @@
 @using vrScraper.Services
 @inject IVideoService Videos
 
-<h4>
-    Actresses
-    <span class="badge rounded-pill text-bg-light">@starInfos.Count</span>
-
-</h4>
-@if (starInfos != null)
-{
-    <div class="star-container">
-        @foreach (var starInfo in starInfos)
-        {
-            <button type="button" class="btn btn-primary star-pill">
-                @starInfo.Star.Name <span class="badge text-bg-secondary">@starInfo.Count</span>
-            </button>
-        }
+<div class="card mt-2">
+    <div class="card-header" @onclick="ToggleCollapse" style="cursor: pointer;">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi @(isCollapsed ? "bi-caret-right-fill" : "bi-caret-down-fill")"></i>
+                Actresses
+                <span class="badge rounded-pill text-bg-light">@starInfos.Count</span>
+            </h5>
+        </div>
     </div>
-}
-else
-{
-    <p>Loading...</p>
-}
+
+    <div class="@(isCollapsed ? "collapse" : "")">
+        <div class="card-body">
+            @if (starInfos != null)
+            {
+                <div class="star-container">
+                    @foreach (var starInfo in starInfos)
+                    {
+                        <button type="button" class="btn btn-sm btn-primary star-pill">
+                            @starInfo.Star.Name <span class="badge text-bg-secondary">@starInfo.Count</span>
+                        </button>
+                    }
+                </div>
+            }
+            else
+            {
+                <p>Loading...</p>
+            }
+        </div>
+    </div>
+</div>
 
 @code {
     private List<(DbStar Star, long Count)> starInfos = new List<(DbStar Star, long Count)>();
+    private bool isCollapsed = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -34,6 +46,11 @@ else
     private async Task LoadActorInfos()
     {
         starInfos = await Videos.GetActorInfos();
+    }
+
+    private void ToggleCollapse()
+    {
+        isCollapsed = !isCollapsed;
     }
 }
 

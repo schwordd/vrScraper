@@ -9,6 +9,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using System.Globalization;
+using System.Threading;
 
 namespace vrScraper.Services
 {
@@ -21,23 +22,68 @@ namespace vrScraper.Services
     private bool _scrapingInprogress = false;
     private string _scrapingStatus = string.Empty;
     private static readonly string[] separator = ["\r\n", "\r", "\n"];
+    private CancellationTokenSource? _cancellationTokenSource;
 
     public void Initialize()
     {
       logger.LogInformation("EpornerScraper initialized.");
     }
 
+    public void StopScraping()
+    {
+      if (_cancellationTokenSource != null)
+      {
+        logger.LogInformation("Stopping scraping process...");
+        _cancellationTokenSource.Cancel();
+        _scrapingStatus = "Stopping...";
+      }
+    }
+
+    private void InitializeNewScraping()
+    {
+      if (_cancellationTokenSource != null)
+      {
+        _cancellationTokenSource.Dispose();
+      }
+      _cancellationTokenSource = new CancellationTokenSource();
+    }
+
     public void StartScraping(int start, int count)
     {
-      if (this._scrapingInprogress) return;
+      logger.LogInformation("StartScraping called with start={Start}, count={Count}", start, count);
+
+      if (this._scrapingInprogress)
+      {
+        logger.LogWarning("Scraping already in progress, ignoring request");
+        return;
+      }
 
       this._scrapingInprogress = true;
+      InitializeNewScraping();
+      logger.LogInformation("Starting scraping process");
 
       Task.Run(async () =>
       {
-        await this.ScrapeEporner("https://www.eporner.com/cat/vr-porn", start, count);
-        this._scrapingInprogress = false;
-        this._scrapingStatus = string.Empty;
+        try
+        {
+          logger.LogInformation("Starting ScrapeEporner task");
+          await this.ScrapeEporner("https://www.eporner.com/cat/vr-porn", start, count, _cancellationTokenSource!.Token);
+          logger.LogInformation("ScrapeEporner task completed");
+        }
+        catch (OperationCanceledException)
+        {
+          logger.LogInformation("Scraping process was cancelled");
+        }
+        catch (Exception ex)
+        {
+          logger.LogError(ex, "Error during scraping process");
+        }
+        finally
+        {
+          this._scrapingInprogress = false;
+          this._scrapingStatus = string.Empty;
+          logger.LogInformation("Scraping process finished");
+        }
       });
     }
 
@@ -46,12 +92,31 @@ namespace vrScraper.Services
       if (this._scrapingInprogress) return;
 
       this._scrapingInprogress = true;
+      InitializeNewScraping();
+      logger.LogInformation("Starting dead thumbnail check");
 
       Task.Run(async () =>
       {
-        await this.RemoveDeadByPicture();
-        this._scrapingInprogress = false;
-        this._scrapingStatus = string.Empty;
+        try
+        {
+          logger.LogInformation("Starting RemoveDeadByPicture task");
+          await this.RemoveDeadByPicture(_cancellationTokenSource!.Token);
+          logger.LogInformation("RemoveDeadByPicture task completed");
+        }
+        catch (OperationCanceledException)
+        {
+          logger.LogInformation("Dead thumbnail check was cancelled");
+        }
+        catch (Exception ex)
+        {
+          logger.LogError(ex, "Error during dead thumbnail check");
+        }
+        finally
+        {
+          this._scrapingInprogress = false;
+          this._scrapingStatus = string.Empty;
+          logger.LogInformation("Dead thumbnail check finished");
+        }
       });
     }
 
@@ -60,24 +125,84 @@ namespace vrScraper.Services
       if (this._scrapingInprogress) return;
 
       this._scrapingInprogress = true;
+      InitializeNewScraping();
+      logger.LogInformation("Starting error items deletion");
 
       Task.Run(async () =>
       {
-        await this.DeleteErrorItems();
-        this._scrapingInprogress = false;
-        this._scrapingStatus = string.Empty;
+        try
+        {
+          logger.LogInformation("Starting DeleteErrorItems task");
+          await this.DeleteErrorItems(_cancellationTokenSource!.Token);
+          logger.LogInformation("DeleteErrorItems task completed");
+        }
+        catch (OperationCanceledException)
+        {
+          logger.LogInformation("Error items deletion was cancelled");
+        }
+        catch (Exception ex)
+        {
+          logger.LogError(ex, "Error during error items deletion");
+        }
+        finally
+        {
+          this._scrapingInprogress = false;
+          this._scrapingStatus = string.Empty;
+          logger.LogInformation("Error items deletion finished");
+        }
       });
     }
 
-    private async Task ScrapeEporner(string url, int startIndex, int pages = 10)
+    public void StartReparseInformations()
     {
+      logger.LogInformation("StartReparseInformations called");
+
+      if (this._scrapingInprogress)
+      {
+        logger.LogWarning("Reparse already in progress, ignoring request");
+        return;
+      }
+
+      this._scrapingInprogress = true;
+      InitializeNewScraping();
+      logger.LogInformation("Starting reparse process");
+
+      Task.Run(async () =>
+      {
+        try
+        {
+          logger.LogInformation("Starting ReparseInformations task");
+          await this.ReparseInformations(_cancellationTokenSource!.Token);
+          logger.LogInformation("ReparseInformations task completed");
+        }
+        catch (OperationCanceledException)
+        {
+          logger.LogInformation("Reparse process was cancelled");
+        }
+        catch (Exception ex)
+        {
+          logger.LogError(ex, "Error during reparse process");
+        }
+        finally
+        {
+          this._scrapingInprogress = false;
+          this._scrapingStatus = string.Empty;
+          logger.LogInformation("Reparse process finished");
+        }
+      });
+    }
+
+    private async Task ScrapeEporner(string url, int startIndex, int pages = 10, CancellationToken cancellationToken = default)
+    {
+      logger.LogInformation("ScrapeEporner started with url={Url}, startIndex={StartIndex}, pages={Pages}", url, startIndex, pages);
+
       var totalList = new List<VideoItem>();
       var newInsertions = new List<DbVideoItem>();
 
       var rnd = new Random();
       var index = startIndex;
 
-      while (true)
+      while (!cancellationToken.IsCancellationRequested)
       {
         this._scrapingStatus = $"Total items found : {totalList.Count} -  Processing page {index} ...";
         logger.LogInformation(this._scrapingStatus);
@@ -102,8 +227,10 @@ namespace vrScraper.Services
           break;
         }
 
-        Thread.Sleep(rnd.Next(500, 1000));
+        await Task.Delay(rnd.Next(500, 1000), cancellationToken);
       }
+
+      cancellationToken.ThrowIfCancellationRequested();
 
       totalList = totalList.Where(v => v.IsVr == true && v.Quality.Contains("4K")).ToList();
 
@@ -117,6 +244,8 @@ namespace vrScraper.Services
 
         foreach (var item in totalList)
         {
+          cancellationToken.ThrowIfCancellationRequested();
+
           if (context.VideoItems.Any(a => a.Site == site && a.SiteVideoId == item.VideoId))
           {
             continue;
@@ -145,7 +274,7 @@ namespace vrScraper.Services
           newInsertions.Add(dbVideoItem);
         }
 
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation($"{newInsertions.Count} new videos found and added to database");
 
@@ -153,10 +282,11 @@ namespace vrScraper.Services
 
         for (var i = 0; i < newInsertions.Count; i++)
         {
+          cancellationToken.ThrowIfCancellationRequested();
           this._scrapingStatus = $"Parse Details: {i + 1} / {newInsertions.Count}";
           logger.LogInformation(this._scrapingStatus);
           await ParseDetails(newInsertions[i], context);
-          Thread.Sleep(100);
+          await Task.Delay(100, cancellationToken);
         }
 
         await vs.Initialize();
@@ -166,6 +296,7 @@ namespace vrScraper.Services
       catch (Exception ex)
       {
         logger.LogError(ex, "Error while scraping.");
+        throw;
       }
     }
 
@@ -400,109 +531,241 @@ namespace vrScraper.Services
       }
     }
 
-    public async Task ReparseInformations()
+    public async Task ReparseInformations(CancellationToken cancellationToken = default)
     {
+      logger.LogInformation("ReparseInformations started");
+
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
-      var items = await context.VideoItems.Include(a => a.Stars).Include(a => a.Tags).OrderBy(a => a.Id).ToListAsync();
-      for (var i = 0; i < items.Count; i++)
+      logger.LogInformation("Loading video items from database");
+      var items = await context.VideoItems
+          .Include(a => a.Stars)
+          .Include(a => a.Tags)
+          .ToListAsync(cancellationToken);
+
+      // Sortiere nach dem Laden in Memory
+      items = items
+          .OrderByDescending(a => Convert.ToInt32(a.SiteVideoId))
+          .ToList();
+
+      logger.LogInformation("Loaded {Count} items for reparse", items.Count);
+
+      for (var i = 0; i < items.Count && !cancellationToken.IsCancellationRequested; i++)
       {
         var videoItem = items[i];
-        logger.LogInformation(message: $"Reparse details: {i + 1} / {items.Count}");
+        this._scrapingStatus = $"Reparse details: {i + 1} / {items.Count}";
+        logger.LogInformation(this._scrapingStatus);
+
         try
         {
           await ParseDetails(items[i], context);
         }
         catch (Exception ex)
         {
-          logger.LogWarning($"Error scraping VideoItem {videoItem.Id}");
-          logger.LogError(ex.ToString());
+          logger.LogError(ex, "Error reparsing VideoItem {Id}: {Title}", videoItem.Id, videoItem.Title);
         }
-        finally
-        {
-          Thread.Sleep(100);
-        }
+
+        await Task.Delay(100, cancellationToken);
       }
+
+      cancellationToken.ThrowIfCancellationRequested();
+      logger.LogInformation("ReparseInformations completed");
     }
 
-    public async Task RemoveDeadByPicture()
+    public async Task RemoveDeadByPicture(CancellationToken cancellationToken = default)
     {
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-      var httpClient = new HttpClient();
 
-      var items = await context.VideoItems.OrderByDescending(a => a.Id).Skip(8000).Take(2000).ToListAsync();
-      var semaphore = new SemaphoreSlim(10); // Maximal 10 gleichzeitige Requests
+      // Nur Videos ohne Fehler und ohne Abspielzählung prüfen
+      var items = await context.VideoItems
+          .OrderByDescending(a => a.Id)
+          .Where(x => x.PlayCount < 1)
+          .ToListAsync(cancellationToken);
+
       var totalCount = items.Count;
-      var processedCount = 0; // Fortschritt
+      var processedCount = 0;
+      var successCount = 0;
+      var deadCount = 0;
+      var errorCount = 0;
 
-      await Parallel.ForEachAsync(items, async (item, token) =>
+      // Optimierte HttpClient-Konfiguration
+      using var httpClient = new HttpClient(new HttpClientHandler
       {
-        await semaphore.WaitAsync(token);
+          AllowAutoRedirect = true,
+          MaxAutomaticRedirections = 2,
+          AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
+          UseCookies = true
+      })
+      {
+          Timeout = TimeSpan.FromSeconds(3)
+      };
+
+      // Browser-ähnliche HTTP-Header
+      httpClient.DefaultRequestHeaders.Clear();
+      httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+      httpClient.DefaultRequestHeaders.Add("Accept", "image/avif,image/webp,image/apng,*/*;q=0.8");
+      httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
+      httpClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
+
+      // Verarbeite jeweils 5 Videos parallel, aber nicht mehr
+      var semaphore = new SemaphoreSlim(5);
+
+      foreach (var item in items)
+      {
         try
         {
-          var res = await httpClient.GetAsync(item.Thumbnail, token);
-          if (!res.IsSuccessStatusCode && res.StatusCode == System.Net.HttpStatusCode.NotFound)
-          {
-            item.ErrorCount = (item.ErrorCount ?? 0) + 1;
-          }
-          else if (!res.IsSuccessStatusCode)
-          {
+          await semaphore.WaitAsync(cancellationToken);
 
-          }
+          // Starte die Prüfung als Task
+          _ = Task.Run(async () =>
+          {
+            try
+            {
+              var status = await CheckThumbnailAsync(httpClient, item, cancellationToken);
+
+              if (status == ThumbnailStatus.Success)
+                Interlocked.Increment(ref successCount);
+              else if (status == ThumbnailStatus.DeadLink)
+                Interlocked.Increment(ref deadCount);
+              else
+                Interlocked.Increment(ref errorCount);
+
+              var count = Interlocked.Increment(ref processedCount);
+
+              // Aktualisiere den Status alle 5 Elemente
+              if (count % 5 == 0 || count == totalCount)
+              {
+                this._scrapingStatus = $"Checking thumbnails: {count}/{totalCount} ({(count * 100.0 / totalCount):F1}%) - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
+              }
+
+              // Speichere die Änderungen alle 20 Elemente
+              if (count % 20 == 0 || count == totalCount)
+              {
+                await context.SaveChangesAsync(cancellationToken);
+                logger.LogInformation($"Progress: {count}/{totalCount} items checked - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
+              }
+            }
+            catch (Exception ex)
+            {
+              logger.LogError(ex, $"Error checking thumbnail for video {item.Id}");
+              Interlocked.Increment(ref errorCount);
+            }
+            finally
+            {
+              semaphore.Release();
+            }
+          }, cancellationToken);
+
+          // Kurze Verzögerung zwischen Task-Starts, um Last zu verteilen
+          await Task.Delay(100, cancellationToken);
         }
         catch (Exception ex)
         {
-          logger.LogWarning($"Error loading image of {item.Id}");
-          logger.LogError(ex.ToString());
-        }
-        finally
-        {
-          var currentCount = Interlocked.Increment(ref processedCount);
-          if (currentCount % 10 == 0 || currentCount == totalCount) // Log alle 10 Elemente
-          {
-            this._scrapingStatus = $"Processed {currentCount}/{totalCount} items...";
-          }
           semaphore.Release();
+          logger.LogError(ex, "Error starting thumbnail check task");
         }
-      });
+      }
 
-      var itemChangedCount = await context.SaveChangesAsync();
-      logger.LogInformation($"Finished processing. Updated {itemChangedCount} items.");
+      // Warte, bis alle Anfragen abgeschlossen sind (maximal 5 Minuten)
+      for (int i = 0; i < 300 && processedCount < totalCount; i++)
+      {
+        if (cancellationToken.IsCancellationRequested) break;
+
+        this._scrapingStatus = $"Checking thumbnails: {processedCount}/{totalCount} ({(processedCount * 100.0 / totalCount):F1}%) - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
+        await Task.Delay(1000, cancellationToken);
+      }
+
+      // Abschließende Speicherung
+      await context.SaveChangesAsync(cancellationToken);
+      logger.LogInformation($"Finished checking thumbnails. Summary: Total: {totalCount}, Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
+
+      this._scrapingStatus = $"✓ Finished checking {totalCount} thumbnails. Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
+      await Task.Delay(2000, cancellationToken);
     }
 
-    private async Task DeleteErrorItems()
+    private enum ThumbnailStatus
+    {
+      Success,
+      DeadLink,
+      Error
+    }
+
+    private async Task<ThumbnailStatus> CheckThumbnailAsync(HttpClient httpClient, DbVideoItem item, CancellationToken cancellationToken)
+    {
+      try
+      {
+        // Verwende HEAD-Anfrage statt GET, um Bandbreite zu sparen
+        var request = new HttpRequestMessage(HttpMethod.Head, item.Thumbnail);
+        var res = await httpClient.SendAsync(request, cancellationToken);
+
+        if (!res.IsSuccessStatusCode)
+        {
+          if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+          {
+            item.ErrorCount = (item.ErrorCount ?? 0) + 1;
+            logger.LogInformation($"Dead thumbnail found for video {item.Id}: {item.Title}");
+            return ThumbnailStatus.DeadLink;
+          }
+          else
+          {
+            logger.LogWarning($"HTTP {(int)res.StatusCode} for video {item.Id}: {res.StatusCode}");
+            return ThumbnailStatus.Error;
+          }
+        }
+        else
+        {
+          return ThumbnailStatus.Success;
+        }
+      }
+      catch (Exception ex)
+      {
+        if (ex is TaskCanceledException || ex is HttpRequestException)
+        {
+          logger.LogWarning($"Network error for video {item.Id}: {ex.Message}");
+        }
+        else
+        {
+          logger.LogError(ex, $"Unexpected error checking video {item.Id}");
+        }
+        return ThumbnailStatus.Error;
+      }
+    }
+
+    public async Task DeleteErrorItems(CancellationToken cancellationToken = default)
     {
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
       var errorItems = await context.VideoItems
           .Where(v => v.ErrorCount > 0)
-          .ToListAsync();
+          .ToListAsync(cancellationToken);
 
       var totalCount = errorItems.Count;
       var currentCount = 0;
 
       foreach (var item in errorItems)
       {
+        if (cancellationToken.IsCancellationRequested)
+          break;
+
         currentCount++;
         this._scrapingStatus = $"Deleting items with errors: {currentCount}/{totalCount}";
         context.VideoItems.Remove(item);
 
         if (currentCount % 100 == 0)
         {
-          await context.SaveChangesAsync();
+          await context.SaveChangesAsync(cancellationToken);
         }
       }
 
-      await context.SaveChangesAsync();
+      cancellationToken.ThrowIfCancellationRequested();
+      await context.SaveChangesAsync(cancellationToken);
       logger.LogInformation($"Deleted {totalCount} items with errors");
 
-      // Zeige den finalen Status für 10 Sekunden
       this._scrapingStatus = $"✓ Successfully deleted {totalCount} items with errors";
-      await Task.Delay(10000); // 10 Sekunden warten
-      this._scrapingStatus = string.Empty;
+      await Task.Delay(5000, cancellationToken);
     }
 
     private List<VideoItem> ParseVideoItems(HtmlNodeCollection? nodes, string baseUrl)

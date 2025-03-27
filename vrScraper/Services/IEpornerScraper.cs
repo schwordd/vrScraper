@@ -12,10 +12,14 @@ namespace vrScraper.Services
     Task<Quality?> GetBestVideoQuality(DbVideoItem item, VideoPlayerSettings settings);
     Task<VideoSource?> GetSource(DbVideoItem item, VrScraperContext context);
     Task ParseMissingInformations();
-    Task ReparseInformations();
+    Task ReparseInformations(CancellationToken cancellationToken = default);
+    Task RemoveDeadByPicture(CancellationToken cancellationToken = default);
+    Task DeleteErrorItems(CancellationToken cancellationToken = default);
     void StartRemoveByDeadPicture();
     void StartScraping(int start, int count);
     void StartDeleteErrorItems();
+    void StartReparseInformations();
+    void StopScraping();
     bool ScrapingInProgress { get; }
     string ScrapingStatus { get; }
   }
