@@ -21,11 +21,11 @@ namespace vrScraper
     public static void Main(string[] args)
     {
       var logo = @$"
- _    __     _____                                
+ _    __     _____
 | |  / /____/ ___/______________ _____  ___  _____
 | | / / ___/\__ \/ ___/ ___/ __ `/ __ \/ _ \/ ___/
-| |/ / /   ___/ / /__/ /  / /_/ / /_/ /  __/ /    
-|___/_/   /____/\___/_/   \__,_/ .___/\___/_/     
+| |/ / /   ___/ / /__/ /  / /_/ / /_/ /  __/ /
+|___/_/   /____/\___/_/   \__,_/ .___/\___/_/
                               /_/    v{GetVersion()}
 ";
       Console.WriteLine(logo);
@@ -64,9 +64,13 @@ namespace vrScraper
         {
           builder.AllowAnyOrigin()
                  .AllowAnyMethod()
-                 .AllowAnyHeader();
+                 .AllowAnyHeader()
+                 .WithExposedHeaders("Content-Length", "Content-Range", "Accept-Ranges", "Content-Type");
         });
       });
+
+      // Füge HttpClient-Factory hinzu
+      builder.Services.AddHttpClient();
 
       // Add services to the container.
       builder.Services.AddControllers().AddNewtonsoftJson(options =>

@@ -1,0 +1,341 @@
+@using Microsoft.EntityFrameworkCore
+@using vrScraper.DB
+@using vrScraper.DB.Models
+@using vrScraper.Services
+@inject IJSRuntime JSRuntime
+@inject IEpornerScraper scraper
+@inject VrScraperContext context
+
+<div class="video-player-overlay @(_isVisible ? "visible" : "")" @onclick="ClosePlayer">
+    <div class="video-player-container" @onclick:stopPropagation>
+        <div class="close-button" @onclick="ClosePlayer">
+            <i class="bi bi-x-lg"></i>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="loading-indicator">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="mt-2 text-light">Video wird geladen...</div>
+            </div>
+        }
+
+        @if (_errorMessage != null)
+        {
+            <div class="error-message">
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                <div>@_errorMessage</div>
+                <button class="btn btn-sm btn-light mt-3" @onclick="ClosePlayer">Schließen</button>
+            </div>
+        }
+
+        <div class="video-container @(_isLoading || _errorMessage != null ? "d-none" : "")">
+            <video id="vr-video" class="video-js vjs-big-play-centered"></video>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public DbVideoItem? CurrentVideo { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private bool _isVisible = false;
+    private bool _isLoading = false;
+    private string? _errorMessage = null;
+    private VideoSource? _videoSource;
+    private string? _videoType = "180";
+    private long? _videoId = null;
+    private DotNetObjectReference<VideoPlayer>? _dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Erstellen der .NET-Objektreferenz für JS-Callbacks beim Start
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Registriere die Callback-Referenz
+            await JSRuntime.InvokeVoidAsync("registerPlayerErrorCallback", _dotNetRef);
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public async Task ShowVideo(DbVideoItem video)
+    {
+        try
+        {
+            // Setze Zustand zurück
+            _errorMessage = null;
+            _isLoading = true;
+            this.CurrentVideo = video;
+            _videoId = video.Id;
+
+            // Element sichtbar machen
+            _isVisible = true;
+            StateHasChanged();
+
+            // Video-Quelle abrufen
+            var foundVideo = await context.VideoItems
+                .Include(v => v.Tags)
+                .Include(v => v.Stars)
+                .FirstOrDefaultAsync(v => v.Id == video.Id);
+
+            if (foundVideo == null)
+            {
+                _errorMessage = "Video konnte nicht gefunden werden.";
+                _isLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            _videoSource = await scraper.GetSource(foundVideo, context);
+            if (_videoSource == null)
+            {
+                _errorMessage = "Video-Quelle konnte nicht geladen werden.";
+                _isLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Bestimme Videotyp basierend auf Tags
+            DetermineVideoType(foundVideo);
+
+            // VideoJS initialisieren mit der gewünschten Quelle und Konfiguration
+            _isLoading = false;
+            StateHasChanged();
+
+            // Verzögerung, um sicherzustellen, dass DOM aktualisiert wurde
+            await Task.Delay(200);
+            await InitializeVideoJS();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fehler beim Laden des Videos: {ex.Message}";
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void DetermineVideoType(DbVideoItem video)
+    {
+        // Bestimme VR-Typ anhand der Tags
+        if (video.Tags.Any(t => t.Name.Contains("360")))
+        {
+            _videoType = "360";
+        }
+        else if (video.Tags.Any(t => t.Name.Contains("180")))
+        {
+            _videoType = "180";
+        }
+        else
+        {
+            // Standard ist 180, falls nicht genauer spezifiziert
+            _videoType = "180";
+        }
+    }
+
+    private async Task InitializeVideoJS()
+    {
+        if (_videoSource == null || CurrentVideo == null) return;
+
+        try
+        {
+            // Registriere die Callback-Referenz erneut vor der Player-Initialisierung
+            await JSRuntime.InvokeVoidAsync("registerPlayerErrorCallback", _dotNetRef);
+
+            await JSRuntime.InvokeVoidAsync("initializeVRPlayer",
+                "vr-video",
+                _videoSource.Src,
+                _videoSource.Type,
+                CurrentVideo.Title,
+                _videoType,
+                _videoId);  // Übergebe die Video-ID für Proxy-Zugriff
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Fehler bei der Initialisierung des Players: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnPlayerError(string errorMessage)
+    {
+        _errorMessage = $"Videowiedergabe-Fehler: {errorMessage}";
+        StateHasChanged();
+    }
+
+    // Neues JSInvokable für Fullscreen-Exit-Event
+    [JSInvokable]
+    public void OnFullscreenExit()
+    {
+        // Diese Methode kann verwendet werden, um auf Blazor-Seite auf Fullscreen-Änderungen zu reagieren
+        StateHasChanged();
+    }
+
+    private async Task ClosePlayer()
+    {
+        // VideoJS-Player beenden
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("disposeVRPlayer");
+        }
+        catch (Exception)
+        {
+            // Ignoriere Fehler beim Beenden des Players
+        }
+
+        _isVisible = false;
+        _isLoading = false;
+        _errorMessage = null;
+        _videoId = null;
+        StateHasChanged();
+
+        await OnClose.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            // VideoJS-Player beenden, falls noch nicht geschehen
+            await JSRuntime.InvokeVoidAsync("disposeVRPlayer");
+
+            // DotNetObjectReference freigeben
+            _dotNetRef?.Dispose();
+        }
+        catch
+        {
+            // Fehler beim Disposal ignorieren
+        }
+    }
+}
+
+<style>
+    .video-player-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        visibility: hidden;
+        opacity: 0;
+        transition: visibility 0s, opacity 0.3s;
+    }
+
+    .video-player-overlay.visible {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .video-player-container {
+        position: relative;
+        width: 95%;
+        height: 85%;
+        max-width: 1600px;
+        background-color: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .close-button {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 10000;
+        font-size: 20px;
+        transition: background-color 0.2s;
+    }
+
+    .close-button:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .video-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    #vr-video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* Verbesserte CSS für Video.js */
+    :global(.video-js) {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute !important;
+    }
+
+    :global(.video-js .vjs-control-bar) {
+        display: flex !important;
+        position: absolute !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 3em !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+    }
+
+    :global(.vjs-has-started .vjs-control-bar) {
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .loading-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+
+    .error-message {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        max-width: 80%;
+    }
+
+    .error-message i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+</style>

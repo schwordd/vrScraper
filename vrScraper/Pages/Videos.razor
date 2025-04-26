@@ -5,6 +5,7 @@
 @using vrScraper.DB.Models
 @using vrScraper.Services
 @using Microsoft.EntityFrameworkCore
+@using vrScraper.Components
 
 @inject IVideoService VideoService
 @inject ISettingService SettingService
@@ -140,10 +141,13 @@
             @foreach (var item in PagedItems)
             {
                 <div class="video-item">
-                    <div class="thumbnail-container">
+                    <div class="thumbnail-container" @onclick="() => PlayVideo(item)">
                         <img src="@item.Thumbnail" alt="@item.Title" />
+                        <div class="play-overlay">
+                            <i class="bi bi-play-circle-fill"></i>
+                        </div>
                         <div class="thumbnail-overlay">
-                            <button class="btn btn-danger btn-sm delete-btn" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
+                            <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -227,6 +231,9 @@
         </div>
     </div>
 </div>
+
+<!-- Video-Player-Komponente hinzufügen -->
+<VideoPlayer @ref="VideoPlayerComponent" OnClose="HandlePlayerClosed" />
 
 @code {
 
@@ -512,6 +519,22 @@
         {
             CurrentPage = page;
         }
+    }
+
+    private VideoPlayer VideoPlayerComponent { get; set; }
+
+    private async Task PlayVideo(DbVideoItem item)
+    {
+        if (VideoPlayerComponent != null)
+        {
+            await VideoPlayerComponent.ShowVideo(item);
+        }
+    }
+
+    private void HandlePlayerClosed()
+    {
+        // Hier könntest du Aktionen ausführen, nachdem der Player geschlossen wurde
+        // z.B. Aktualisieren des Play Count
     }
 }
 
@@ -854,5 +877,33 @@
 
     .text-muted.small {
         font-size: 12px;
+    }
+
+    .play-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.3);
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+    }
+
+    .play-overlay i {
+        color: white;
+        font-size: 48px;
+        opacity: 0.8;
+    }
+
+    .thumbnail-container {
+        cursor: pointer;
+    }
+
+    .thumbnail-container:hover .play-overlay {
+        opacity: 1;
     }
 </style>
