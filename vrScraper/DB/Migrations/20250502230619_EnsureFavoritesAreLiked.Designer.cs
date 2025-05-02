@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using vrScraper.DB;
 
@@ -10,9 +11,11 @@ using vrScraper.DB;
 namespace vrScraper.DB.Migrations
 {
     [DbContext(typeof(VrScraperContext))]
-    partial class VrScraperContextModelSnapshot : ModelSnapshot
+    [Migration("20250502230619_EnsureFavoritesAreLiked")]
+    partial class EnsureFavoritesAreLiked
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.8");
@@ -120,6 +123,9 @@ namespace vrScraper.DB.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("ErrorCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Favorite")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsVr")

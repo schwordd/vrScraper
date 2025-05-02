@@ -37,8 +37,7 @@
         <h3 class="live-title">@LiveVideo.Title</h3>
 
         <div class="rate-buttons">
-            <button class="@(LiveVideo.Liked || LiveVideo.Favorite ? "btn btn-success btn-block active" : "btn btn-success btn-block")" @onclick="Like">Like</button>
-            <button class="@(LiveVideo.Favorite ? "btn btn-secondary btn-block active" : "btn btn-secondary btn-block")" @onclick="Fav">Fav</button>
+            <button class="@(LiveVideo.Liked ? "btn btn-success btn-block active" : "btn btn-success btn-block")" @onclick="Like">Like</button>
             <button class="@(LiveVideo.Disliked ? "btn btn-danger btn-block active" : "btn btn-danger btn-block")" @onclick="Dislike">Dislike</button>
         </div>
     </div>

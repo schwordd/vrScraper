@@ -165,7 +165,7 @@ namespace vrScraper.Services
 
       if (vid.Liked == false)
       {
-        vid.Favorite = false;
+        // Keine Aktion mehr für Favorite erforderlich
       }
 
       if (vid.Liked == true)
@@ -174,7 +174,6 @@ namespace vrScraper.Services
       }
 
       return UpdateLikeDisklikeFav(vid);
-
     }
 
     public DbVideoItem DislikeVideo(DbVideoItem vid)
@@ -184,22 +183,17 @@ namespace vrScraper.Services
       if (vid.Disliked == true)
       {
         vid.Liked = false;
-        vid.Favorite = false;
+        // Keine Aktion mehr für Favorite erforderlich
       }
 
       return UpdateLikeDisklikeFav(vid);
-
     }
 
     public DbVideoItem FavVideo(DbVideoItem vid)
     {
-      vid.Favorite = !vid.Favorite;
-
-      if (vid.Favorite == true)
-      {
-        vid.Disliked = false;
-        vid.Liked = true;
-      }
+      // Statt Favorite umzuschalten, setzen wir einfach Liked auf true
+      vid.Liked = true;
+      vid.Disliked = false;
 
       return UpdateLikeDisklikeFav(vid);
     }
@@ -213,13 +207,11 @@ namespace vrScraper.Services
 
       dbVid.Liked = vid.Liked;
       dbVid.Disliked = vid.Disliked;
-      dbVid.Favorite = vid.Favorite;
 
       context.SaveChanges();
 
       memVid.Liked = vid.Liked;
       memVid.Disliked = vid.Disliked;
-      memVid.Favorite = vid.Favorite;
 
       return vid;
     }

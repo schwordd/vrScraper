@@ -242,7 +242,7 @@ namespace vrScraper.Controllers
         fullVideoReady = true,
         fullAccess = true,
         videoThumbnail = "",
-        isFavorite = false,
+        isFavorite = foundVideo.Liked,
         isScripted = false,
         isWatchlist = false,
         date = 1715731200
