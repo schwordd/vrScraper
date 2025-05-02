@@ -141,15 +141,39 @@
             @foreach (var item in PagedItems)
             {
                 <div class="video-item">
-                    <div class="thumbnail-container" @onclick="() => PlayVideo(item)">
-                        <img src="@item.Thumbnail" alt="@item.Title" />
-                        <div class="play-overlay">
-                            <i class="bi bi-play-circle-fill"></i>
-                        </div>
+                    <div class="thumbnail-container @(item.IsThumbnailNotAvailable == true ? "not-available" : "")"
+                         @onclick="@(item.IsThumbnailNotAvailable == true ? null : (() => PlayVideo(item)))">
+                        @{
+                            if (string.IsNullOrEmpty(item.Thumbnail))
+                            {
+                                item.IsThumbnailNotAvailable = true;
+                            }
+                        }
+                        <img src="@(string.IsNullOrEmpty(item.Thumbnail) ? "/images/thumbnail-not-available.svg" : item.Thumbnail)"
+                             alt="@item.Title"
+                             @onerror="e => HandleImageError(e, item)" />
+                        @if (item.IsThumbnailNotAvailable != true)
+                        {
+                            <div class="play-overlay">
+                                <i class="bi bi-play-circle-fill"></i>
+                            </div>
+                        }
                         <div class="thumbnail-overlay">
                             <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
                                 <i class="bi bi-trash"></i>
                             </button>
+                        </div>
+                        <div class="like-btn-container">
+                            <button class="like-btn @(item.Liked ? "liked" : "not-liked")"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => ToggleLike(item)"
+                                    title="@(item.Liked ? "Entfernen von Favoriten" : "Zu Favoriten hinzufügen")">
+                                <i class="bi bi-heart-fill"></i>
+                            </button>
+                            <span class="play-count" title="Anzahl der Wiedergaben">
+                                <i class="bi bi-play-fill"></i>
+                                @item.PlayCount
+                            </span>
                         </div>
                     </div>
                     <h3>@item.Title</h3>
@@ -536,6 +560,29 @@
         // Hier könntest du Aktionen ausführen, nachdem der Player geschlossen wurde
         // z.B. Aktualisieren des Play Count
     }
+
+    private async Task ToggleLike(DbVideoItem item)
+    {
+        item.Liked = !item.Liked;
+
+        // Like-Status in der Datenbank aktualisieren
+        await VideoService.UpdateVideoLikeStatus(item.Id, item.Liked);
+
+        StateHasChanged();
+    }
+
+    private async void HandleImageError(Microsoft.AspNetCore.Components.Web.ErrorEventArgs e, DbVideoItem item)
+    {
+        // ErrorEventArgs hat keine CurrentTarget-Eigenschaft
+        // Stattdessen setzen wir den Thumbnail-Pfad direkt im item-Objekt
+        item.Thumbnail = "/images/thumbnail-not-available.svg";
+        item.IsThumbnailNotAvailable = true;
+
+        // Erhöhe den ErrorCount in der Datenbank und im Speicher
+        await VideoService.UpdateVideoErrorCount(item.Id);
+
+        StateHasChanged();
+    }
 }
 
 <style>
@@ -905,5 +952,66 @@
 
     .thumbnail-container:hover .play-overlay {
         opacity: 1;
+    }
+
+    .thumbnail-container.not-available {
+        cursor: default;
+    }
+
+    .like-btn {
+        position: relative;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        padding: 0;
+    }
+
+    .like-btn.liked {
+        background-color: #e83e8c;
+        color: white;
+    }
+
+    .like-btn.not-liked {
+        background-color: rgba(232, 62, 140, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .like-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .like-btn i {
+        font-size: 16px;
+    }
+
+    .like-btn-container {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        display: flex;
+        gap: 8px;
+        z-index: 5;
+    }
+
+    .play-count {
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 32px;
+    }
+
+    .play-count i {
+        color: #0dcaf0;
+        font-size: 14px;
     }
 </style>

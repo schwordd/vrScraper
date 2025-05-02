@@ -47,6 +47,9 @@ namespace vrScraper.DB.Models
     public double? LocalRating { get; set; }
 
     public int? ErrorCount { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool IsThumbnailNotAvailable { get; set; }
   }
 
 }

@@ -216,6 +216,75 @@ namespace vrScraper.Services
       return vid;
     }
 
+    public async Task<bool> UpdateVideoLikeStatus(long id, bool liked)
+    {
+      try
+      {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var dbVid = await context.VideoItems.FirstOrDefaultAsync(a => a.Id == id);
+
+        if (dbVid == null)
+        {
+          return false;
+        }
+
+        dbVid.Liked = liked;
+
+        // Wenn ein Video geliked wird, kann es nicht gleichzeitig disliked sein
+        if (liked)
+        {
+          dbVid.Disliked = false;
+        }
+
+        await context.SaveChangesAsync();
+
+        // Aktualisieren des Videos im Speicher-Cache
+        var memVid = this.videoItems.FirstOrDefault(a => a.Id == id);
+        if (memVid != null)
+        {
+          memVid.Liked = liked;
+          if (liked)
+          {
+            memVid.Disliked = false;
+          }
+        }
+
+        return true;
+      }
+      catch (Exception)
+      {
+        return false;
+      }
+    }
+
+    public async Task<bool> UpdateVideoErrorCount(long id)
+    {
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+      var video = await context.VideoItems.FindAsync(id);
+
+      if (video == null)
+        return false;
+
+      if (video.ErrorCount == null)
+        video.ErrorCount = 1;
+      else
+        video.ErrorCount++;
+
+      await context.SaveChangesAsync();
+
+      // Update video in memory
+      var memVideo = videoItems.FirstOrDefault(v => v.Id == id);
+      if (memVideo != null)
+      {
+        memVideo.ErrorCount = video.ErrorCount;
+      }
+
+      logger.LogWarning("Fehler für Video-ID {0} erhöht auf {1}", id, video.ErrorCount);
+      return true;
+    }
+
     public async Task DeleteVideo(long id)
     {
       var video = await GetVideoById(id);
