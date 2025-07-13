@@ -26,7 +26,7 @@ namespace vrScraper
 | | / / ___/\__ \/ ___/ ___/ __ `/ __ \/ _ \/ ___/
 | |/ / /   ___/ / /__/ /  / /_/ / /_/ /  __/ /
 |___/_/   /____/\___/_/   \__,_/ .___/\___/_/
-                              /_/    v{GetVersion()}
+                              /_/    v {GetVersion()}
 ";
       Console.WriteLine(logo);
 
