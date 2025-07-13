@@ -5,6 +5,7 @@
 
 ## 1. Running the Service
 
+
 ### Windows
 1. **Download & Extract:**  
    Download the latest [Release](https://github.com/schwordd/vrScraper/releases) (.zip) and extract it.
