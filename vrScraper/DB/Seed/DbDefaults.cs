@@ -16,6 +16,47 @@ namespace vrScraper.DB.Seed
         });
       }
 
+      // Add automated scraping settings
+      if (defaultSettings.Exists(a => a.Key == "ScheduledScrapingEnabled") == false)
+      {
+        db.Settings.Add(new Models.DbSetting()
+        {
+          Key = "ScheduledScrapingEnabled",
+          Type = "System.Boolean",
+          Value = "false"
+        });
+      }
+
+      if (defaultSettings.Exists(a => a.Key == "ScheduledScrapingTime") == false)
+      {
+        db.Settings.Add(new Models.DbSetting()
+        {
+          Key = "ScheduledScrapingTime",
+          Type = "System.String",
+          Value = "02:00" // 2 AM default
+        });
+      }
+
+      if (defaultSettings.Exists(a => a.Key == "ScheduledScrapingMaxPages") == false)
+      {
+        db.Settings.Add(new Models.DbSetting()
+        {
+          Key = "ScheduledScrapingMaxPages",
+          Type = "System.Int32",
+          Value = "50" // Max 50 pages to prevent infinite loops
+        });
+      }
+
+      if (defaultSettings.Exists(a => a.Key == "LastScheduledScrape") == false)
+      {
+        db.Settings.Add(new Models.DbSetting()
+        {
+          Key = "LastScheduledScrape",
+          Type = "System.String",
+          Value = ""
+        });
+      }
+
       db.SaveChanges();
     }
     public static void SeedDefaultTabs(VrScraperContext db)

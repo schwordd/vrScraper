@@ -91,6 +91,9 @@ namespace vrScraper
       builder.Services.AddSingleton<ISettingService, SettingService>();
       builder.Services.AddBootstrapSelect();
 
+      // Add scheduled scraping background service
+      builder.Services.AddHostedService<ScheduledScrapingService>();
+
 
       // Register the ILogger service with DI
       builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddSerilog(dispose: true));

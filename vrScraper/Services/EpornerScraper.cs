@@ -19,8 +19,18 @@ namespace vrScraper.Services
 
     public string ScrapingStatus => this._scrapingStatus;
 
+    // Current video being processed (for UI feedback)
+    public string? CurrentVideoThumbnail => this._currentVideoThumbnail;
+    public string? CurrentVideoTitle => this._currentVideoTitle;
+
+    // Scraping Options
+    public bool StopAtKnownVideo { get; set; } = false;
+    public bool IsScheduledScraping { get; set; } = false;
+
     private bool _scrapingInprogress = false;
     private string _scrapingStatus = string.Empty;
+    private string? _currentVideoThumbnail = null;
+    private string? _currentVideoTitle = null;
     private static readonly string[] separator = ["\r\n", "\r", "\n"];
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -82,6 +92,8 @@ namespace vrScraper.Services
         {
           this._scrapingInprogress = false;
           this._scrapingStatus = string.Empty;
+          this._currentVideoThumbnail = null;
+          this._currentVideoTitle = null;
           logger.LogInformation("Scraping process finished");
         }
       });
@@ -115,6 +127,8 @@ namespace vrScraper.Services
         {
           this._scrapingInprogress = false;
           this._scrapingStatus = string.Empty;
+          this._currentVideoThumbnail = null;
+          this._currentVideoTitle = null;
           logger.LogInformation("Dead thumbnail check finished");
         }
       });
@@ -148,6 +162,8 @@ namespace vrScraper.Services
         {
           this._scrapingInprogress = false;
           this._scrapingStatus = string.Empty;
+          this._currentVideoThumbnail = null;
+          this._currentVideoTitle = null;
           logger.LogInformation("Error items deletion finished");
         }
       });
@@ -187,6 +203,8 @@ namespace vrScraper.Services
         {
           this._scrapingInprogress = false;
           this._scrapingStatus = string.Empty;
+          this._currentVideoThumbnail = null;
+          this._currentVideoTitle = null;
           logger.LogInformation("Reparse process finished");
         }
       });
@@ -246,8 +264,18 @@ namespace vrScraper.Services
         {
           cancellationToken.ThrowIfCancellationRequested();
 
-          if (context.VideoItems.Any(a => a.Site == site && a.SiteVideoId == item.VideoId))
+          var existingVideo = context.VideoItems.FirstOrDefault(a => a.Site == site && a.SiteVideoId == item.VideoId);
+          if (existingVideo != null)
           {
+            // If we should stop at known videos
+            if (StopAtKnownVideo)
+            {
+              var scrapingType = IsScheduledScraping ? "scheduled scraping" : "scraping";
+              this._scrapingStatus = $"Found known video '{item.Title}' - stopping {scrapingType}";
+              logger.LogInformation("{ScrapingType} stopped at known video: {Title} (ID: {VideoId})",
+                IsScheduledScraping ? "Scheduled scraping" : "Manual scraping", item.Title, item.VideoId);
+              return; // Exit scraping completely
+            }
             continue;
           }
 
@@ -285,7 +313,20 @@ namespace vrScraper.Services
           cancellationToken.ThrowIfCancellationRequested();
           this._scrapingStatus = $"Parse Details: {i + 1} / {newInsertions.Count}";
           logger.LogInformation(this._scrapingStatus);
-          await ParseDetails(newInsertions[i], context);
+
+          try
+          {
+            await ParseDetails(newInsertions[i], context);
+          }
+          catch (Exception ex)
+          {
+            logger.LogError(ex, "Error parsing details for VideoItem {Id}: {Title}. Skipping this video.",
+              newInsertions[i].Id, newInsertions[i].Title);
+
+            // Increase error count for this video in DB and memory
+            await vs.UpdateVideoErrorCount(newInsertions[i].Id);
+          }
+
           await Task.Delay(100, cancellationToken);
         }
 
@@ -544,33 +585,110 @@ namespace vrScraper.Services
           .Include(a => a.Tags)
           .ToListAsync(cancellationToken);
 
-      // Sortiere nach dem Laden in Memory
+      // Sortiere nach dem Laden in Memory - vom ältesten zum neuesten für Rescraping
       items = items
-          .OrderByDescending(a => Convert.ToInt32(a.SiteVideoId))
+          .OrderBy(a => Convert.ToInt32(a.SiteVideoId))
           .ToList();
 
       logger.LogInformation("Loaded {Count} items for reparse", items.Count);
 
+      var startTime = DateTime.UtcNow;
+      var errorCount = 0;
+      var successCount = 0;
+      var consecutiveErrors = 0;
+
       for (var i = 0; i < items.Count && !cancellationToken.IsCancellationRequested; i++)
       {
         var videoItem = items[i];
-        this._scrapingStatus = $"Reparse details: {i + 1} / {items.Count}";
+        var progress = (double)(i + 1) / items.Count * 100;
+
+        // Calculate ETA
+        var elapsed = DateTime.UtcNow - startTime;
+        var avgTimePerItem = elapsed.TotalSeconds / (i + 1);
+        var remainingItems = items.Count - (i + 1);
+        var etaSeconds = remainingItems * avgTimePerItem;
+        var eta = TimeSpan.FromSeconds(etaSeconds);
+
+        // Set current video info for UI feedback
+        this._currentVideoThumbnail = videoItem.Thumbnail;
+        this._currentVideoTitle = videoItem.Title;
+
+        this._scrapingStatus = $"Reparse details: {i + 1} / {items.Count} ({progress:F1}%) - ETA: {eta:hh\\:mm\\:ss} | Errors: {errorCount}, Success: {successCount}";
         logger.LogInformation(this._scrapingStatus);
+
+        var requestStartTime = DateTime.UtcNow;
+        var success = false;
 
         try
         {
           await ParseDetails(items[i], context);
+          success = true;
+          successCount++;
+          consecutiveErrors = 0;
         }
         catch (Exception ex)
         {
           logger.LogError(ex, "Error reparsing VideoItem {Id}: {Title}", videoItem.Id, videoItem.Title);
+          errorCount++;
+          consecutiveErrors++;
+
+          // Increase error count for this video in DB and memory
+          await vs.UpdateVideoErrorCount(videoItem.Id);
         }
 
-        await Task.Delay(100, cancellationToken);
+        // Defensive rate limiting with adaptive delays
+        var delay = CalculateAdaptiveDelay(i, consecutiveErrors, success, DateTime.UtcNow.Hour);
+        logger.LogDebug("Using delay: {Delay}ms for item {Item}", delay, i + 1);
+
+        await Task.Delay(delay, cancellationToken);
       }
 
       cancellationToken.ThrowIfCancellationRequested();
-      logger.LogInformation("ReparseInformations completed");
+      logger.LogInformation("ReparseInformations completed. Total: {Total}, Success: {Success}, Errors: {Errors}",
+        items.Count, successCount, errorCount);
+    }
+
+    /// <summary>
+    /// Calculates adaptive delay with defensive rate limiting to prevent blocks
+    /// </summary>
+    private int CalculateAdaptiveDelay(int itemIndex, int consecutiveErrors, bool lastSuccess, int currentHour)
+    {
+      // Base delay: 3-7 seconds (much more defensive than 100ms)
+      var baseDelay = 1000;
+
+      // Night time (22:00 - 06:00): Can be more aggressive
+      if (currentHour >= 22 || currentHour <= 6)
+      {
+        baseDelay = 1000; // 2-4 seconds at night
+      }
+      // Peak hours (09:00 - 17:00): Be more defensive  
+      else if (currentHour >= 9 && currentHour <= 17)
+      {
+        baseDelay = 1000; // 5-10 seconds during day
+      }
+
+      // Exponential backoff on consecutive errors (VERY defensive)
+      if (consecutiveErrors > 0)
+      {
+        var errorMultiplier = Math.Pow(2, Math.Min(consecutiveErrors, 6)); // Max 64x multiplier
+        baseDelay = (int)(baseDelay * errorMultiplier);
+        logger.LogWarning("Consecutive errors detected: {Count}. Increasing delay to {Delay}ms",
+          consecutiveErrors, baseDelay);
+      }
+
+      // Progressive slowdown every 100 items (prevent sustained high load)
+      var progressiveMultiplier = 1 + (itemIndex / 100) * 0.1; // +10% every 100 items
+      baseDelay = (int)(baseDelay * progressiveMultiplier);
+
+      // Add random jitter (±25%) for human-like behavior
+      var random = new Random();
+      var jitter = random.Next(-25, 26) / 100.0; // -25% to +25%
+      var finalDelay = (int)(baseDelay * (1 + jitter));
+
+      // Safety bounds: minimum 1 second, maximum 5 minutes
+      finalDelay = Math.Max(1000, Math.Min(finalDelay, 300000));
+
+      return finalDelay;
     }
 
     public async Task RemoveDeadByPicture(CancellationToken cancellationToken = default)
@@ -593,13 +711,13 @@ namespace vrScraper.Services
       // Optimierte HttpClient-Konfiguration
       using var httpClient = new HttpClient(new HttpClientHandler
       {
-          AllowAutoRedirect = true,
-          MaxAutomaticRedirections = 2,
-          AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
-          UseCookies = true
+        AllowAutoRedirect = true,
+        MaxAutomaticRedirections = 2,
+        AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate,
+        UseCookies = true
       })
       {
-          Timeout = TimeSpan.FromSeconds(3)
+        Timeout = TimeSpan.FromSeconds(3)
       };
 
       // Browser-ähnliche HTTP-Header

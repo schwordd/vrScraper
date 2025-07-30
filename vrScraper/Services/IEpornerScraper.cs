@@ -22,5 +22,13 @@ namespace vrScraper.Services
     void StopScraping();
     bool ScrapingInProgress { get; }
     string ScrapingStatus { get; }
+    
+    // Current video being processed (for UI feedback)
+    string? CurrentVideoThumbnail { get; }
+    string? CurrentVideoTitle { get; }
+    
+    // Scraping Options
+    bool StopAtKnownVideo { get; set; }
+    bool IsScheduledScraping { get; set; }
   }
 }

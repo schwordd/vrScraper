@@ -12,15 +12,105 @@
 
 <div style="min-height: 75vh;">
 
-    <!-- Tag Blacklist -->
-    <div class="form-group settings-form">
-        <label class="mr-2">Global Tag Blacklist</label>
-        <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
-                         TextField="@((item) => item.Name)"
-                         ValueField="@((item) => item.Name)"
-                         ShowSearch="true"
-                         TType="IEnumerable<string>"
-                         @bind-Value="TagBlacklist" />
+    <!-- Tag Blacklist Section -->
+    <div class="tag-blacklist-section">
+        <div class="section-header">
+            <h4 class="section-title">
+                <i class="fas fa-ban me-2"></i>
+                Content Filtering
+            </h4>
+            <p class="section-description">
+                Configure global content filters to customize your video collection
+            </p>
+        </div>
+
+        <div class="setting-card">
+            <label class="form-label fw-semibold mb-3">
+                <i class="fas fa-filter me-1"></i>
+                Global Tag Blacklist
+            </label>
+            <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                             TextField="@((item) => item.Name)"
+                             ValueField="@((item) => item.Name)"
+                             ShowSearch="true"
+                             TType="IEnumerable<string>"
+                             @bind-Value="TagBlacklist" />
+            <small class="form-text text-muted mt-2">
+                Select tags that should be filtered out from all video listings and API responses
+            </small>
+        </div>
+    </div>
+
+    <hr class="my-4" />
+
+    <!-- Scheduled Scraping Settings -->
+    <div class="scheduled-scraping-section">
+        <div class="section-header">
+            <h4 class="section-title">
+                <i class="fas fa-clock me-2"></i>
+                Automated Daily Scraping
+            </h4>
+            <p class="section-description">
+                Configure automatic daily scraping to keep your collection up-to-date
+            </p>
+        </div>
+
+        <div class="settings-grid">
+            <div class="setting-card">
+                <div class="setting-header">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="scheduledScrapingEnabled" @bind="ScheduledScrapingEnabled" />
+                        <label class="form-check-label fw-semibold" for="scheduledScrapingEnabled">
+                            Enable Automated Daily Scraping
+                        </label>
+                    </div>
+                </div>
+                <small class="text-muted">
+                    Automatically scrape new videos daily until a known video is found
+                </small>
+            </div>
+
+            <div class="setting-card">
+                <label class="form-label fw-semibold" for="scheduledScrapingTime">
+                    <i class="fas fa-clock me-1"></i>
+                    Scraping Time
+                </label>
+                <input type="text" class="form-control form-control-lg" id="scheduledScrapingTime" 
+                       @bind="ScheduledScrapingTime" placeholder="HH:MM (e.g., 02:00)" />
+                <small class="form-text text-muted">
+                    Time when daily scraping should start (24h format)
+                </small>
+            </div>
+
+            <div class="setting-card">
+                <label class="form-label fw-semibold" for="scheduledScrapingMaxPages">
+                    <i class="fas fa-shield-alt me-1"></i>
+                    Maximum Pages per Run
+                </label>
+                <input type="number" class="form-control form-control-lg" id="scheduledScrapingMaxPages" 
+                       @bind="ScheduledScrapingMaxPages" min="1" max="100" />
+                <small class="form-text text-muted">
+                    Safety limit to prevent infinite scraping (recommended: 50)
+                </small>
+            </div>
+
+            <div class="setting-card status-card">
+                <label class="form-label fw-semibold">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Last Scheduled Scrape
+                </label>
+                <div class="status-value">
+                    @if (string.IsNullOrEmpty(LastScheduledScrape))
+                    {
+                        <span class="badge bg-secondary">Never</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success">@LastScheduledScrape</span>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -45,6 +135,60 @@
         }
     }
 
+    public bool ScheduledScrapingEnabled
+    {
+        get
+        {
+            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingEnabled");
+            return bool.TryParse(s.Value, out bool result) && result;
+        }
+        set
+        {
+            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingEnabled");
+            s.Value = value.ToString();
+            this.SettingService.UpdateSetting(s);
+        }
+    }
+
+    public string ScheduledScrapingTime
+    {
+        get
+        {
+            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingTime");
+            return s.Value;
+        }
+        set
+        {
+            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingTime");
+            s.Value = value;
+            this.SettingService.UpdateSetting(s);
+        }
+    }
+
+    public int ScheduledScrapingMaxPages
+    {
+        get
+        {
+            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingMaxPages");
+            return int.TryParse(s.Value, out int result) ? result : 50;
+        }
+        set
+        {
+            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingMaxPages");
+            s.Value = value.ToString();
+            this.SettingService.UpdateSetting(s);
+        }
+    }
+
+    public string LastScheduledScrape
+    {
+        get
+        {
+            var s = AllSettings.Single(s => s.Key == "LastScheduledScrape");
+            return s.Value;
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadTags();
@@ -63,11 +207,157 @@
 }
 
 <style>
+    .scheduled-scraping-section {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-top: 1rem;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .section-header {
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+
+    .section-title {
+        color: #495057;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .section-description {
+        color: #6c757d;
+        margin-bottom: 0;
+        font-size: 0.95rem;
+    }
+
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .setting-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .setting-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .setting-header {
+        margin-bottom: 0.75rem;
+    }
+
+    .form-check-input:checked {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+
+    .form-control-lg {
+        font-size: 1rem;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        border: 2px solid #e9ecef;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .form-control-lg:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .status-card {
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        border: 1px solid #bbdefb;
+    }
+
+    .status-value {
+        margin-top: 0.5rem;
+    }
+
+    .badge {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+    }
+
+    .bg-secondary {
+        background-color: #6c757d !important;
+    }
+
+    .bg-success {
+        background-color: #28a745 !important;
+    }
+
+    .fas {
+        color: #007bff;
+    }
+
+    .form-label.fw-semibold {
+        color: #495057;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .text-muted {
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+
+    @@media (max-width: 768px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .scheduled-scraping-section {
+            padding: 1.5rem;
+        }
+        
+        .setting-card {
+            padding: 1rem;
+        }
+    }
+
+    /* Tag Blacklist Section */
+    .tag-blacklist-section {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e8f5e8 100%);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 1rem;
+        border: 1px solid #d4edda;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .tag-blacklist-section .setting-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #d4edda;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-top: 1.5rem;
+    }
+
+    .tag-blacklist-section .setting-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    /* Existing settings form style */
     .settings-form {
         display: flex;
         justify-content: space-between;
         align-items: center;
         max-width: 450px;
     }
-
 </style>
