@@ -44,6 +44,11 @@
                 </span>
 
                 <span class="filter-item">
+                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
+                    <label class="form-check-label" for="showErrorsCheck">Show only with errors</label>
+                </span>
+
+                <span class="filter-item">
                     <label for="tags">Tags:</label>
                     <div class="d-flex align-items-center gap-2">
                         <BootstrapSelect IsMultiple="true"
@@ -303,12 +308,15 @@
     private int CurrentPage { get; set; } = 1;
     private int PageSize { get; set; } = 30;
 
-    private List<DbVideoItem> VideoItems = new List<DbVideoItem>();
+    private List<DbVideoItem> VideoItems => VideoService.GetVideoItems().GetAwaiter().GetResult();
     private string _currentSortOption = "latest";
 
     private bool _showOnlyLiked;
     private bool _showOnlyUnwatched;
+    private bool _showOnlyWithErrors;
     private Random rng = new Random();
+    private List<DbVideoItem>? _cachedRandomItems = null;
+    private string? _lastRandomSeed = null;
 
     public bool ShowOnlyLiked
     {
@@ -319,6 +327,7 @@
             {
                 _showOnlyLiked = value;
                 CurrentPage = 1; // Reset page on filter change
+                _cachedRandomItems = null; // Clear cache on filter change
             }
         }
     }
@@ -332,6 +341,21 @@
             {
                 _showOnlyUnwatched = value;
                 CurrentPage = 1; // Reset page on filter change
+                _cachedRandomItems = null; // Clear cache on filter change
+            }
+        }
+    }
+
+    public bool ShowOnlyWithErrors
+    {
+        get => _showOnlyWithErrors;
+        set
+        {
+            if (_showOnlyWithErrors != value)
+            {
+                _showOnlyWithErrors = value;
+                CurrentPage = 1; // Reset page on filter change
+                _cachedRandomItems = null; // Clear cache on filter change
             }
         }
     }
@@ -345,24 +369,80 @@
             {
                 _currentSortOption = value;
                 CurrentPage = 1; // Reset page on sort change
+                
+                // Clear random cache when switching away from random
+                if (value != "random")
+                {
+                    _cachedRandomItems = null;
+                    _lastRandomSeed = null;
+                }
+                // Generate new random seed when switching to random
+                else if (value == "random")
+                {
+                    _lastRandomSeed = Guid.NewGuid().ToString();
+                    _cachedRandomItems = null;
+                }
             }
         }
     }
 
-    private List<DbVideoItem> FilteredItems => VideoItems
-        .Where(v => (!_showOnlyLiked || v.Liked) &&
-                (!_showOnlyUnwatched || v.PlayCount == 0) &&
-                (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
-                (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))))
-        .OrderByDescending(v => _currentSortOption switch
+    private List<DbVideoItem> FilteredItems
+    {
+        get
         {
-            "latest" => Convert.ToInt32(v.SiteVideoId),
-            "rating" => v.SiteRating ?? 0,
-            "random" => rng.Next(),
-            "playtime" => v.PlayDurationEst.TotalSeconds,
-            _ => Convert.ToInt32(v.SiteVideoId)
-        })
-        .ToList();
+            // Use cached random items if in random mode and cache exists
+            if (_currentSortOption == "random" && _cachedRandomItems != null)
+            {
+                return _cachedRandomItems;
+            }
+            
+            var items = VideoItems;
+            
+            // Apply global tag blacklist
+            var setting = SettingService.GetSetting("TagBlacklist").GetAwaiter().GetResult();
+            var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
+            items = items.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
+            
+            // Apply filters
+            var filteredItems = items
+                .Where(v => (!_showOnlyLiked || v.Liked) &&
+                        (!_showOnlyUnwatched || v.PlayCount == 0) &&
+                        (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
+                        (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
+                        (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))));
+
+            // Apply sorting
+            List<DbVideoItem> sortedItems;
+            if (_currentSortOption == "random")
+            {
+                // Create stable random order using seed
+                var seed = _lastRandomSeed?.GetHashCode() ?? 0;
+                var seededRng = new Random(seed);
+                sortedItems = filteredItems
+                    .Select(v => new { Item = v, Order = seededRng.Next() })
+                    .OrderByDescending(x => x.Order)
+                    .Select(x => x.Item)
+                    .ToList();
+                    
+                // Cache the random order
+                _cachedRandomItems = sortedItems;
+            }
+            else
+            {
+                sortedItems = filteredItems
+                    .OrderByDescending(v => _currentSortOption switch
+                    {
+                        "latest" => Convert.ToInt32(v.SiteVideoId),
+                        "rating" => v.SiteRating ?? 0,
+                        "playtime" => v.PlayDurationEst.TotalSeconds,
+                        _ => Convert.ToInt32(v.SiteVideoId)
+                    })
+                    .ToList();
+            }
+            
+            return sortedItems;
+        }
+    }
 
     private List<DbTag> AllTags { get { return this.AvailableTags.Select(x => x.Tag).ToList(); } }
     private List<DbStar> AllStars { get { return this.AvailableActresses.Select(x => x.Star).ToList(); } }
@@ -399,14 +479,9 @@
 
     private async Task LoadVideos()
     {
-        VideoItems = await VideoService.GetVideoItems();
-
-        //global tag blacklist
-        var setting = await SettingService.GetSetting("TagBlacklist");
-        var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
-        VideoItems = VideoItems.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
-
-        CurrentPage = 1; // Nach dem Laden der Videos zur ersten Seite wechseln
+        // Nur noch für das initiale Laden der Seite benötigt
+        CurrentPage = 1;
+        StateHasChanged();
     }
 
     private async Task LoadTags()
@@ -423,12 +498,14 @@
     {
         SelectedTags = e.ToHashSet();
         CurrentPage = 1; // Reset page on filter change
+        _cachedRandomItems = null; // Clear cache on filter change
     }
 
     private void OnActressesChanged(IEnumerable<string> e)
     {
         SelectedActresses = e.ToHashSet();
         CurrentPage = 1; // Reset page on filter change
+        _cachedRandomItems = null; // Clear cache on filter change
     }
 
     private void NextPage()
@@ -499,12 +576,10 @@
 
         await VideoService.DeleteVideo(videoId);
 
-        // Entferne das Video direkt aus der lokalen Liste
+        // Hole das Video für die Tag- und Star-Zähler Aktualisierung
         var videoToRemove = VideoItems.FirstOrDefault(v => v.Id == videoId);
         if (videoToRemove != null)
         {
-            VideoItems.Remove(videoToRemove);
-
             // Aktualisiere die Tag- und Star-Zähler
             foreach (var tag in videoToRemove.Tags)
             {

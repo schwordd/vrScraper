@@ -94,6 +94,10 @@ namespace vrScraper.Services
           this._scrapingStatus = string.Empty;
           this._currentVideoThumbnail = null;
           this._currentVideoTitle = null;
+          
+          // Reload VideoService cache after scraping
+          await vs.ReloadVideos();
+          
           logger.LogInformation("Scraping process finished");
         }
       });
@@ -129,6 +133,10 @@ namespace vrScraper.Services
           this._scrapingStatus = string.Empty;
           this._currentVideoThumbnail = null;
           this._currentVideoTitle = null;
+          
+          // Reload VideoService cache after removing dead thumbnails
+          await vs.ReloadVideos();
+          
           logger.LogInformation("Dead thumbnail check finished");
         }
       });
@@ -164,6 +172,10 @@ namespace vrScraper.Services
           this._scrapingStatus = string.Empty;
           this._currentVideoThumbnail = null;
           this._currentVideoTitle = null;
+          
+          // Reload VideoService cache after deleting error items
+          await vs.ReloadVideos();
+          
           logger.LogInformation("Error items deletion finished");
         }
       });
@@ -205,6 +217,10 @@ namespace vrScraper.Services
           this._scrapingStatus = string.Empty;
           this._currentVideoThumbnail = null;
           this._currentVideoTitle = null;
+          
+          // Reload VideoService cache after reparsing
+          await vs.ReloadVideos();
+          
           logger.LogInformation("Reparse process finished");
         }
       });
@@ -708,7 +724,7 @@ namespace vrScraper.Services
       var deadCount = 0;
       var errorCount = 0;
 
-      // Optimierte HttpClient-Konfiguration
+      // Optimierte HttpClient-Konfiguration mit längerem Timeout
       using var httpClient = new HttpClient(new HttpClientHandler
       {
         AllowAutoRedirect = true,
@@ -717,7 +733,7 @@ namespace vrScraper.Services
         UseCookies = true
       })
       {
-        Timeout = TimeSpan.FromSeconds(3)
+        Timeout = TimeSpan.FromSeconds(5) // Moderater Timeout
       };
 
       // Browser-ähnliche HTTP-Header
@@ -727,48 +743,72 @@ namespace vrScraper.Services
       httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
       httpClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
 
-      // Verarbeite jeweils 5 Videos parallel, aber nicht mehr
-      var semaphore = new SemaphoreSlim(5);
+      // Moderately defensive: 3 parallel connections
+      var semaphore = new SemaphoreSlim(3);
+      var runningTasks = new List<Task>();
 
       foreach (var item in items)
       {
+        // Check for cancellation before starting new tasks
+        if (cancellationToken.IsCancellationRequested) 
+        {
+          logger.LogInformation("Thumbnail check cancelled, stopping new task creation");
+          break;
+        }
+
         try
         {
           await semaphore.WaitAsync(cancellationToken);
 
-          // Starte die Prüfung als Task
-          _ = Task.Run(async () =>
+          // Starte die Prüfung als Task und behalte Referenz
+          var task = Task.Run(async () =>
           {
             try
             {
+              // Check cancellation at start of task
+              if (cancellationToken.IsCancellationRequested) return;
+              
               var status = await CheckThumbnailAsync(httpClient, item, cancellationToken);
 
               if (status == ThumbnailStatus.Success)
                 Interlocked.Increment(ref successCount);
               else if (status == ThumbnailStatus.DeadLink)
                 Interlocked.Increment(ref deadCount);
+              else if (status == ThumbnailStatus.Timeout)
+                Interlocked.Increment(ref errorCount); // Zähle als Error in Statistik, aber kein ErrorCount am Video
               else
                 Interlocked.Increment(ref errorCount);
 
               var count = Interlocked.Increment(ref processedCount);
 
-              // Aktualisiere den Status alle 5 Elemente
-              if (count % 5 == 0 || count == totalCount)
+              // Aktualisiere den Status alle 10 Elemente
+              if (count % 10 == 0 || count == totalCount)
               {
                 this._scrapingStatus = $"Checking thumbnails: {count}/{totalCount} ({(count * 100.0 / totalCount):F1}%) - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
               }
 
-              // Speichere die Änderungen alle 20 Elemente
-              if (count % 20 == 0 || count == totalCount)
+              // Speichere die Änderungen alle 50 Elemente
+              if (count % 50 == 0 || count == totalCount)
               {
-                await context.SaveChangesAsync(cancellationToken);
-                logger.LogInformation($"Progress: {count}/{totalCount} items checked - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                  await context.SaveChangesAsync(cancellationToken);
+                  logger.LogInformation($"Progress: {count}/{totalCount} items checked - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
+                }
               }
+            }
+            catch (OperationCanceledException)
+            {
+              // Expected when cancelled, don't log as error
+              logger.LogDebug($"Thumbnail check cancelled for video {item.Id}");
             }
             catch (Exception ex)
             {
-              logger.LogError(ex, $"Error checking thumbnail for video {item.Id}");
-              Interlocked.Increment(ref errorCount);
+              if (!cancellationToken.IsCancellationRequested)
+              {
+                logger.LogError(ex, $"Error checking thumbnail for video {item.Id}");
+                Interlocked.Increment(ref errorCount);
+              }
             }
             finally
             {
@@ -776,8 +816,16 @@ namespace vrScraper.Services
             }
           }, cancellationToken);
 
-          // Kurze Verzögerung zwischen Task-Starts, um Last zu verteilen
-          await Task.Delay(100, cancellationToken);
+          runningTasks.Add(task);
+
+          // Moderate Verzögerung zwischen Task-Starts (500ms)
+          await Task.Delay(500, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+          semaphore.Release();
+          logger.LogInformation("Thumbnail check cancelled during task creation");
+          break;
         }
         catch (Exception ex)
         {
@@ -786,28 +834,45 @@ namespace vrScraper.Services
         }
       }
 
-      // Warte, bis alle Anfragen abgeschlossen sind (maximal 5 Minuten)
-      for (int i = 0; i < 300 && processedCount < totalCount; i++)
+      // Warte auf alle laufenden Tasks oder bis Cancellation
+      try
       {
-        if (cancellationToken.IsCancellationRequested) break;
-
-        this._scrapingStatus = $"Checking thumbnails: {processedCount}/{totalCount} ({(processedCount * 100.0 / totalCount):F1}%) - Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
-        await Task.Delay(1000, cancellationToken);
+        // Gib den Tasks maximal 10 Sekunden nach Cancellation zum Beenden
+        using (var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+        {
+          cts.CancelAfter(TimeSpan.FromSeconds(10));
+          await Task.WhenAll(runningTasks).ConfigureAwait(false);
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        logger.LogInformation("Waiting for running thumbnail checks to complete after cancellation");
+      }
+      catch (Exception ex)
+      {
+        logger.LogError(ex, "Error waiting for thumbnail check tasks");
       }
 
-      // Abschließende Speicherung
-      await context.SaveChangesAsync(cancellationToken);
-      logger.LogInformation($"Finished checking thumbnails. Summary: Total: {totalCount}, Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
-
-      this._scrapingStatus = $"✓ Finished checking {totalCount} thumbnails. Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
-      await Task.Delay(2000, cancellationToken);
+      // Abschließende Speicherung nur wenn nicht cancelled
+      if (!cancellationToken.IsCancellationRequested)
+      {
+        await context.SaveChangesAsync(cancellationToken);
+        logger.LogInformation($"Finished checking thumbnails. Summary: Total: {totalCount}, Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
+        this._scrapingStatus = $"✓ Finished checking {totalCount} thumbnails. Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}";
+      }
+      else
+      {
+        logger.LogInformation($"Thumbnail check cancelled. Processed: {processedCount}/{totalCount}, Ok: {successCount}, Dead: {deadCount}, Errors: {errorCount}");
+        this._scrapingStatus = $"Thumbnail check stopped. Processed: {processedCount}/{totalCount}";
+      }
     }
 
     private enum ThumbnailStatus
     {
       Success,
       DeadLink,
-      Error
+      Error,
+      Timeout  // Neuer Status für Timeouts
     }
 
     private async Task<ThumbnailStatus> CheckThumbnailAsync(HttpClient httpClient, DbVideoItem item, CancellationToken cancellationToken)
@@ -822,6 +887,7 @@ namespace vrScraper.Services
         {
           if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
           {
+            // Nur bei 404 den ErrorCount erhöhen (eindeutig totes Bild)
             item.ErrorCount = (item.ErrorCount ?? 0) + 1;
             logger.LogInformation($"Dead thumbnail found for video {item.Id}: {item.Title}");
             return ThumbnailStatus.DeadLink;
@@ -837,16 +903,22 @@ namespace vrScraper.Services
           return ThumbnailStatus.Success;
         }
       }
+      catch (TaskCanceledException tcEx)
+      {
+        // Timeout - KEINEN ErrorCount erhöhen, könnte temporär sein
+        logger.LogDebug($"Timeout checking thumbnail for video {item.Id}: {item.Title} - No error count increase");
+        return ThumbnailStatus.Timeout;
+      }
+      catch (HttpRequestException httpEx)
+      {
+        // Netzwerkfehler - KEINEN ErrorCount erhöhen, könnte temporär sein
+        logger.LogWarning($"Network error for video {item.Id}: {httpEx.Message} - No error count increase");
+        return ThumbnailStatus.Timeout;
+      }
       catch (Exception ex)
       {
-        if (ex is TaskCanceledException || ex is HttpRequestException)
-        {
-          logger.LogWarning($"Network error for video {item.Id}: {ex.Message}");
-        }
-        else
-        {
-          logger.LogError(ex, $"Unexpected error checking video {item.Id}");
-        }
+        // Unerwarteter Fehler
+        logger.LogError(ex, $"Unexpected error checking video {item.Id}");
         return ThumbnailStatus.Error;
       }
     }

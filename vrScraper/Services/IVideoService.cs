@@ -7,6 +7,7 @@ namespace vrScraper.Services
   public interface IVideoService
   {
     Task Initialize();
+    Task ReloadVideos();
     Task<List<DbVideoItem>> GetVideoItems();
     Task<DbVideoItem> GetVideoById(long id);
     Task<List<(DbTag Tag, long Count)>> GetTagInfos();

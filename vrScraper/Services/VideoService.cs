@@ -25,6 +25,7 @@ namespace vrScraper.Services
     private object listLock = new object();
     List<(long Id, DateTime Requested)> Requests = new List<(long Id, DateTime Requested)>();
     private bool nextRecordValid = false;
+    private bool backgroundTaskStarted = false;
 
     public DbVideoItem? CurrentLiveVideo => this.currentVideo;
 
@@ -33,12 +34,27 @@ namespace vrScraper.Services
 
     public async Task Initialize()
     {
-      logger.LogInformation("loading all video meta data");
+      await ReloadVideos();
+    }
+
+    public async Task ReloadVideos()
+    {
+      logger.LogInformation("reloading all video meta data");
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
       this.videoItems = await context.VideoItems.Include(a => a.Tags).Include(a => a.Stars).AsNoTracking().AsSplitQuery().ToListAsync();
-      logger.LogInformation("all video meta data loaded ({items} items)", this.videoItems.Count);
+      logger.LogInformation("all video meta data reloaded ({items} items)", this.videoItems.Count);
 
+      // Only start the background task if not already started
+      if (!backgroundTaskStarted)
+      {
+        backgroundTaskStarted = true;
+        StartBackgroundTask();
+      }
+    }
+
+    private void StartBackgroundTask()
+    {
       new Task(() =>
       {
         while (true)
