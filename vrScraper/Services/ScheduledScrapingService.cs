@@ -103,7 +103,6 @@ namespace vrScraper.Services
         }
 
         // Set scraping options
-        scraper.StopAtKnownVideo = true;
         scraper.IsScheduledScraping = true;
 
         _logger.LogInformation("Starting scheduled scraping with max {MaxPages} pages", maxPages);
@@ -141,7 +140,6 @@ namespace vrScraper.Services
       finally
       {
         // Reset scraping options
-        scraper.StopAtKnownVideo = false;
         scraper.IsScheduledScraping = false;
       }
     }

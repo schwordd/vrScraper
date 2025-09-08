@@ -24,7 +24,6 @@ namespace vrScraper.Services
     public string? CurrentVideoTitle => this._currentVideoTitle;
 
     // Scraping Options
-    public bool StopAtKnownVideo { get; set; } = false;
     public bool IsScheduledScraping { get; set; } = false;
 
     private bool _scrapingInprogress = false;
@@ -283,15 +282,6 @@ namespace vrScraper.Services
           var existingVideo = context.VideoItems.FirstOrDefault(a => a.Site == site && a.SiteVideoId == item.VideoId);
           if (existingVideo != null)
           {
-            // If we should stop at known videos
-            if (StopAtKnownVideo)
-            {
-              var scrapingType = IsScheduledScraping ? "scheduled scraping" : "scraping";
-              this._scrapingStatus = $"Found known video '{item.Title}' - stopping {scrapingType}";
-              logger.LogInformation("{ScrapingType} stopped at known video: {Title} (ID: {VideoId})",
-                IsScheduledScraping ? "Scheduled scraping" : "Manual scraping", item.Title, item.VideoId);
-              return; // Exit scraping completely
-            }
             continue;
           }
 

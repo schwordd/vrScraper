@@ -28,7 +28,6 @@ namespace vrScraper.Services
     string? CurrentVideoTitle { get; }
     
     // Scraping Options
-    bool StopAtKnownVideo { get; set; }
     bool IsScheduledScraping { get; set; }
   }
 }
