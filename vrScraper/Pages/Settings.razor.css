@@ -1,0 +1,153 @@
+.scheduled-scraping-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 1rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.section-header {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.section-title {
+    color: #495057;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.section-description {
+    color: #6c757d;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.setting-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.setting-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.setting-header {
+    margin-bottom: 0.75rem;
+}
+
+.form-check-input:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.form-control-lg {
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    border: 2px solid #e9ecef;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control-lg:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.status-card {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    border: 1px solid #bbdefb;
+}
+
+.status-value {
+    margin-top: 0.5rem;
+}
+
+.badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.bg-success {
+    background-color: #28a745 !important;
+}
+
+.fas {
+    color: #007bff;
+}
+
+.form-label.fw-semibold {
+    color: #495057;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+}
+
+.text-muted {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .scheduled-scraping-section {
+        padding: 1.5rem;
+    }
+    
+    .setting-card {
+        padding: 1rem;
+    }
+}
+
+/* Tag Blacklist Section */
+.tag-blacklist-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e8f5e8 100%);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1rem;
+    border: 1px solid #d4edda;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.tag-blacklist-section .setting-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid #d4edda;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-top: 1.5rem;
+}
+
+.tag-blacklist-section .setting-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Existing settings form style */
+.settings-form {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 450px;
+}

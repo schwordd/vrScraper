@@ -1,0 +1,14 @@
+.star-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.star-pill {
+    background-color: #ff7bff;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    white-space: nowrap;
+}

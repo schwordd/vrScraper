@@ -1,0 +1,13 @@
+/* Global Bootstrap-Select Overrides für vrScraper */
+/* Nur die wichtigen Höhen-Einstellungen */
+
+.bootstrap-select .dropdown-menu .inner {
+    max-height: 350px !important;
+    overflow-y: auto !important;
+}
+
+/* Fallback für verschiedene Zustände */
+.dropdown-menu .inner.show {
+    max-height: 350px !important;
+    overflow-y: auto !important;
+}

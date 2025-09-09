@@ -1,0 +1,9 @@
+.card.p-2.default {
+    opacity: 0.6;
+}
+
+.fake-select {
+    width: 220px;
+    background-color: var(--bs-btn-bg);
+    text-align: left;
+}
