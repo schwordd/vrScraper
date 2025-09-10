@@ -41,17 +41,17 @@
                             @if (!tab.IsEditing)
                             {
                                 <div class="d-flex align-items-center">
-                                    <h6 class="card-title mb-1 me-1" style="min-height:32px; display: flex; align-items: center;">
+                                    <h6 class="card-title card-title-flexible mb-1 me-1">
                                         @tab.Name
                                     </h6>
-                                    <button class="btn btn-link btn-sm p-0 ml-1" style="margin-left: 4px;" @onclick="() => StartEditing(tab)">
-                                        <i class="bi bi-pencil" style="font-size: 0.85rem;"></i>
+                                    <button class="btn btn-link btn-sm p-0 ml-1 edit-btn" @onclick="() => StartEditing(tab)">
+                                        <i class="bi bi-pencil edit-icon"></i>
                                     </button>
                                 </div>
                             }
                             else
                             {
-                                <input type="text" class="form-control form-control-sm ml-auto me-1" style="flex-grow: 1; min-width: 120px;" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
+                                <input type="text" class="form-control form-control-sm ml-auto me-1 tab-name-input" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
                                 <button class="btn btn-sm btn-outline-secondary ml-2 me-1" @onclick="() => StopEditing(tab)">
                                     <i class="bi bi-check-lg"></i>
                                 </button>
@@ -59,7 +59,7 @@
                         }
                         else
                         {
-                            <h6 class="card-title mb-1" style="min-height:32px;">@tab.Name</h6>
+                            <h6 class="card-title card-title-min mb-1">@tab.Name</h6>
                         }
 
                         @if (tab.Type != "DEFAULT")
@@ -78,7 +78,7 @@
                     {
                       <div class="form-group mb-1 d-flex justify-content-between align-items-center">
                           <label class="mr-2">Order</label>
-                          <input type="number" min="0" class="form-control form-control-sm input-sm ml-auto" style="width: 140px;" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" disabled="@IsDefaultTab(tab)" />
+                          <input type="number" min="0" class="form-control form-control-sm input-sm ml-auto order-input" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" disabled="@IsDefaultTab(tab)" />
                       </div>
                     }
 

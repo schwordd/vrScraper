@@ -120,6 +120,11 @@
     }
 }
 
+/* Container */
+.settings-container {
+    min-height: 75vh;
+}
+
 /* Tag Blacklist Section */
 .tag-blacklist-section {
     background: linear-gradient(135deg, #f8f9fa 0%, #e8f5e8 100%);

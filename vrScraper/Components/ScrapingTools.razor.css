@@ -5,6 +5,18 @@
     gap: 8px;
 }
 
+.input-width-small {
+    width: 80px;
+}
+
+.progress-height {
+    height: 20px;
+}
+
+.progress-full {
+    width: 100%;
+}
+
 .status-container {
     margin-top: 20px;
 }

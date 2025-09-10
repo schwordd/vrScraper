@@ -1,3 +1,7 @@
+.clickable-header {
+    cursor: pointer;
+}
+
 .star-container {
     display: flex;
     flex-wrap: wrap;

@@ -1,3 +1,7 @@
+.clickable-header {
+    cursor: pointer;
+}
+
 .tag-container {
     display: flex;
     flex-wrap: wrap;

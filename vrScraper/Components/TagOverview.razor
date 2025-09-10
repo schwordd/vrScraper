@@ -3,7 +3,7 @@
 @inject IVideoService Videos
 
 <div class="card mt-2">
-    <div class="card-header" @onclick="ToggleCollapse" style="cursor: pointer;">
+    <div class="card-header clickable-header" @onclick="ToggleCollapse">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
                 <i class="bi @(isCollapsed ? "bi-caret-right-fill" : "bi-caret-down-fill")"></i>

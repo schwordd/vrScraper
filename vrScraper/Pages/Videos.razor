@@ -16,7 +16,7 @@
 
 @using Blzr.BootstrapSelect
 
-<div style="min-height: 75vh; display: flex; flex-direction: column;">
+<div class="main-container">
 
     <div class="filters">
         <div class="filter-container">
@@ -25,7 +25,7 @@
 
                 <span class="filter-item">
                     <label for="sort">Sort by:</label>
-                    <select class="form-select" @bind="CurrentSortOption" style="width: auto;">
+                    <select class="form-select sort-select" @bind="CurrentSortOption">
                         <option value="latest">Latest</option>
                         <option value="rating">Rating</option>
                         <option value="random">Random</option>

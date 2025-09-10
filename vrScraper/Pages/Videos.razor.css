@@ -1,5 +1,15 @@
 /* Dropdown Styles sind jetzt in bootstrap-select-overrides.css global definiert */
 
+.main-container {
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.sort-select {
+    width: auto;
+}
+
 .filters {
     margin-bottom: 20px;
     padding: 10px;

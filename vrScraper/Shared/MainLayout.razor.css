@@ -2,10 +2,25 @@
     border-right: 1px solid #ddd;
 }
 
+.sidebar-custom {
+    min-width: 200px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: sticky;
+    top: 0;
+}
+
 .main {
     display: flex;
     flex-direction: column;
     width: 100%;
+}
+
+.main-custom {
+    height: 100vh;
+    overflow: hidden;
 }
 
 .title {
@@ -19,6 +34,7 @@
 .content {
     overflow-y: auto;
     padding-top: 20px;
+    height: 100vh;
 }
 
 .version {

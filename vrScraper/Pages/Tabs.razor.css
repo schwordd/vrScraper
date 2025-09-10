@@ -7,3 +7,30 @@
     background-color: var(--bs-btn-bg);
     text-align: left;
 }
+
+.card-title-flexible {
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+}
+
+.card-title-min {
+    min-height: 32px;
+}
+
+.edit-btn {
+    margin-left: 4px;
+}
+
+.edit-icon {
+    font-size: 0.85rem;
+}
+
+.tab-name-input {
+    flex-grow: 1;
+    min-width: 120px;
+}
+
+.order-input {
+    width: 140px;
+}

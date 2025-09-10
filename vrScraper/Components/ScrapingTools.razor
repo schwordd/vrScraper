@@ -8,11 +8,11 @@
 <div class="scraper">
     <div class="pe-2">
         <label for="startPage">Start Page:</label>
-        <InputNumber @bind-Value="startPage" id="startPage" class="form-control" style="width: 80px;" disabled="@Scraper.ScrapingInProgress" />
+        <InputNumber @bind-Value="startPage" id="startPage" class="form-control input-width-small" disabled="@Scraper.ScrapingInProgress" />
     </div>
     <div class="pe-2">
         <label for="count">Pages:</label>
-        <InputNumber @bind-Value="count" id="count" class="form-control" style="width: 80px;" disabled="@Scraper.ScrapingInProgress" />
+        <InputNumber @bind-Value="count" id="count" class="form-control input-width-small" disabled="@Scraper.ScrapingInProgress" />
     </div>
     <div class="pe-2">
         <button class="btn btn-primary" @onclick="Scrape" disabled="@Scraper.ScrapingInProgress">Scrape</button>
@@ -45,12 +45,12 @@
                 <i class="bi bi-info-circle"></i> Status
             </div>
             <div class="card-body">
-                <div class="progress mb-2" style="height: 20px;">
+                <div class="progress progress-height mb-2">
                     @if (GetProgressPercentage() > 0)
                     {
                         <div class="progress-bar progress-bar-striped progress-bar-animated"
                              role="progressbar"
-                             style="width: @(GetProgressPercentage())%;"
+                             style="width: @(GetProgressPercentage())%"
                              aria-valuenow="@GetProgressPercentage()"
                              aria-valuemin="0"
                              aria-valuemax="100">
@@ -59,9 +59,8 @@
                     }
                     else
                     {
-                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                        <div class="progress-bar progress-bar-striped progress-bar-animated progress-full"
                              role="progressbar"
-                             style="width: 100%;"
                              aria-valuenow="100"
                              aria-valuemin="0"
                              aria-valuemax="100">

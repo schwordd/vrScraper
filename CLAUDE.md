@@ -130,3 +130,4 @@ Core entities:
 - **All-in-Memory Architecture**: Videos loaded once at startup, not queried per-request
 - **Defensive Rate Limiting**: Prevents blocks from scraped sites with adaptive timing
 - **Background Processing**: Scheduled tasks run independently without blocking main application
+- nur einzeiler als commit messages
