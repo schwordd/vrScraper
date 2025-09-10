@@ -55,6 +55,7 @@ VrScraper is an ASP.NET Core 8.0 web application that serves as a VR video scrap
 - Blazor Server for web interface
 - Components for video player, actor overview, tag management
 - Real-time scraping progress via SignalR
+- CSS Isolation: Each component has its own .razor.css file for scoped styling
 
 ### Key Design Patterns
 
@@ -98,6 +99,14 @@ Core entities:
 - All-in-memory video loading: ~21,960+ videos loaded at startup for optimal VR API performance
 - Settings seeded automatically via `DbDefaults.SeedDefaultSettings()` in `DB/Seed/DbDefaults.cs`
 
+### Code Style Guidelines
+
+#### CSS Organization
+- **No Inline Styles**: All styles should be in component-specific .razor.css files
+- **CSS Isolation**: Each Razor component should have its own .razor.css file for scoped styles
+- **Class Naming**: Use descriptive, semantic class names instead of inline styles
+- **Dynamic Styles**: Only use inline styles for truly dynamic values (e.g., calculated widths)
+
 ### Implemented Features
 
 #### Automated Daily Scraping System
@@ -120,6 +129,7 @@ Core entities:
 - **Responsive Layout**: CSS Grid with mobile-friendly breakpoints
 - **FontAwesome Icons**: Visual hierarchy and professional appearance
 - **Consistent Styling**: Unified design across Tag Blacklist and Scheduled Scraping sections
+- **CSS Isolation**: All inline styles extracted to component-specific .razor.css files for better maintainability
 
 ### Content Filtering
 - **Global Tag Blacklist**: JSON array stored in Settings, applies to all VR APIs and UI
