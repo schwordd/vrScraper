@@ -79,15 +79,9 @@ body {
 }
 
 .card {
-    border: none;
-    border-radius: var(--border-radius);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-    transition: all var(--transition-speed) ease;
-}
-
-.card:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    transform: translateY(-2px);
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: none;
 }
 
 .badge {

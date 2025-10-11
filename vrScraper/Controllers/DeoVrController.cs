@@ -161,7 +161,7 @@ namespace vrScraper.Controllers
             foreach (var item in videoWl!)
               matchingItems = matchingItems.Where(a => a.Id == Convert.ToInt64(item));
 
-            foreach (var item in videoWl!)
+            foreach (var item in videoBl!)
               matchingItems = matchingItems.Where(a => a.Id != Convert.ToInt64(item));
 
 

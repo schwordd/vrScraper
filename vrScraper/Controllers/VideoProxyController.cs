@@ -59,7 +59,7 @@ namespace vrScraper.Controllers
                 }
 
                 // Erhöhe den Play Count
-                _videoService.SetPlayedVideo(video);
+                //_videoService.SetPlayedVideo(video);
 
                 // Extrahiere Range-Header, falls vorhanden
                 string rangeHeader = Request.Headers["Range"].ToString();

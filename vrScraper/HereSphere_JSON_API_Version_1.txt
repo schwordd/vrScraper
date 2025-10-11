@@ -1,0 +1,343 @@
+HereSphere JSON API Version 1
+
+Using the /heresphere endpoint on your website, you can supply JSON content for HereSphere to parse into a convenient video library interface. For example, https://www.example.com/heresphere
+
+The app will use a http POST request sent to the /heresphere endpoint with the body containing the following json content:
+{
+    "username" : "ExampleUser",
+    "password" : "ExamplePass"
+}
+
+The response header at the /heresphere endpoint should contain:
+HereSphere-JSON-Version: 1 (integer with the HereSphere JSON API version used)
+
+If "HereSphere-JSON-Version" is detected in the response header, then the app will switch to the video library interface in the app.
+If the url ends with "/heresphere", then the player will attempt to load the API view automatically without needing to press the web API button.
+This means you can place a link pointing to the /heresphere endpoint on your website, and if a user clicks on it, the player should automatically load the web API view.
+
+You should supply different JSON content depending on whether the user has premium access.
+If you would prefer to use an authentication token instead of a username and password, then you can provide the token at the /heresphere/auth endpoint.
+HereSphere will send a POST request to the /heresphere/auth endpoint with the username and password in the JSON body. The response should be the following JSON body:
+{
+    "auth-token" : "example-auth-token-12345abcdef" (string that contains the authentication token)
+    "access" : 1 (integer that signals user access state: 0 = guest, 1 = member, -1 = bad login)
+}
+HereSphere will store the authentication token instead of the password, and every HereSphere API POST request will have a header with the field "auth-token" supplied.
+
+*****************************************************************************************************************************************
+
+The JSON content at the /heresphere endpoint should have the following fields:
+
+access: 0 (integer that signals user access state: 0 = guest, 1 = member, -1 = bad login)
+banner: (object with two fields used to display a clickable banner)
+{
+    image: "https://www.example.com/heresphere/banner.png" (url to the image used in the banner, max size is 1920x200p, use alpha transparency with rounded corners to make it look nicer)
+    link: "https://www.example.com/signup" (url to destination when banner is clicked, like a signup page)
+}
+library: (object array with lists of video data urls)
+[
+    {
+        name: "Recent" (string with the name of the list)
+        list: (string array with urls to video data)
+        [
+            0: "https://www.example.com/heresphere/videoID1" (url to first video data)
+            1: "https://www.example.com/heresphere/videoID2" (url to second video data)
+            2: "https://www.example.com/heresphere/videoID3" (url to third video data)
+        ]
+    }
+    {
+        name: "Recommended" (another example list name)
+        list: (string array with urls to video data)
+        [
+            0: "https://www.example.com/heresphere/videoID3" (url to first recommended video, notice this is pointing to videoID3)
+            1: "https://www.example.com/heresphere/videoID1" (url to second recommended video, notice this is pointing to videoID1)
+        ]
+    }
+]
+
+You can add as many lists as you like. The name of each list will be displayed at the top of the video library interface. The user can click on it to display the specific list of videos arranged in sequential order.
+The app will scan the entire list and send a http GET request to every video url to retrieve video data like title, thumbnails, and tags to fill out the video library user interface.
+These requests occur very rapidly, so make sure your bot detection systems allow these requests through.
+Alternatively, you can provide the library scan data at the /heresphere/scan endpoint to reduce the number of requests needed. Details for the /heresphere/scan endpoint are at the bottom of the documentation.
+
+*****************************************************************************************************************************************
+
+When a user wants to play a video, a http POST request will be sent to the video url endpoint with the following json content:
+{
+    "username" : "ExampleUser",
+    "password" : "ExamplePass",
+    "needsMediaSource" : true (boolean field indicates that the media sources are needed because the user is playing the video. If it's false, this means the app just needs the video data for displaying in the UI.
+                               If the needsMediaSource field is missing, you should assume that it's true, because this is a request made by an older version of the HereSphere app)
+}
+If an authentication token is used, then it will be supplied via the header field "auth-token".
+If the user is authorized, then you should provide the full video. Else, a trailer can be provided.
+
+Each video data url should have this response header:
+HereSphere-JSON-Version: 1 (integer with the HereSphere JSON API version used)
+
+Each video data url should have JSON content with the following fields:
+
+access: 0 (integer that signals user access state: 0 = guest, 1 = full access, -1 = bad login; if you have different membership tiers and the current user doesn't have full access to the video, then use 0 as access)
+title: "Example Title" (string with title of the video)
+description: "Example description of video" (string with video description)
+thumbnailImage: "https://www.example.com/thumbnailImage1.png" (string with url to thumbnail image)
+thumbnailVideo: "https://www.example.com/thumbnailVideo1.mp4" (string with url to thumbnail video that's played when hovered)
+dateReleased: "2022-03-10" (string with the date the video was released by the production studio formatted as YYYY-MM-DD)
+dateAdded: "2022-06-16" (string with the date the video was added to the website formatted as YYYY-MM-DD)
+duration: 120000.0 (decimal number with the duration of the video in milliseconds)
+rating: 4.5 (decimal number with rating of the video from 0-5)
+favorites: 23 (integer with number of users that have favorited the video)
+comments: 12 (integer with number of comments on the video)
+isFavorite: true (boolean, true if the current video is favorited by the user)
+projection: "equirectangular" (string with the type of projection, options are "perspective", "equirectangular", "equirectangular360", "fisheye", "cubemap", "equiangularCubemap")
+stereo: "sbs" (string with the stereo mode, options are "mono", "sbs", "tb")
+isEyeSwapped: false (boolean that determines if left and right eyes are swapped when stereo mode is sbs or tb, default has left eye on the left or top of the image)
+fov: 180.0 (decimal number with the actual FOV of the video)
+lens: "Linear" (string with name of the actual lens type, options are "Linear", "MKX220", "MKX200", "VRCA220")
+cameraIPD: 6.5 (decimal number with the IPD of the stereo cameras used to record the video in cm, typically ranges between 6.0 to 7.0cm, with 6.4 to 6.5 being a good default)
+hsp: "https://www.example.com/heresphere/videoID1/settings.hsp" (optional string with URL to hsp file exported by the HereSphere app, which will contain key framed projection settings and tags)
+eventServer: "https://www.example.com" (optional string with url to a server that will receive playback events, which could be used for synchronizing services like haptics with playback events. Details are at the bottom of document)
+scripts: (object array with scripts for synchronized perhiperals)
+[
+    {
+        name: "Script By Author 1" (string with name of the script)
+        url: "https://www.example.com/heresphere/videoID1/author1.funscript" (string with URL to download the script)
+        rating: 4.8 (decimal number with rating of the script)
+    }
+    {
+        name: "Script By Author 2" (string with name of the script)
+        url: "https://www.example.com/heresphere/videoID1/author2.funscript" (string with URL to download the script)
+        rating: 3.2 (decimal number with rating of the script)
+    }
+]
+subtitles: (object array with links to srt/ssa/ass subtitles)
+[
+    {
+        name: "Subtitle Name 1"
+        language: "English"
+        url: "https://www.example.com/herespehre/videoID1/subtitle1.srt"
+    }
+    {
+        name: "Subtitle Name 2"
+        language: "Japanese"
+        url: "https://www.example.com/herespehre/videoID1/subtitle2.srt"
+    }
+]
+tags: (object array with timestamped tags)
+[
+    {
+        name: "Scene:Introduction" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+        start: 0.0 (decimal number with start time of the tag in milliseconds)
+        end: 60000.0 (decimal number with end time of the tag in milliseconds)
+        track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+        rating: 2.5 (decimal number with the rating of the tag)
+    }
+    {
+        name: "Scene:Action" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+        start: 60000.0 (decimal number with start time of the tag in milliseconds)
+        end: 120000.0 (decimal number with end time of the tag in milliseconds)
+        track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+        rating: 4.3 (decimal number with the rating of the tag)
+    }
+    {
+        name: "Scene:Ending" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+        start: 120000.0 (decimal number with start time of the tag in milliseconds)
+        end: 180000.0 (decimal number with end time of the tag in milliseconds)
+        track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+        rating: 3.5 (decimal number with the rating of the tag)
+    }
+    {
+        name: "Talent:Example Talent Name" (recommend using "Talent" as the category for talent name)
+        start: 0.0 (decimal number with start time of the tag in milliseconds)
+        end: 0.0 (if the end time is 0, then the player will automatically use the video duration, so this tag will span the entire duration of the video)
+        track: 1 (notice it's on a different track)
+        rating: 5.0 (decimal number with the rating of the tag)
+    }
+    {
+        name: "Studio:Example Studio Name" (recommend using "Studio" as the category for the studio name)
+        start: 0.0 (decimal number with start time of the tag in milliseconds)
+        end: 0.0 (if the end time is 0, then the player will automatically use the video duration, so this tag will span the entire duration of the video)
+        track: 2 (notice it's on a different track)
+        rating: 4.5 (decimal number with the rating of the tag)
+    }
+]
+media: (object array with list of actual media)
+[
+    {
+        name: "h265" (string with the name of the source, recommend using encoding type like "h265", "h264", "h264_30fps", etc)
+        sources: (object array with media info and link to actual source)
+        [
+            {
+                resolution: 1080 (integer with resolution classification, typically the same as the height of the video unless the video is a top-bottom video)
+                height: 1080 (integer with height of the video or image)
+                width: 2160 (integer with width of the video or image)
+                size: 1512321 (integer with size of the file in bytes)
+                url: "https://cdn.example.com/videoID1/h265-1080p.mp4" (string with url to video or image)
+            }
+            {
+                resolution: 1920 (integer with resolution classification, typically the same as the height of the video unless the video is a top-bottom video)
+                height: 1920 (integer with height of the video or image)
+                width: 3840 (integer with width of the video or image)
+                size: 51238412 (integer with size of the file in bytes)
+                url: "https://cdn.example.com/videoID1/h265-3840p.mp4" (string with url to video or image)
+            }
+        ]
+    }
+    {
+        name: "h264" (string with the name of the source, recommend using encoding type like "h265", "h264", "h264_30fps", etc)
+        sources: (object array with media info and link to actual source)
+        [
+            {
+                height: 1080 (integer with height of the video or image)
+                width: 2160 (integer with width of the video or image)
+                size: 1512321 (integer with size of the file in bytes)
+                url: "https://cdn.example.com/videoID1/h264-1080p.mp4" (string with url to video or image)
+            }
+            {
+                height: 1920 (integer with height of the video or image)
+                width: 3840 (integer with width of the video or image)
+                size: 51238412 (integer with size of the file in bytes)
+                url: "https://cdn.example.com/videoID1/h264-3840p.mp4" (string with url to video or image)
+            }
+        ]
+    }
+]
+writeFavorite: false (boolean, set to true if you want HereSphere to write changes to favorite back to the server)
+writeRating: false (boolean, set to true if you want HereSphere to write changes to rating back to the server)
+writeTags: false (boolean, set to true if you want HereSphere to write changes to tags back to the server)
+writeHSP: false (boolean, set to true if you want HereSphere to write HSP files back to the server)
+
+A note on tags:
+Some commonly used tag categories are "Position" (like "Standing", "Sitting", "Laying", etc), "Talent" (for the the name of the person in the video), "Studio" (for the name of the studio that produced the video). If no category is specified (meaning there's no ":" used in the tag), then the tag will be included in the "Uncategorized" section of tags. The start, end, track, and rating fields are optional, though I'd recommend supplying them if you want timestamped tags. If there are multiple tags in track 0, then they will displayed above the seekbar so users can jump to the start time of the tags by clicking on them. HereSphere also has the ability to use boolean combinations with ratings on the timestamped tags, so the player can automatically seek to specific points in the video that meet user-specified criteria (like a user can search for scenes with a talent, studio, position, rating, etc). This can be a very powerful and convenient tool for users to make smart playlists and easily watch the specific content they want.
+
+*****************************************************************************************************************************************
+
+If you would like to synchronize user changes to favorite videos, ratings, tags, HSP files, or file deletions with your servers, then the app can send a http POST request to the video url endpoint. Make sure to set the "writeFavorite", "writeRating", "writeTags", or "writeHSP" fields to true. Below is an example JSON content that will be in the body of the POST request:
+{
+    "username" : "ExampleUser",
+    "password" : "ExamplePassword",
+    "isFavorite" : true,
+    "rating" : 4.5,
+    "tags": (object array with timestamped tags)
+    [
+        {
+            name: "Scene:Introduction" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+            start: 0.0 (decimal number with start time of the tag in milliseconds)
+            end: 60000.0 (decimal number with end time of the tag in milliseconds)
+            track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+            rating: 2.5 (decimal number with the rating of the tag)
+        }
+        {
+            name: "Scene:Action" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+            start: 60000.0 (decimal number with start time of the tag in milliseconds)
+            end: 120000.0 (decimal number with end time of the tag in milliseconds)
+            track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+            rating: 4.3 (decimal number with the rating of the tag)
+        }
+        {
+            name: "Scene:Ending" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+            start: 120000.0 (decimal number with start time of the tag in milliseconds)
+            end: 180000.0 (decimal number with end time of the tag in milliseconds)
+            track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+            rating: 3.5 (decimal number with the rating of the tag)
+        }
+        {
+            name: "Talent:Example Talent Name" (recommend using "Talent" as the category for talent name)
+            start: 0.0 (decimal number with start time of the tag in milliseconds)
+            end: 0.0 (if the end time is 0, then the player will automatically use the video duration, so this tag will span the entire duration of the video)
+            track: 1 (notice it's on a different track)
+            rating: 5.0 (decimal number with the rating of the tag)
+        }
+        {
+            name: "Studio:Example Studio Name" (recommend using "Studio" as the category for the studio name)
+            start: 0.0 (decimal number with start time of the tag in milliseconds)
+            end: 0.0 (if the end time is 0, then the player will automatically use the video duration, so this tag will span the entire duration of the video)
+            track: 2 (notice it's on a different track)
+            rating: 4.5 (decimal number with the rating of the tag)
+        }
+    ]
+    "hsp" : "Base64 encoded string" (hsp files are compressed binary files, the "hsp" field encodes the binary file into a Base64 encoded string)
+    "deleteFile" : false (boolean, if true, a user is requesting to permanently delete the scene files)
+}
+
+*****************************************************************************************************************************************
+
+In order to reduce the number of requests needed to scan the entire library, you can provide the scan data at the /heresphere/scan endpoint.
+HereSphere will send an http POST request (same header and json content as any other HereSphere request) to this endpoint when it needs to scan the library for data needed for searching and sorting.
+The response should contain the same header and the following json content:
+
+scanData :
+[
+    {
+        link: "https://www.example.com/heresphere/videoID1"
+        title: "Example Title" (string with title of the video)
+        dateReleased: "2022-03-10" (string with the date the video was released by the production studio formatted as YYYY-MM-DD)
+        dateAdded: "2022-06-16" (string with the date the video was added to the website formatted as YYYY-MM-DD)
+        duration: 120000.0 (decimal number with the duration of the video in milliseconds)
+        rating: 4.5 (decimal number with rating of the video from 0-5)
+        favorites: 23 (integer with number of users that have favorited the video)
+        comments: 12 (integer with number of comments on the video)
+        isFavorite: true (boolean, true if the current video is favorited by the user)
+        tags: (object array with timestamped tags)
+        [
+            {
+                name: "Scene:Introduction" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+                start: 0.0 (decimal number with start time of the tag in milliseconds)
+                end: 60000.0 (decimal number with end time of the tag in milliseconds)
+                track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+                rating: 2.5 (decimal number with the rating of the tag)
+            }
+            {
+                name: "Scene:Action" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+                start: 60000.0 (decimal number with start time of the tag in milliseconds)
+                end: 120000.0 (decimal number with end time of the tag in milliseconds)
+                track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+                rating: 4.3 (decimal number with the rating of the tag)
+            }
+        ]
+    }
+    {
+        link: "https://www.example.com/heresphere/videoID2"
+        title: "Example Title" (string with title of the video)
+        dateReleased: "2022-03-10" (string with the date the video was released by the production studio formatted as YYYY-MM-DD)
+        dateAdded: "2022-06-16" (string with the date the video was added to the website formatted as YYYY-MM-DD)
+        duration: 120000.0 (decimal number with the duration of the video in milliseconds)
+        rating: 4.5 (decimal number with rating of the video from 0-5)
+        favorites: 23 (integer with number of users that have favorited the video)
+        comments: 12 (integer with number of comments on the video)
+        isFavorite: true (boolean, true if the current video is favorited by the user)
+        tags: (object array with timestamped tags)
+        [
+            {
+                name: "Scene:Introduction" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+                start: 0.0 (decimal number with start time of the tag in milliseconds)
+                end: 60000.0 (decimal number with end time of the tag in milliseconds)
+                track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+                rating: 2.5 (decimal number with the rating of the tag)
+            }
+            {
+                name: "Scene:Action" (string with name of the tag formatted as Category:Tag where the portion of the string before the ":" is the category of the tag, and the portion after the ":" is the actual tag)
+                start: 60000.0 (decimal number with start time of the tag in milliseconds)
+                end: 120000.0 (decimal number with end time of the tag in milliseconds)
+                track: 0 (integer which determines the track the tag is on, since multiple tags can be displayed on a single track)
+                rating: 4.3 (decimal number with the rating of the tag)
+            }
+        ]
+    }
+    etc.
+]
+
+
+*****************************************************************************************************************************************
+
+The event server will receive http POST requests with the following JSON content when a playback event occurs:
+{
+    "username" : "ExampleUser" (string with username)
+    "id" : "https://www.example.com/heresphere/videoID", (string with the video url used for the HereSphere API)
+    "title" : "Example Video Title", (string with video title)
+    "event" : 0, (integer representing playback event. 0 = open, 1 = play, 2 = pause, 3 = close. Seek and playback speed changes will be sent with the play event)
+    "time" : 10000.5, (decimal number with playback time in milliseconds)
+    "speed" : 1.0, (decimal number with playback speed)
+    "utc" : 12891248.123 (decimal number with milliseconds since utc unix epoch year 1970)
+    "connectionKey" : "abcd1234" (string with the connection key of the synchronized peripheral)
+}
