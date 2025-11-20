@@ -220,8 +220,8 @@
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     display: flex;
-    justify-content: flex-end;
-    align-items: flex-start;
+    justify-content: space-between;
+    align-items: flex-end;
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
     padding: 8px;
@@ -250,6 +250,28 @@
 }
 
 .delete-btn i {
+    font-size: 14px;
+}
+
+.download-btn {
+    padding: 6px;
+    height: 28px;
+    width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #0d6efd;
+    border: none;
+    color: white;
+    border-radius: 50%;
+}
+
+.download-btn:hover {
+    background-color: #0b5ed7;
+    color: white;
+}
+
+.download-btn i {
     font-size: 14px;
 }
 

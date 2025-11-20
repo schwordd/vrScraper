@@ -135,7 +135,7 @@ namespace vrScraper.Controllers
                 }
 
                 // Content-Range für Partial-Content setzen, wenn vorhanden
-                string contentRangeHeader = response.Content.Headers.GetValues("Content-Range").FirstOrDefault();
+                string? contentRangeHeader = response.Content.Headers.GetValues("Content-Range").FirstOrDefault();
                 if (!string.IsNullOrEmpty(contentRangeHeader))
                 {
                     Response.Headers["Content-Range"] = contentRangeHeader;
@@ -159,6 +159,101 @@ namespace vrScraper.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ein Fehler ist beim Verarbeiten der Proxy-Anfrage aufgetreten");
+                return StatusCode(500, "Ein interner Serverfehler ist aufgetreten");
+            }
+        }
+
+        // GET: api/VideoProxy/download/{videoId}
+        [HttpGet("download/{videoId}")]
+        public async Task<IActionResult> Download(long videoId)
+        {
+            try
+            {
+                _logger.LogInformation("Video download request for videoId {VideoId}", videoId);
+
+                // Video aus der Datenbank abrufen
+                var video = await _videoService.GetVideoById(videoId);
+                if (video == null)
+                {
+                    _logger.LogWarning("Video mit ID {VideoId} nicht gefunden", videoId);
+                    return NotFound("Video nicht gefunden");
+                }
+
+                // Video-Quelle abrufen
+                var source = await _scraper.GetSource(video, _context);
+                if (source == null)
+                {
+                    _logger.LogWarning("Keine Video-Quelle für Video {VideoId} gefunden", videoId);
+                    return NotFound("Video-Quelle nicht gefunden");
+                }
+
+                // Erstelle einen HttpClient mit geeigneten Headers
+                var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.Clear();
+                client.Timeout = TimeSpan.FromMinutes(30); // Erhöhe Timeout für große Downloads
+
+                // Standard-Headers
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                client.DefaultRequestHeaders.Add("Referer", "https://www.eporner.com/");
+                client.DefaultRequestHeaders.Add("Accept", "*/*");
+                client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+                client.DefaultRequestHeaders.Add("Origin", "https://www.eporner.com");
+
+                HttpResponseMessage response;
+                try
+                {
+                    // Download die Video-Datei mit HEAD Request für Größe
+                    var headResponse = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, source.Src));
+                    long? contentLength = headResponse.Content.Headers.ContentLength;
+
+                    // Jetzt hole das eigentliche Video
+                    response = await client.GetAsync(source.Src, HttpCompletionOption.ResponseHeadersRead);
+
+                    // Prüfe, ob der Request erfolgreich war
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        _logger.LogWarning("Fehler beim Herunterladen des Videos: StatusCode {StatusCode}", response.StatusCode);
+                        return StatusCode((int)response.StatusCode, "Fehler beim Herunterladen des Videos");
+                    }
+                }
+                catch (HttpRequestException ex)
+                {
+                    _logger.LogError(ex, "Fehler beim Herunterladen des Videos von der Quelle: {Url}", source.Src);
+                    return StatusCode(500, "Fehler beim Herunterladen des Videos von der Quelle");
+                }
+
+                // Erstelle einen sicheren Dateinamen
+                var safeTitle = Regex.Replace(video.Title ?? "video", @"[^a-zA-Z0-9_-]", "_");
+                var fileName = $"{safeTitle}_{video.SiteVideoId}.mp4";
+
+                // Setze Headers für Download
+                Response.Headers["Content-Disposition"] = $"attachment; filename=\"{fileName}\"";
+                Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "video/mp4";
+
+                // Setze Content-Length wenn verfügbar
+                if (response.Content.Headers.ContentLength.HasValue)
+                {
+                    Response.Headers["Content-Length"] = response.Content.Headers.ContentLength.Value.ToString();
+                    _logger.LogInformation("Content-Length für Download: {ContentLength} bytes", response.Content.Headers.ContentLength.Value);
+                }
+
+                // CORS Headers für bessere Kompatibilität
+                Response.Headers["Access-Control-Allow-Origin"] = "*";
+                Response.Headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Disposition";
+
+                // Stream die Daten mit größerem Buffer für bessere Performance
+                var videoStream = await response.Content.ReadAsStreamAsync();
+
+                // Verwende FileStreamResult mit enableRangeProcessing für bessere Download-Performance
+                return new FileStreamResult(videoStream, Response.ContentType)
+                {
+                    EnableRangeProcessing = false,
+                    FileDownloadName = fileName
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ein Fehler ist beim Verarbeiten der Download-Anfrage aufgetreten");
                 return StatusCode(500, "Ein interner Serverfehler ist aufgetreten");
             }
         }

@@ -167,6 +167,9 @@
                             <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
                                 <i class="bi bi-trash"></i>
                             </button>
+                            <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => DownloadVideo(item)" title="Download video">
+                                <i class="bi bi-download"></i>
+                            </button>
                         </div>
                         <div class="like-btn-container">
                             <button class="like-btn @(item.Liked ? "liked" : "not-liked")"
@@ -657,5 +660,34 @@
         await VideoService.UpdateVideoErrorCount(item.Id);
 
         StateHasChanged();
+    }
+
+    private async Task DownloadVideo(DbVideoItem item)
+    {
+        try
+        {
+            // Verwende den Backend-Download-Endpoint mit direktem Download
+            var downloadUrl = $"/api/VideoProxy/download/{item.Id}";
+
+            // Erstelle einen sicheren Dateinamen
+            var safeTitle = System.Text.RegularExpressions.Regex.Replace(item.Title ?? "video", @"[^a-zA-Z0-9_-]", "_");
+            var fileName = $"{safeTitle}_{item.SiteVideoId}.mp4";
+
+            // Triggere Download über JavaScript
+            var js = $@"
+                const link = document.createElement('a');
+                link.href = '{downloadUrl}';
+                link.download = '{fileName}';
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            ";
+            await JSRuntime.InvokeVoidAsync("eval", js);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading video: {ex.Message}");
+        }
     }
 }

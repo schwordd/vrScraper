@@ -44,10 +44,9 @@
 }
 
 .logo {
-    max-width: 140px;
-    margin-bottom: 32px;
-    filter: brightness(0) invert(1) opacity(0.95);
-    transition: transform 0.3s ease;
+  max-width: 123px;
+  transition: transform 0.3s ease;
+  margin-right: 32px;
 }
 
 .logo:hover {
