@@ -15,31 +15,74 @@
 .rate-buttons {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
-    min-width: 320px;
+    justify-content: center;
+    min-width: 480px;
     margin: 8px 0px 8px 0px;
+    gap: 4px;
 }
 
 .rate-buttons button.btn {
-    padding-right: 32px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease-in-out;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
-.rate-buttons button.btn:before {
-    content: ' ✓'; /* Fügt einen Haken nach dem Button-Text hinzu */
-    font-size: 1.0rem; /* Größe des Hakens anpassen */
-    color: white; /* Farbe des Hakens */
-    margin-right: 10px; /* Abstand zwischen Button-Text und Haken */
-    vertical-align: middle; /* Vertikale Ausrichtung, damit es sich mit dem Text ausrichtet */
-    opacity: 0;
+.rate-buttons button.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-.rate-buttons button.btn.active:before {
-    content: ' ✓'; /* Fügt einen Haken nach dem Button-Text hinzu */
-    font-size: 1.0rem; /* Größe des Hakens anpassen */
-    color: white; /* Farbe des Hakens */
-    margin-right: 10px; /* Abstand zwischen Button-Text und Haken */
-    vertical-align: middle; /* Vertikale Ausrichtung, damit es sich mit dem Text ausrichtet */
-    opacity: 1;
+.rate-buttons button.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.rate-buttons button.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.rate-buttons button.btn-success:hover {
+    background: linear-gradient(135deg, #34ce57 0%, #2ddaa8 100%);
+}
+
+.rate-buttons button.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e63946 100%);
+}
+
+.rate-buttons button.btn-danger:hover {
+    background: linear-gradient(135deg, #e74c5a 0%, #f04956 100%);
+}
+
+.rate-buttons button.btn-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: #000;
+}
+
+.rate-buttons button.btn-warning:hover {
+    background: linear-gradient(135deg, #ffd43b 0%, #ffad33 100%);
+}
+
+.rate-buttons button.btn.active {
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.2);
+    transform: scale(1.05);
+}
+
+.rate-buttons button.btn.active:hover {
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.7), 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.rate-buttons button.btn i {
+    font-size: 1.1rem;
 }
 
 .tag-container {

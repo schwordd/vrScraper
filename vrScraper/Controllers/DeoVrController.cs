@@ -99,6 +99,18 @@ namespace vrScraper.Controllers
 
               tabs.Add((t.Name, list6));
             }
+            else if (t.Name == "PlayCount")
+            {
+              var list9 = allItems.OrderByDescending(a => a.PlayCount).Where(a => a.PlayCount > 0).Take(500).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"{BaseUrl}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list9));
+            }
             else if (t.Name == "Unwatched")
             {
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
@@ -131,6 +143,26 @@ namespace vrScraper.Controllers
               }).ToList<dynamic>();
 
               tabs.Add((t.Name, list8));
+            }
+            else if (t.Name == "Best Unwatched")
+            {
+              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
+              var k10 = 16000; // Tuning-Parameter, der angepasst werden kann
+              var averageRating10 = allItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
+              var averageViews10 = allItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
+
+              var list10 = allUnwatched.OrderByDescending(a =>
+                      ((a.Views!.Value / (double)(a.Views.Value + k10)) * a.SiteRating!.Value) +
+                      ((k10 / (double)(a.Views.Value + k10)) * averageRating10)
+                  ).Take(500).Select(item => new
+              {
+                title = item.Title,
+                videoLength = (int)(item.Duration.TotalSeconds),
+                thumbnailUrl = $"{item.Thumbnail}",
+                video_url = $"{BaseUrl}/deovr/detail/{item.Id}"
+              }).ToList<dynamic>();
+
+              tabs.Add((t.Name, list10));
             }
 
             break;

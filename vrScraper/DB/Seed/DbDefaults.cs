@@ -174,6 +174,28 @@ namespace vrScraper.DB.Seed
         tab!.Order = -50;
       }
 
+      if (defaultTabs.Exists(a => a.Name == "PlayCount") == false)
+      {
+        db.Tabs.Add(new Models.DbVrTab()
+        {
+          Type = "DEFAULT",
+          Name = "PlayCount",
+          Active = true,
+          Order = -45,
+          ActressBlacklist = "[]",
+          ActressWhitelist = "[]",
+          TagBlacklist = "[]",
+          TagWhitelist = "[]",
+          VideoBlacklist = "[]",
+          VideoWhitelist = "[]"
+        });
+      }
+      else
+      {
+        var tab = db.Tabs.Where(a => a.Name == "PlayCount").FirstOrDefault();
+        tab!.Order = -45;
+      }
+
       if (defaultTabs.Exists(a => a.Name == "Unwatched") == false)
       {
         db.Tabs.Add(new Models.DbVrTab()
@@ -216,6 +238,28 @@ namespace vrScraper.DB.Seed
       {
         var tab = db.Tabs.Where(a => a.Name == "Latest Unwatched").FirstOrDefault();
         tab!.Order = -30;
+      }
+
+      if (defaultTabs.Exists(a => a.Name == "Best Unwatched") == false)
+      {
+        db.Tabs.Add(new Models.DbVrTab()
+        {
+          Type = "DEFAULT",
+          Name = "Best Unwatched",
+          Active = true,
+          Order = -20,
+          ActressBlacklist = "[]",
+          ActressWhitelist = "[]",
+          TagBlacklist = "[]",
+          TagWhitelist = "[]",
+          VideoBlacklist = "[]",
+          VideoWhitelist = "[]"
+        });
+      }
+      else
+      {
+        var tab = db.Tabs.Where(a => a.Name == "Best Unwatched").FirstOrDefault();
+        tab!.Order = -20;
       }
 
       db.SaveChanges();

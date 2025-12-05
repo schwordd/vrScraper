@@ -61,6 +61,12 @@ namespace vrScraper.Controllers
 
               tabs.Add((t.Name, list6));
             }
+            else if (t.Name == "PlayCount")
+            {
+              var list9 = allItems.OrderByDescending(a => a.PlayCount).Where(a => a.PlayCount > 0).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
+
+              tabs.Add((t.Name, list9));
+            }
             else if (t.Name == "Unwatched")
             {
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
@@ -80,6 +86,19 @@ namespace vrScraper.Controllers
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
               var list8 = allUnwatched.OrderByDescending(v => Convert.ToInt32(v.SiteVideoId)).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
               tabs.Add((t.Name, list8));
+            }
+            else if (t.Name == "Best Unwatched")
+            {
+              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
+              var k10 = 16000; // Tuning-Parameter, der angepasst werden kann
+              var averageRating10 = allItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
+              var averageViews10 = allItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
+
+              var list10 = allUnwatched.OrderByDescending(a =>
+                      ((a.Views!.Value / (double)(a.Views.Value + k10)) * a.SiteRating!.Value) +
+                      ((k10 / (double)(a.Views.Value + k10)) * averageRating10)
+                  ).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
+              tabs.Add((t.Name, list10));
             }
 
             break;
@@ -138,7 +157,7 @@ namespace vrScraper.Controllers
         access = 1,
         banner = new
         {
-          image = $"{BaseUrl}/logo.png",
+          image = $"{BaseUrl}/logo1.png",
           link = $"{BaseUrl}/heresphere"
         },
         library = tabs.Select(a => new { name = a.Name, list = a.List })

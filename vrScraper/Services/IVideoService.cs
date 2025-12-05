@@ -17,6 +17,7 @@ namespace vrScraper.Services
     Task<bool> UpdateVideoErrorCount(long id);
 
     void SetPlayedVideo(DbVideoItem vid);
+    DbVideoItem? FinishCurrentPlayback();
 
     DbVideoItem LikeVideo(DbVideoItem vid);
     DbVideoItem DislikeVideo(DbVideoItem vid);

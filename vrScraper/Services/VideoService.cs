@@ -318,5 +318,52 @@ namespace vrScraper.Services
       logger.LogInformation($"Video with ID {id} deleted");
     }
 
+    public DbVideoItem? FinishCurrentPlayback()
+    {
+      lock (dblock)
+      {
+        if (currentVideoId == null || requestedCurrentVideoItem == null || currentVideo == null)
+        {
+          logger.LogInformation("No active playback to finish");
+          return null;
+        }
+
+        // Berechne Wiedergabezeit
+        TimeSpan watchedTime = DateTime.UtcNow - (DateTime)requestedCurrentVideoItem;
+
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var video = context.VideoItems.Find(currentVideoId);
+
+        if (video != null)
+        {
+          video.PlayDurationEst += watchedTime;
+          video.PlayCount += 1;
+          context.SaveChanges();
+
+          // Aktualisiere In-Memory-Cache
+          var memVid = this.videoItems.FirstOrDefault(v => v.Id == currentVideoId);
+          if (memVid != null)
+          {
+            memVid.PlayCount = video.PlayCount;
+            memVid.PlayDurationEst = video.PlayDurationEst;
+          }
+
+          logger.LogInformation("Finished playback for video {0}. PlayCount: {1}, Total PlayDuration: {2}",
+              video.Id, video.PlayCount, video.PlayDurationEst);
+        }
+
+        // Speichere Referenz zum beendeten Video
+        var finishedVideo = currentVideo;
+
+        // Setze current video state zurück
+        currentVideoId = null;
+        currentVideo = null;
+        requestedCurrentVideoItem = null;
+
+        return finishedVideo;
+      }
+    }
+
   }
 }

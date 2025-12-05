@@ -37,8 +37,15 @@
         <h3 class="live-title">@LiveVideo.Title</h3>
 
         <div class="rate-buttons">
-            <button class="@(LiveVideo.Liked ? "btn btn-success btn-block active" : "btn btn-success btn-block")" @onclick="Like">Like</button>
-            <button class="@(LiveVideo.Disliked ? "btn btn-danger btn-block active" : "btn btn-danger btn-block")" @onclick="Dislike">Dislike</button>
+            <button class="@(LiveVideo.Liked ? "btn btn-success btn-block active" : "btn btn-success btn-block")" @onclick="Like">
+                <i class="bi bi-hand-thumbs-up-fill"></i> Like
+            </button>
+            <button class="@(LiveVideo.Disliked ? "btn btn-danger btn-block active" : "btn btn-danger btn-block")" @onclick="Dislike">
+                <i class="bi bi-hand-thumbs-down-fill"></i> Dislike
+            </button>
+            <button class="btn btn-warning btn-block" @onclick="FinishPlayback">
+                <i class="bi bi-check-circle-fill"></i> Stopped
+            </button>
         </div>
     </div>
 }
@@ -78,6 +85,19 @@
         if (this.LiveVideo == null) return;
         this.LiveVideo = this.VideoService.FavVideo(this.LiveVideo);
         InvokeAsync(StateHasChanged);
+    }
+
+    private void FinishPlayback()
+    {
+        if (this.LiveVideo == null) return;
+
+        var finishedVideo = this.VideoService.FinishCurrentPlayback();
+
+        if (finishedVideo != null)
+        {
+            this.LiveVideo = null;
+            InvokeAsync(StateHasChanged);
+        }
     }
 }
 

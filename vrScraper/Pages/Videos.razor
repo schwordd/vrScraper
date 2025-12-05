@@ -30,6 +30,8 @@
                         <option value="rating">Rating</option>
                         <option value="random">Random</option>
                         <option value="playtime">Most played time</option>
+                        <option value="playcount">Most played count</option>
+                        <option value="bestunwatched">Best unwatched</option>
                     </select>
                 </span>
 
@@ -426,9 +428,23 @@
                     .OrderByDescending(x => x.Order)
                     .Select(x => x.Item)
                     .ToList();
-                    
+
                 // Cache the random order
                 _cachedRandomItems = sortedItems;
+            }
+            else if (_currentSortOption == "bestunwatched")
+            {
+                // Best unwatched: filter unwatched and sort by Bayesian Average
+                var allUnwatched = filteredItems.Where(v => v.PlayCount == 0).ToList();
+                var k = 16000; // Tuning-Parameter
+                var averageRating = items.Average(a => a.SiteRating);
+
+                sortedItems = allUnwatched
+                    .OrderByDescending(a =>
+                        ((a.Views!.Value / (double)(a.Views.Value + k)) * a.SiteRating!.Value) +
+                        ((k / (double)(a.Views.Value + k)) * averageRating)
+                    )
+                    .ToList();
             }
             else
             {
@@ -438,6 +454,7 @@
                         "latest" => Convert.ToInt32(v.SiteVideoId),
                         "rating" => v.SiteRating ?? 0,
                         "playtime" => v.PlayDurationEst.TotalSeconds,
+                        "playcount" => v.PlayCount,
                         _ => Convert.ToInt32(v.SiteVideoId)
                     })
                     .ToList();
