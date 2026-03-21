@@ -275,50 +275,6 @@
     font-size: 14px;
 }
 
-.pager-info {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin: 8px 0;
-}
-
-.pager {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.page-size {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.page-size select {
-    width: 70px;
-}
-
-.pager .btn {
-    min-width: 32px;
-    height: 32px;
-    padding: 4px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.page-ellipsis {
-    color: #6c757d;
-    margin: 0 2px;
-    user-select: none;
-    font-size: 12px;
-}
-
-.text-muted.small {
-    font-size: 12px;
-}
-
 .play-overlay {
     position: absolute;
     top: 0;
@@ -402,4 +358,62 @@
 .play-count i {
     color: #0dcaf0;
     font-size: 14px;
+}
+
+.watchlist-btn-container {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    display: none;
+}
+
+.watchlist-btn-container.visible {
+    display: block;
+}
+
+.watchlist-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.watchlist-btn.in-watchlist {
+    background-color: #198754;
+    color: white;
+}
+
+.watchlist-btn.not-in-watchlist {
+    background-color: rgba(25, 135, 84, 0.2);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.watchlist-btn:hover {
+    transform: scale(1.1);
+}
+
+.watchlist-btn i {
+    font-size: 16px;
+}
+
+@media (max-width: 1200px) {
+    .video-gallery {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .video-gallery {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-section {
+        flex-wrap: wrap;
+    }
 }

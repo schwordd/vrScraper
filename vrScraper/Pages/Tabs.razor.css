@@ -34,3 +34,12 @@
 .order-input {
     width: 140px;
 }
+
+.watchlist-card {
+    border-left: 3px solid #198754;
+}
+
+.watchlist-icon {
+    color: #198754;
+    margin-right: 4px;
+}

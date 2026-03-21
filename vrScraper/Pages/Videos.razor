@@ -9,10 +9,12 @@
 
 @inject IVideoService VideoService
 @inject ISettingService SettingService
+@inject ITabService TabService
 @inject IEpornerScraper scraper
 @inject VrScraperContext context
 @inject IJSRuntime JSRuntime
 @inject IServiceProvider serviceProvider
+@implements IAsyncDisposable
 
 @using Blzr.BootstrapSelect
 
@@ -22,6 +24,14 @@
         <div class="filter-container">
             <div class="filter-section">
                 <span class="filter-item">Total items: @TotalItems</span>
+
+                <span class="filter-item">
+                    <label for="search">Search:</label>
+                    <input type="text" class="form-control sort-select" id="search"
+                           placeholder="Search title..."
+                           @bind="SearchQuery"
+                           @bind:event="oninput" />
+                </span>
 
                 <span class="filter-item">
                     <label for="sort">Sort by:</label>
@@ -83,73 +93,43 @@
                         </button>
                     </div>
                 </span>
+
+                @if (WatchlistTabs.Any())
+                {
+                    <span class="filter-item">
+                        <label><i class="bi bi-bookmark"></i> Watchlist:</label>
+                        <select class="form-select sort-select" @bind="SelectedWatchlistId">
+                            <option value="0">-- None --</option>
+                            @foreach (var wl in WatchlistTabs)
+                            {
+                                <option value="@wl.Id">@wl.Name</option>
+                            }
+                        </select>
+                        @if (_selectedWatchlistId > 0)
+                        {
+                            <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success" : "btn-outline-success")"
+                                    @onclick="() => ToggleShowOnlyWatchlist()"
+                                    title="Nur Watchlist-Videos anzeigen">
+                                <i class="bi bi-funnel-fill"></i>
+                            </button>
+                        }
+                    </span>
+                }
             </div>
         </div>
     </div>
 
     <div class="content-wrapper">
-        <div class="pager-info">
-            <div class="pager">
-                <button class="btn btn-sm btn-outline-primary" @onclick="PreviousPage" disabled="@IsFirstPage">
-                    <i class="bi bi-chevron-left"></i>
-                </button>
-
-                @{
-                    const int maxVisiblePages = 5;
-                    var startPage = Math.Max(1, CurrentPage - maxVisiblePages / 2);
-                    var endPage = Math.Min(TotalPages, startPage + maxVisiblePages - 1);
-
-                    if (startPage > 1)
-                    {
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(1)">1</button>
-                        if (startPage > 2)
-                        {
-                            <span class="page-ellipsis">...</span>
-                        }
-                    }
-
-                    @for (int i = startPage; i <= endPage; i++)
-                    {
-                        var pageNumber = i;
-                        <button class="btn btn-sm @(pageNumber == CurrentPage ? "btn-primary" : "btn-outline-primary")"
-                                @onclick="() => GoToPage(pageNumber)">
-                            @pageNumber
-                        </button>
-                    }
-
-                    if (endPage < TotalPages)
-                    {
-                        if (endPage < TotalPages - 1)
-                        {
-                            <span class="page-ellipsis">...</span>
-                        }
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(TotalPages)">@TotalPages</button>
-                    }
-                }
-
-                <button class="btn btn-sm btn-outline-primary" @onclick="NextPage" disabled="@IsLastPage">
-                    <i class="bi bi-chevron-right"></i>
-                </button>
-            </div>
-            <div class="page-size">
-                <select class="form-select form-select-sm" @onchange="PageSizeChanged">
-                    <option value="10" selected="@IsSelected(10)">10</option>
-                    <option value="20" selected="@IsSelected(20)">20</option>
-                    <option value="30" selected="@IsSelected(30)">30</option>
-                    <option value="40" selected="@IsSelected(40)">40</option>
-                    <option value="50" selected="@IsSelected(50)">50</option>
-                    <option value="100" selected="@IsSelected(100)">100</option>
-                </select>
-                <span class="text-muted small">per page</span>
-            </div>
-        </div>
+        <Pager CurrentPage="CurrentPage" TotalPages="TotalPages" PageSize="PageSize"
+               IsFirstPage="IsFirstPage" IsLastPage="IsLastPage"
+               OnPageChanged="GoToPage" OnPageSizeChanged="PageSizeChanged" />
 
         <div class="video-gallery">
             @foreach (var item in PagedItems)
             {
                 <div class="video-item">
                     <div class="thumbnail-container @(item.IsThumbnailNotAvailable == true ? "not-available" : "")"
-                         @onclick="@(item.IsThumbnailNotAvailable == true ? null : (() => PlayVideo(item)))">
+                         @onclick="(async () => { if (item.IsThumbnailNotAvailable != true) await PlayVideo(item); })">
                         @{
                             if (string.IsNullOrEmpty(item.Thumbnail))
                             {
@@ -185,6 +165,14 @@
                                 @item.PlayCount
                             </span>
                         </div>
+                        <div class="watchlist-btn-container @(_selectedWatchlistId > 0 ? "visible" : "")">
+                            <button class="watchlist-btn @(IsInSelectedWatchlist(item.Id) ? "in-watchlist" : "not-in-watchlist")"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => ToggleWatchlist(item.Id)"
+                                    title="@(IsInSelectedWatchlist(item.Id) ? "Aus Watchlist entfernen" : "Zur Watchlist hinzufügen")">
+                                <i class="bi @(IsInSelectedWatchlist(item.Id) ? "bi-bookmark-fill" : "bi-bookmark")"></i>
+                            </button>
+                        </div>
                     </div>
                     <h3>@item.Title</h3>
                     <div class="tag-container">
@@ -212,57 +200,9 @@
             }
         </div>
 
-        <div class="pager-info">
-            <div class="pager">
-                <button class="btn btn-sm btn-outline-primary" @onclick="PreviousPage" disabled="@IsFirstPage">
-                    <i class="bi bi-chevron-left"></i>
-                </button>
-
-                @{
-                    if (startPage > 1)
-                    {
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(1)">1</button>
-                        if (startPage > 2)
-                        {
-                            <span class="page-ellipsis">...</span>
-                        }
-                    }
-
-                    @for (int i = startPage; i <= endPage; i++)
-                    {
-                        var pageNumber = i;
-                        <button class="btn btn-sm @(pageNumber == CurrentPage ? "btn-primary" : "btn-outline-primary")"
-                                @onclick="() => GoToPage(pageNumber)">
-                            @pageNumber
-                        </button>
-                    }
-
-                    if (endPage < TotalPages)
-                    {
-                        if (endPage < TotalPages - 1)
-                        {
-                            <span class="page-ellipsis">...</span>
-                        }
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(TotalPages)">@TotalPages</button>
-                    }
-                }
-
-                <button class="btn btn-sm btn-outline-primary" @onclick="NextPage" disabled="@IsLastPage">
-                    <i class="bi bi-chevron-right"></i>
-                </button>
-            </div>
-            <div class="page-size">
-                <select class="form-select form-select-sm" @onchange="PageSizeChanged">
-                    <option value="10" selected="@IsSelected(10)">10</option>
-                    <option value="20" selected="@IsSelected(20)">20</option>
-                    <option value="30" selected="@IsSelected(30)">30</option>
-                    <option value="40" selected="@IsSelected(40)">40</option>
-                    <option value="50" selected="@IsSelected(50)">50</option>
-                    <option value="100" selected="@IsSelected(100)">100</option>
-                </select>
-                <span class="text-muted small">per page</span>
-            </div>
-        </div>
+        <Pager CurrentPage="CurrentPage" TotalPages="TotalPages" PageSize="PageSize"
+               IsFirstPage="IsFirstPage" IsLastPage="IsLastPage"
+               OnPageChanged="GoToPage" OnPageSizeChanged="PageSizeChanged" />
     </div>
 </div>
 
@@ -299,26 +239,36 @@
         }
     }
 
-    public async void GetSource(DbVideoItem item)
-    {
-        var foundVideo = await VideoService.GetVideoById(item.Id);
-        if (foundVideo == null) return;
-
-        VideoSource? source = null;
-        source = await scraper.GetSource(foundVideo, context);
-    }
-
     public int TotalItems { get { return this.FilteredItems.Count; } }
 
     private int CurrentPage { get; set; } = 1;
     private int PageSize { get; set; } = 30;
 
-    private List<DbVideoItem> VideoItems => VideoService.GetVideoItems().GetAwaiter().GetResult();
+    private List<DbVideoItem> _videoItems = new();
+    private List<string> _globalBlackList = new();
+
+    private List<DbVideoItem> VideoItems => _videoItems;
     private string _currentSortOption = "latest";
+
+    private string _searchQuery = "";
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (_searchQuery != value)
+            {
+                _searchQuery = value;
+                CurrentPage = 1;
+                _cachedRandomItems = null;
+            }
+        }
+    }
 
     private bool _showOnlyLiked;
     private bool _showOnlyUnwatched;
     private bool _showOnlyWithErrors;
+    private bool _showOnlyWatchlist;
     private Random rng = new Random();
     private List<DbVideoItem>? _cachedRandomItems = null;
     private string? _lastRandomSeed = null;
@@ -402,17 +352,17 @@
             }
             
             var items = VideoItems;
-            
+
             // Apply global tag blacklist
-            var setting = SettingService.GetSetting("TagBlacklist").GetAwaiter().GetResult();
-            var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
-            items = items.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
+            items = items.Where(item => !item.Tags.Exists(a => _globalBlackList.Any(b => b == a.Name))).ToList();
             
             // Apply filters
             var filteredItems = items
                 .Where(v => (!_showOnlyLiked || v.Liked) &&
                         (!_showOnlyUnwatched || v.PlayCount == 0) &&
                         (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
+                        (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
+                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) &&
                         (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
                         (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))));
 
@@ -437,9 +387,10 @@
                 // Best unwatched: filter unwatched and sort by Bayesian Average
                 var allUnwatched = filteredItems.Where(v => v.PlayCount == 0).ToList();
                 var k = 16000; // Tuning-Parameter
-                var averageRating = items.Average(a => a.SiteRating);
+                var averageRating = items.Where(a => a.SiteRating.HasValue).Average(a => a.SiteRating);
 
                 sortedItems = allUnwatched
+                    .Where(a => a.Views.HasValue && a.SiteRating.HasValue)
                     .OrderByDescending(a =>
                         ((a.Views!.Value / (double)(a.Views.Value + k)) * a.SiteRating!.Value) +
                         ((k / (double)(a.Views.Value + k)) * averageRating)
@@ -451,11 +402,11 @@
                 sortedItems = filteredItems
                     .OrderByDescending(v => _currentSortOption switch
                     {
-                        "latest" => Convert.ToInt32(v.SiteVideoId),
+                        "latest" => (double)long.Parse(v.SiteVideoId),
                         "rating" => v.SiteRating ?? 0,
                         "playtime" => v.PlayDurationEst.TotalSeconds,
                         "playcount" => v.PlayCount,
-                        _ => Convert.ToInt32(v.SiteVideoId)
+                        _ => (double)long.Parse(v.SiteVideoId)
                     })
                     .ToList();
             }
@@ -490,11 +441,83 @@
         .ThenBy(a => a.Star.Name)
         .ToList();
 
+    private List<DbVrTab> WatchlistTabs { get; set; } = new();
+    private long _selectedWatchlistId;
+    private HashSet<long> _selectedWatchlistVideoIds = new();
+
+    public long SelectedWatchlistId
+    {
+        get => _selectedWatchlistId;
+        set
+        {
+            _selectedWatchlistId = value;
+            _showOnlyWatchlist = false;
+            UpdateWatchlistVideoIds();
+        }
+    }
+
+    private void ToggleShowOnlyWatchlist()
+    {
+        _showOnlyWatchlist = !_showOnlyWatchlist;
+        CurrentPage = 1;
+        _cachedRandomItems = null;
+    }
+
+    private void UpdateWatchlistVideoIds()
+    {
+        if (_selectedWatchlistId == 0)
+        {
+            _selectedWatchlistVideoIds.Clear();
+            return;
+        }
+        var wl = WatchlistTabs.FirstOrDefault(t => t.Id == _selectedWatchlistId);
+        if (wl != null)
+        {
+            _selectedWatchlistVideoIds = wl.VideoWhitelistList
+                .Select(v => Convert.ToInt64(v))
+                .ToHashSet();
+        }
+        else
+        {
+            _selectedWatchlistVideoIds.Clear();
+        }
+    }
+
+    private bool IsInSelectedWatchlist(long videoId)
+    {
+        return _selectedWatchlistVideoIds.Contains(videoId);
+    }
+
+    private async Task ToggleWatchlist(long videoId)
+    {
+        if (_selectedWatchlistId == 0) return;
+
+        if (IsInSelectedWatchlist(videoId))
+        {
+            await TabService.RemoveVideoFromWatchlist(_selectedWatchlistId, videoId);
+            _selectedWatchlistVideoIds.Remove(videoId);
+        }
+        else
+        {
+            await TabService.AddVideoToWatchlist(_selectedWatchlistId, videoId);
+            _selectedWatchlistVideoIds.Add(videoId);
+        }
+
+        WatchlistTabs = TabService.GetWatchlistTabs();
+        StateHasChanged();
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        _videoItems = await VideoService.GetVideoItems();
+        var setting = await SettingService.GetSetting("TagBlacklist");
+        if (setting != null)
+            _globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value) ?? new List<string>();
+
         await LoadVideos();
         await LoadTags();
         await LoadActresses();
+        WatchlistTabs = TabService.GetWatchlistTabs();
     }
 
     private async Task LoadVideos()
@@ -528,35 +551,10 @@
         _cachedRandomItems = null; // Clear cache on filter change
     }
 
-    private void NextPage()
+    private void PageSizeChanged(int newSize)
     {
-        if (CurrentPage < TotalPages)
-        {
-            CurrentPage++;
-        }
-    }
-
-    private void PreviousPage()
-    {
-        if (CurrentPage > 1)
-        {
-            CurrentPage--;
-        }
-    }
-
-    private void PageSizeChanged(ChangeEventArgs e)
-    {
-        if (e == null || e.Value == null) return;
-        var val = e.Value.ToString();
-        if (val == null) return;
-
-        PageSize = int.Parse(val);
+        PageSize = newSize;
         CurrentPage = 1; // Reset page on page size change
-    }
-
-    private bool IsSelected(int size)
-    {
-        return PageSize == size;
     }
 
     private void AddTagFilter(string tagName)
@@ -640,7 +638,7 @@
         }
     }
 
-    private VideoPlayer VideoPlayerComponent { get; set; }
+    private VideoPlayer? VideoPlayerComponent { get; set; }
 
     private async Task PlayVideo(DbVideoItem item)
     {
@@ -691,20 +689,50 @@
             var fileName = $"{safeTitle}_{item.SiteVideoId}.mp4";
 
             // Triggere Download über JavaScript
-            var js = $@"
-                const link = document.createElement('a');
-                link.href = '{downloadUrl}';
-                link.download = '{fileName}';
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            ";
-            await JSRuntime.InvokeVoidAsync("eval", js);
+            await JSRuntime.InvokeVoidAsync("downloadFile", downloadUrl, fileName);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error downloading video: {ex.Message}");
         }
+    }
+
+    private DotNetObjectReference<Videos>? _dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("addPageKeyListener", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void HandleKeyNavigation(int direction)
+    {
+        if (direction == -1 && !IsFirstPage)
+        {
+            GoToPage(CurrentPage - 1);
+            StateHasChanged();
+        }
+        if (direction == 1 && !IsLastPage)
+        {
+            GoToPage(CurrentPage + 1);
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("removePageKeyListener");
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit already disconnected, ignore
+        }
+        _dotNetRef?.Dispose();
     }
 }

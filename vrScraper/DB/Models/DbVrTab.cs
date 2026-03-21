@@ -139,8 +139,30 @@ namespace vrScraper.DB.Models
     [Required]
     public string VideoWhitelist { get; set; }
 
+    [NotMapped]
+    public IEnumerable<string> VideoWhitelistList
+    {
+      get => string.IsNullOrEmpty(VideoWhitelist) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(VideoWhitelist) ?? new List<string>();
+      set
+      {
+        VideoWhitelist = JsonSerializer.Serialize(value);
+        this.IsDirty = true;
+      }
+    }
+
     [Required]
     public string VideoBlacklist { get; set; }
+
+    [NotMapped]
+    public IEnumerable<string> VideoBlacklistList
+    {
+      get => string.IsNullOrEmpty(VideoBlacklist) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(VideoBlacklist) ?? new List<string>();
+      set
+      {
+        VideoBlacklist = JsonSerializer.Serialize(value);
+        this.IsDirty = true;
+      }
+    }
   }
 }
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.

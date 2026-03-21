@@ -3,7 +3,6 @@ using vrScraper.DB;
 using vrScraper.DB.Models;
 using vrScraper.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using vrScraper.Controllers.@base;
 
@@ -11,7 +10,7 @@ namespace vrScraper.Controllers
 {
   [Route("[controller]")]
   [ApiController]
-  public class HeresphereController(ILogger<HeresphereController> logger, IEpornerScraper scraper, VrScraperContext context, IVideoService videoService, ISettingService settings) : VrScraperBaseController
+  public class HeresphereController(ILogger<HeresphereController> logger, IEpornerScraper scraper, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
   {
     // Post: <HeresphereController>
     [HttpPost]
@@ -19,136 +18,19 @@ namespace vrScraper.Controllers
     public async Task<dynamic> Post()
     {
       logger.LogInformation("HereSphere get Lists");
-      var tabs = new List<(string Name, List<string> List)>();
       var allItems = await videoService.GetVideoItems();
 
       //global tag blacklist
       var setting = await settings.GetSetting("TagBlacklist");
-      var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting.Value);
-      allItems = allItems.Where(item => !item.Tags.Exists(a => globalBlackList!.Any(b => b == a.Name))).ToList();
+      var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting?.Value ?? "[]") ?? new List<string>();
 
-      var tabConfigs = await context.Tabs.Where(t => t.Active).OrderBy(t => t.Order).ToListAsync();
-      tabConfigs.ForEach(t =>
+      var filteredTabs = await tabFilteringService.GetFilteredTabVideos(allItems, globalBlackList);
+
+      var tabs = filteredTabs.Select(tab => new
       {
-        switch (t.Type)
-        {
-          case "DEFAULT":
-            if (t.Name == "Latest")
-            {
-              var list1 = allItems.OrderByDescending(v => Convert.ToInt32(v.SiteVideoId)).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-              tabs.Add((t.Name, list1));
-            }
-            else if (t.Name == "Rating")
-            {
-              var list2 = allItems.OrderByDescending(v => v.SiteRating).ThenByDescending(v => v.Views).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-              tabs.Add((t.Name, list2));
-            }
-            else if (t.Name == "Random")
-            {
-              var list3 = allItems.OrderBy(a => Guid.NewGuid()).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-              tabs.Add((t.Name, list3));
-            }
-            else if (t.Name == "Liked")
-            {
-              var list5 = allItems.Where(x => x.Liked == true).OrderBy(a => Guid.NewGuid()).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-              tabs.Add((t.Name, list5));
-            }
-            else if (t.Name == "Playtime")
-            {
-              var list6 = allItems.OrderByDescending(a => a.PlayDurationEst).Where(a => a.PlayDurationEst > TimeSpan.FromSeconds(20)).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-              tabs.Add((t.Name, list6));
-            }
-            else if (t.Name == "PlayCount")
-            {
-              var list9 = allItems.OrderByDescending(a => a.PlayCount).Where(a => a.PlayCount > 0).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-              tabs.Add((t.Name, list9));
-            }
-            else if (t.Name == "Unwatched")
-            {
-              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
-              var k1 = 16000; // Tuning-Parameter, der angepasst werden kann
-              var averageRating1 = allItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
-              var averageViews1 = allItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
-
-              var list7 = allUnwatched.OrderByDescending(a =>
-                      ((a.Views!.Value / (double)(a.Views.Value + k1)) * a.SiteRating!.Value) +
-                      ((k1 / (double)(a.Views.Value + k1)) * averageRating1)
-                  ).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-              tabs.Add((t.Name, list7));
-            }
-            else if (t.Name == "Latest Unwatched")
-            {
-              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
-              var list8 = allUnwatched.OrderByDescending(v => Convert.ToInt32(v.SiteVideoId)).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-              tabs.Add((t.Name, list8));
-            }
-            else if (t.Name == "Best Unwatched")
-            {
-              var allUnwatched = allItems.Where(x => x.PlayCount == 0);
-              var k10 = 16000; // Tuning-Parameter, der angepasst werden kann
-              var averageRating10 = allItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
-              var averageViews10 = allItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
-
-              var list10 = allUnwatched.OrderByDescending(a =>
-                      ((a.Views!.Value / (double)(a.Views.Value + k10)) * a.SiteRating!.Value) +
-                      ((k10 / (double)(a.Views.Value + k10)) * averageRating10)
-                  ).Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-              tabs.Add((t.Name, list10));
-            }
-
-            break;
-
-          case "CUSTOM":
-
-            var matchingItems = allItems.AsQueryable();
-
-            var tagsWL = JsonConvert.DeserializeObject<List<string>>(t.TagWhitelist);
-            var tagsBL = JsonConvert.DeserializeObject<List<string>>(t.TagBlacklist);
-            var acctressWL = JsonConvert.DeserializeObject<List<string>>(t.ActressWhitelist);
-            var acctressBL = JsonConvert.DeserializeObject<List<string>>(t.ActressBlacklist);
-            var videoWl = JsonConvert.DeserializeObject<List<string>>(t.VideoWhitelist);
-            var videoBl = JsonConvert.DeserializeObject<List<string>>(t.VideoBlacklist);
-
-            foreach (var item in tagsWL!)
-              matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.Name == item));
-
-            foreach (var item in tagsBL!)
-              matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.Name == item) == false);
-
-            foreach (var item in acctressWL!)
-              matchingItems = matchingItems.Where(a => a.Stars.Any(t => t.Name == item));
-
-            foreach (var item in acctressBL!)
-              matchingItems = matchingItems.Where(a => a.Stars.Any(t => t.Name == item) == false);
-
-            foreach (var item in videoWl!)
-              matchingItems = matchingItems.Where(a => a.Id == Convert.ToInt64(item));
-
-            foreach (var item in videoBl!)
-              matchingItems = matchingItems.Where(a => a.Id != Convert.ToInt64(item));
-
-            var k = 16000; // Tuning-Parameter, der angepasst werden kann
-            var averageRating = matchingItems.Average(a => a.SiteRating); // Berechnung des durchschnittlichen Ratings
-            var averageViews = matchingItems.Average(a => a.Views); // Berechnung des durchschnittlichen Views
-
-            var list = matchingItems
-                .OrderByDescending(a =>
-                    ((a.Views!.Value / (double)(a.Views.Value + k)) * a.SiteRating!.Value) +
-                    ((k / (double)(a.Views.Value + k)) * averageRating)
-                )
-
-                .Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList<string>();
-
-            tabs.Add((t.Name, list));
-
-            break;
-        }
-      });
+        name = tab.Name,
+        list = tab.Videos.Select(item => $"{BaseUrl}/heresphere/{item.Id}").ToList()
+      }).ToList();
 
       Response.Headers.Append("HereSphere-JSON-Version", "1");
 
@@ -160,9 +42,41 @@ namespace vrScraper.Controllers
           image = $"{BaseUrl}/logo1.png",
           link = $"{BaseUrl}/heresphere"
         },
-        library = tabs.Select(a => new { name = a.Name, list = a.List })
+        library = tabs
       };
 
+    }
+
+    [HttpPost]
+    [Produces("application/json")]
+    [Route("scan")]
+    public async Task<dynamic> Scan()
+    {
+      logger.LogInformation("HereSphere scan request");
+      Response.Headers.Append("HereSphere-JSON-Version", "1");
+
+      var allItems = await videoService.GetVideoItems();
+
+      var setting = await settings.GetSetting("TagBlacklist");
+      var globalBlackList = JsonConvert.DeserializeObject<List<string>>(setting?.Value ?? "[]") ?? new List<string>();
+      allItems = allItems.Where(item => !item.Tags.Exists(a => globalBlackList.Any(b => b == a.Name))).ToList();
+
+      var scanData = allItems.Select(item => new
+      {
+        link = $"{BaseUrl}/heresphere/{item.Id}",
+        title = item.Title,
+        dateReleased = item.AddedUTC?.ToString("yyyy-MM-dd") ?? "",
+        dateAdded = item.AddedUTC?.ToString("yyyy-MM-dd") ?? "",
+        duration = item.Duration.TotalMilliseconds,
+        rating = ScaleValue(item.SiteRating, 0, 1, 0, 5),
+        favorites = item.Liked ? 1 : 0,
+        comments = 0,
+        isFavorite = item.Liked,
+        tags = item.Tags.Select(t => new { name = t.Name, start = 0.0d, end = 0.0d, track = 0 })
+            .Concat(item.Stars.Select(s => new { name = $"Talent:{s.Name}", start = 0.0d, end = 0.0d, track = 1 }))
+      });
+
+      return new { scanData };
     }
 
     [HttpPost]
@@ -174,10 +88,16 @@ namespace vrScraper.Controllers
 
       logger.LogInformation("Detail query for {videoId}", videoId);
 
-      //logger.LogInformation(JsonConvert.SerializeObject(model));
-
       var foundVideo = await videoService.GetVideoById(videoId);
       if (foundVideo == null) return NotFound();
+
+      // Handle deleteFile request
+      if (model.DeleteFile == true)
+      {
+        logger.LogInformation("HereSphere delete request for video {videoId}", videoId);
+        await videoService.DeleteVideo(foundVideo.Id);
+        return Ok();
+      }
 
       VideoSource? source = null;
 
@@ -199,19 +119,29 @@ namespace vrScraper.Controllers
         videoService.FavVideo(foundVideo);
       }
 
+      // Handle rating write-back
+      if (model.Rating.HasValue)
+      {
+        foundVideo.LocalRating = model.Rating.Value / 5.0;
+        await videoService.UpdateVideoRating(foundVideo.Id, foundVideo.LocalRating.Value);
+        logger.LogInformation("HereSphere rating update for video {videoId}: {rating}", videoId, foundVideo.LocalRating);
+      }
+
       var stars = foundVideo.Stars.Select(s => new { name = $"Talent:{s.Name}", start = 0.0d, end = 0.0d, track = 1 }).ToList();
       var tags = foundVideo.Tags.Select(t => new { name = t.Name, start = 0.0d, end = 0.0d, track = 0 }).ToList();
+
+      var dateStr = foundVideo.AddedUTC?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd");
 
       return new
       {
         access = 1,
         title = foundVideo.Title,
-        description = "dummy",
+        description = "",
         thumbnailImage = $"{foundVideo.Thumbnail}",
-        dateReleased = "2022-03-10",
-        dateAdded = "2022-06-16",
+        dateReleased = dateStr,
+        dateAdded = dateStr,
         duration = foundVideo.Duration.TotalMilliseconds,
-        rating = ScaleValue(foundVideo.SiteRating, 0, 1, 0, 5),
+        rating = ScaleValue(foundVideo.LocalRating ?? foundVideo.SiteRating, 0, 1, 0, 5),
         favorites = foundVideo.Liked ? 1 : 0,
         comments = 0,
         isFavorite = foundVideo.Liked,
@@ -239,7 +169,7 @@ namespace vrScraper.Controllers
            }
         ],
         writeFavorite = true,
-        writeRating = false, //TODO
+        writeRating = true,
         writeTags = false,
         writeHSP = false
       };

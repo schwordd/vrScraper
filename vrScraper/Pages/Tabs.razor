@@ -7,11 +7,15 @@
 
 @inject ITabService TabService
 @inject IVideoService VideoService
+@inject IJSRuntime JSRuntime
 
 <h3>Manage Tabs</h3>
 
 <button class="btn btn-primary btn-sm mb-2" @onclick="AddNewTab">
     <i class="bi bi-plus-lg"></i> Add new user defined tab
+</button>
+<button class="btn btn-success btn-sm mb-2 ms-2" @onclick="AddNewWatchlist">
+    <i class="bi bi-bookmark-plus"></i> Add new watchlist
 </button>
 
 <div class="row">
@@ -22,7 +26,7 @@
 
         <h5>Default Tabs</h5>
 
-        foreach (var tab in AvailableTabs.OrderBy(t => t.Order))
+        foreach (var tab in AvailableTabs.Where(t => t.Type != "WATCHLIST").OrderBy(t => t.Order))
         {
             // Check for transition from IsDefaultTab == true to false
             if (lastTabWasDefault && !IsDefaultTab(tab))
@@ -179,17 +183,74 @@
     {
         <p>No tabs available.</p>
     }
+
+    @{
+        var watchlistTabs = (AvailableTabs ?? new List<DbVrTab>()).Where(t => t.Type == "WATCHLIST").OrderBy(t => t.Order).ToList();
+        if (watchlistTabs.Any())
+        {
+            <div class="w-100 my-2"></div>
+            <h5><i class="bi bi-bookmark"></i> Watchlists</h5>
+
+            foreach (var tab in watchlistTabs)
+            {
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
+                    <div class="card p-2 watchlist-card">
+                        <div class="d-flex justify-content-between align-items-center">
+                            @if (!tab.IsEditing)
+                            {
+                                <div class="d-flex align-items-center">
+                                    <h6 class="card-title card-title-flexible mb-1 me-1">
+                                        <i class="bi bi-bookmark-fill watchlist-icon"></i> @tab.Name
+                                    </h6>
+                                    <button class="btn btn-link btn-sm p-0 ml-1 edit-btn" @onclick="() => StartEditing(tab)">
+                                        <i class="bi bi-pencil edit-icon"></i>
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control form-control-sm ml-auto me-1 tab-name-input" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
+                                <button class="btn btn-sm btn-outline-secondary ml-2 me-1" @onclick="() => StopEditing(tab)">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            }
+                            <button class="btn btn-sm btn-outline-danger ml-2" @onclick="() => DeleteTab(tab.Id)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Active</label>
+                            <input type="checkbox" class="form-check-input form-check-sm ml-auto" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
+                        </div>
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Order</label>
+                            <input type="number" min="0" class="form-control form-control-sm input-sm ml-auto order-input" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" />
+                        </div>
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Videos</label>
+                            <span class="badge bg-secondary">@tab.VideoWhitelistList.Count()</span>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
+                                <i class="bi bi-floppy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
 </div>
 
 @code {
 
 
-    private List<DbTag> AvailableTagsFake { get; set; } = new();
-    private List<DbStar> AvailableActressesFake { get; set; } = new();
-
     private List<DbVrTab> AvailableTabs { get; set; } = new();
     private List<DbTag> AvailableTags { get; set; } = new();
     private List<DbStar> AvailableActresses { get; set; } = new();
+    private Dictionary<long, string> _originalNames = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -233,12 +294,35 @@
         await LoadTabs();
     }
 
+    private async Task AddNewWatchlist()
+    {
+        var newTab = new DbVrTab
+            {
+                Name = "New Watchlist",
+                Type = "WATCHLIST",
+                Active = true,
+                Order = AvailableTabs.Count + 1,
+                TagWhitelist = "[]",
+                ActressWhitelist = "[]",
+                TagBlacklist = "[]",
+                ActressBlacklist = "[]",
+                VideoWhitelist = "[]",
+                VideoBlacklist = "[]"
+            };
+
+        await TabService.AddTab(newTab);
+        await LoadTabs();
+    }
+
     private async Task DeleteTab(long id)
     {
         var tabToDelete = AvailableTabs.FirstOrDefault(t => t.Id == id);
 
         if (tabToDelete != null && tabToDelete.Type != "DEFAULT")
         {
+            bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this tab?");
+            if (!confirmed) return;
+
             await TabService.DeleteTab(id);
             await LoadTabs();
         }
@@ -248,8 +332,8 @@
     {
         await TabService.UpdateTab(tab);
         tab.IsDirty = false;
-        tab.IsEditing = false;  // Beenden des Bearbeitungsmodus nach dem Speichern
-        await LoadTabs();
+        tab.IsEditing = false;
+        // Don't call LoadTabs() — the tab is already updated in the singleton cache
     }
 
     private bool IsDefaultTab(DbVrTab tab)
@@ -290,11 +374,17 @@
 
     private void StartEditing(DbVrTab tab)
     {
+        _originalNames[tab.Id] = tab.Name;
         tab.IsEditing = true;
     }
 
     private void StopEditing(DbVrTab tab)
     {
+        if (_originalNames.TryGetValue(tab.Id, out var originalName))
+        {
+            tab.Name = originalName;
+            _originalNames.Remove(tab.Id);
+        }
         tab.IsEditing = false;
     }
 }
