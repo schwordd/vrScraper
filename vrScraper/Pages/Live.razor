@@ -4,6 +4,7 @@
 @using vrScraper.Services
 @inject IVideoService VideoService
 @using Blzr.BootstrapSelect
+@implements IDisposable
 
 @if (LiveVideo != null)
 {
@@ -54,16 +55,27 @@
 
     public DbVideoItem? LiveVideo { get; set; }
 
+    private VideoService.LiveVideoChanged? _liveVideoHandler;
+
     protected override async Task OnInitializedAsync()
     {
         await Task.FromResult(0);
 
         this.LiveVideo = this.VideoService.CurrentLiveVideo;
-        this.VideoService.OnLiveVideoChanged += (s, e) =>
+        _liveVideoHandler = (s, e) =>
         {
             this.LiveVideo = e.Video;
             InvokeAsync(StateHasChanged);
         };
+        this.VideoService.OnLiveVideoChanged += _liveVideoHandler;
+    }
+
+    public void Dispose()
+    {
+        if (_liveVideoHandler != null)
+        {
+            this.VideoService.OnLiveVideoChanged -= _liveVideoHandler;
+        }
     }
 
     private void Like()

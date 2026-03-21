@@ -18,7 +18,7 @@ namespace vrScraper
   {
     public static string Version { get => "1.0.0"; }
 
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
       var logo = @$"
  _    __     _____
@@ -89,6 +89,7 @@ namespace vrScraper
       builder.Services.AddSingleton<IEpornerScraper, EpornerScraper>();
       builder.Services.AddSingleton<ITabService, TabService>();
       builder.Services.AddSingleton<ISettingService, SettingService>();
+      builder.Services.AddSingleton<ITabFilteringService, TabFilteringService>();
       builder.Services.AddBootstrapSelect();
 
       // Add scheduled scraping background service
@@ -130,10 +131,10 @@ namespace vrScraper
         DbDefaults.SeedDefaultTabs(context);
       }
 
-      app.UseRouting();
-
       // Enable CORS
       app.UseCors("AllowAll");
+
+      app.UseRouting();
       app.UseAuthorization();
 
       app.UseStaticFiles();
@@ -148,20 +149,20 @@ namespace vrScraper
 
       // Retrieve the service from the DI container and call the method
       var settingService = app.Services.GetRequiredService<ISettingService>();
-      settingService.Initialize();
+      await settingService.Initialize();
 
       var videoService = app.Services.GetRequiredService<IVideoService>();
-      videoService.Initialize();
+      await videoService.Initialize();
 
       var epornerScraper = app.Services.GetRequiredService<IEpornerScraper>();
       epornerScraper.Initialize();
 
       var tabService = app.Services.GetRequiredService<ITabService>();
-      tabService.Initialize();
+      await tabService.Initialize();
 
       // Open the browser asynchronously
       var url = $"http://127.0.0.1:{builder.Configuration.GetValue<int>("Port")}";
-      Task.Run(() => OpenBrowser(url));
+      _ = Task.Run(() => OpenBrowser(url));
 
       app.Run();
     }
