@@ -14,6 +14,7 @@
 @inject VrScraperContext context
 @inject IJSRuntime JSRuntime
 @inject IServiceProvider serviceProvider
+@inject IRecommendationService RecommendationService
 @implements IAsyncDisposable
 
 @using Blzr.BootstrapSelect
@@ -21,101 +22,102 @@
 <div class="main-container">
 
     <div class="filters">
-        <div class="filter-container">
-            <div class="filter-section">
-                <span class="filter-item">Total items: @TotalItems</span>
-
-                <span class="filter-item">
-                    <label for="search">Search:</label>
-                    <input type="text" class="form-control sort-select" id="search"
+        <div class="filter-row">
+            <span class="filter-item">
+                <div class="search-wrapper">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="text" class="form-control filter-search" id="search"
                            placeholder="Search title..."
                            @bind="SearchQuery"
                            @bind:event="oninput" />
-                </span>
+                </div>
+            </span>
 
-                <span class="filter-item">
-                    <label for="sort">Sort by:</label>
-                    <select class="form-select sort-select" @bind="CurrentSortOption">
-                        <option value="latest">Latest</option>
-                        <option value="rating">Rating</option>
-                        <option value="random">Random</option>
-                        <option value="playtime">Most played time</option>
-                        <option value="playcount">Most played count</option>
-                        <option value="bestunwatched">Best unwatched</option>
-                    </select>
-                </span>
+            <span class="filter-item">
+                <select class="form-select filter-select" @bind="CurrentSortOption">
+                    <option value="latest">Latest</option>
+                    <option value="rating">Rating</option>
+                    <option value="random">Random</option>
+                    <option value="playtime">Most played time</option>
+                    <option value="playcount">Most played count</option>
+                    <option value="bestunwatched">Best unwatched</option>
+                    <option value="recommended">Recommended</option>
+                </select>
+            </span>
 
-                <span class="filter-item">
-                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyLiked" id="showLikedCheck">
-                    <label class="form-check-label" for="showLikedCheck">Show only liked</label>
-                </span>
+            <span class="filter-item">
+                <input class="form-check-input" type="checkbox" @bind="ShowOnlyLiked" id="showLikedCheck">
+                <label class="form-check-label" for="showLikedCheck">Liked</label>
+            </span>
 
-                <span class="filter-item">
-                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyUnwatched" id="showUnwatchedCheck">
-                    <label class="form-check-label" for="showUnwatchedCheck">Show only unwatched</label>
-                </span>
+            <span class="filter-item">
+                <input class="form-check-input" type="checkbox" @bind="ShowOnlyUnwatched" id="showUnwatchedCheck">
+                <label class="form-check-label" for="showUnwatchedCheck">Unwatched</label>
+            </span>
 
-                <span class="filter-item">
-                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
-                    <label class="form-check-label" for="showErrorsCheck">Show only with errors</label>
-                </span>
+            <span class="filter-item">
+                <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
+                <label class="form-check-label" for="showErrorsCheck">Errors</label>
+            </span>
 
+            <span class="filter-item-count">@TotalItems videos</span>
+        </div>
+
+        <div class="filter-row">
+            <span class="filter-item">
+                <label>Tags:</label>
+                <div class="d-flex align-items-center gap-2">
+                    <BootstrapSelect IsMultiple="true"
+                                    TItem="(DbTag Tag, long Count)"
+                                    Data="@SortedTags"
+                                    TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
+                                    ValueField="@((item) => item.Tag.Name)"
+                                    ShowSearch="true"
+                                    TType="IEnumerable<string>"
+                                    @bind-Value="@SelectedTagValues" />
+                    <button class="btn btn-sm btn-clear" @onclick="ClearTags" disabled="@(SelectedTags.Count == 0)" title="Clear tags">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </span>
+
+            <span class="filter-item">
+                <label>Actresses:</label>
+                <div class="d-flex align-items-center gap-2">
+                    <BootstrapSelect IsMultiple="true"
+                                    TItem="(DbStar Star, long Count)"
+                                    Data="@SortedActresses"
+                                    TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
+                                    ValueField="@((item) => item.Star.Name)"
+                                    ShowSearch="true"
+                                    TType="IEnumerable<string>"
+                                    @bind-Value="@SelectedActressesValues" />
+                    <button class="btn btn-sm btn-clear" @onclick="ClearActresses" disabled="@(SelectedActresses.Count == 0)" title="Clear actresses">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </span>
+
+            @if (WatchlistTabs.Any())
+            {
                 <span class="filter-item">
-                    <label for="tags">Tags:</label>
-                    <div class="d-flex align-items-center gap-2">
-                        <BootstrapSelect IsMultiple="true"
-                                        TItem="(DbTag Tag, long Count)"
-                                        Data="@SortedTags"
-                                        TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
-                                        ValueField="@((item) => item.Tag.Name)"
-                                        ShowSearch="true"
-                                        TType="IEnumerable<string>"
-                                        @bind-Value="@SelectedTagValues" />
-                        <button class="btn btn-sm btn-clear" @onclick="ClearTags" disabled="@(SelectedTags.Count == 0)" title="Clear tags">
-                            <i class="bi bi-x-lg"></i>
+                    <label><i class="bi bi-bookmark"></i> Watchlist:</label>
+                    <BootstrapSelect TItem="DbVrTab"
+                                    Data="@WatchlistTabs"
+                                    TextField="@((item) => item.Name)"
+                                    ValueField="@((item) => item.Id.ToString())"
+                                    TType="string"
+                                    @bind-Value="@SelectedWatchlistValue" />
+                    @if (_selectedWatchlistId > 0)
+                    {
+                        <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success" : "btn-outline-success")"
+                                @onclick="() => ToggleShowOnlyWatchlist()"
+                                title="Nur Watchlist-Videos anzeigen">
+                            <i class="bi bi-funnel-fill"></i>
                         </button>
-                    </div>
+                    }
                 </span>
-
-                <span class="filter-item">
-                    <label for="actresses">Actresses:</label>
-                    <div class="d-flex align-items-center gap-2">
-                        <BootstrapSelect IsMultiple="true"
-                                        TItem="(DbStar Star, long Count)"
-                                        Data="@SortedActresses"
-                                        TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
-                                        ValueField="@((item) => item.Star.Name)"
-                                        ShowSearch="true"
-                                        TType="IEnumerable<string>"
-                                        @bind-Value="@SelectedActressesValues" />
-                        <button class="btn btn-sm btn-clear" @onclick="ClearActresses" disabled="@(SelectedActresses.Count == 0)" title="Clear actresses">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                </span>
-
-                @if (WatchlistTabs.Any())
-                {
-                    <span class="filter-item">
-                        <label><i class="bi bi-bookmark"></i> Watchlist:</label>
-                        <select class="form-select sort-select" @bind="SelectedWatchlistId">
-                            <option value="0">-- None --</option>
-                            @foreach (var wl in WatchlistTabs)
-                            {
-                                <option value="@wl.Id">@wl.Name</option>
-                            }
-                        </select>
-                        @if (_selectedWatchlistId > 0)
-                        {
-                            <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success" : "btn-outline-success")"
-                                    @onclick="() => ToggleShowOnlyWatchlist()"
-                                    title="Nur Watchlist-Videos anzeigen">
-                                <i class="bi bi-funnel-fill"></i>
-                            </button>
-                        }
-                    </span>
-                }
-            </div>
+            }
         </div>
     </div>
 
@@ -149,6 +151,9 @@
                             <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
                                 <i class="bi bi-trash"></i>
                             </button>
+                            <button class="btn btn-info btn-sm similar-btn" @onclick:stopPropagation="true" @onclick="() => ShowSimilar(item)" title="Find similar videos">
+                                <i class="bi bi-stars"></i>
+                            </button>
                             <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => DownloadVideo(item)" title="Download video">
                                 <i class="bi bi-download"></i>
                             </button>
@@ -175,17 +180,18 @@
                         </div>
                     </div>
                     <h3>@item.Title</h3>
-                    <div class="tag-container">
-                        @if (item.Stars != null)
-                        {
+                    @if (item.Stars != null && item.Stars.Any())
+                    {
+                        <div class="star-container">
                             @foreach (var starInfo in item.Stars)
                             {
                                 <button type="button" class="btn btn-primary star-pill" @onclick="() => AddStarFilter(starInfo.Name)">
-                                    @starInfo.Name
+                                    <i class="bi bi-person-fill"></i> @starInfo.Name
                                 </button>
                             }
-                        }
-
+                        </div>
+                    }
+                    <div class="tag-container">
                         @if (item.Tags != null)
                         {
                             @foreach (var tagInfo in item.Tags)
@@ -205,6 +211,27 @@
                OnPageChanged="GoToPage" OnPageSizeChanged="PageSizeChanged" />
     </div>
 </div>
+
+@if (_similarVideos != null && _similarVideos.Any())
+{
+    <div class="similar-panel">
+        <div class="similar-header">
+            <h5><i class="bi bi-stars"></i> Similar to: @_similarToTitle</h5>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="CloseSimilar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="similar-grid">
+            @foreach (var sv in _similarVideos)
+            {
+                <div class="similar-item" @onclick="() => PlayVideo(sv)">
+                    <img src="@(string.IsNullOrEmpty(sv.Thumbnail) ? "/images/thumbnail-not-available.svg" : sv.Thumbnail)" alt="@sv.Title" />
+                    <div class="similar-item-title">@sv.Title</div>
+                </div>
+            }
+        </div>
+    </div>
+}
 
 <!-- Video-Player-Komponente hinzufügen -->
 <VideoPlayer @ref="VideoPlayerComponent" OnClose="HandlePlayerClosed" />
@@ -397,6 +424,10 @@
                     )
                     .ToList();
             }
+            else if (_currentSortOption == "recommended")
+            {
+                sortedItems = RecommendationService.GetRecommendedVideos(filteredItems.ToList());
+            }
             else
             {
                 sortedItems = filteredItems
@@ -444,6 +475,15 @@
     private List<DbVrTab> WatchlistTabs { get; set; } = new();
     private long _selectedWatchlistId;
     private HashSet<long> _selectedWatchlistVideoIds = new();
+
+    public string SelectedWatchlistValue
+    {
+        get => _selectedWatchlistId.ToString();
+        set
+        {
+            SelectedWatchlistId = long.TryParse(value, out var id) ? id : 0;
+        }
+    }
 
     public long SelectedWatchlistId
     {
@@ -721,6 +761,23 @@
             GoToPage(CurrentPage + 1);
             StateHasChanged();
         }
+    }
+
+    private List<DbVideoItem>? _similarVideos;
+    private string? _similarToTitle;
+
+    private void ShowSimilar(DbVideoItem item)
+    {
+        _similarToTitle = item.Title;
+        _similarVideos = RecommendationService.GetSimilarVideos(item.Id, _videoItems, 12);
+        StateHasChanged();
+    }
+
+    private void CloseSimilar()
+    {
+        _similarVideos = null;
+        _similarToTitle = null;
+        StateHasChanged();
     }
 
     public async ValueTask DisposeAsync()

@@ -63,7 +63,13 @@
                         }
                         else
                         {
-                            <h6 class="card-title card-title-min mb-1">@tab.Name</h6>
+                            <h6 class="card-title card-title-min mb-1">
+                                @if (tab.Name == "Recommended")
+                                {
+                                    <i class="bi bi-stars" title="Algorithm-powered"></i>
+                                }
+                                @tab.Name
+                            </h6>
                         }
 
                         @if (tab.Type != "DEFAULT")
@@ -90,7 +96,7 @@
                     {
                         <!-- Tag Whitelist -->
                         <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Tag WL</label>
+                            <label class="mr-2">Include Tags</label>
                             <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
                                              TextField="@((item) => item.Name)"
                                              ValueField="@((item) => item.Name)"
@@ -102,7 +108,7 @@
 
                         <!-- Tag Blacklist -->
                         <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Tag BL</label>
+                            <label class="mr-2">Exclude Tags</label>
                             <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
                                              TextField="@((item) => item.Name)"
                                              ValueField="@((item) => item.Name)"
@@ -114,7 +120,7 @@
 
                         <!-- Actress Whitelist -->
                         <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Act WL</label>
+                            <label class="mr-2">Include Actresses</label>
                             <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
                                              TextField="@((item) => item.Name)"
                                              ValueField="@((item) => item.Name)"
@@ -126,7 +132,7 @@
 
                         <!-- Actress Blacklist -->
                         <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Act BL</label>
+                            <label class="mr-2">Exclude Actresses</label>
                             <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
                                              TextField="@((item) => item.Name)"
                                              ValueField="@((item) => item.Name)"
@@ -139,39 +145,54 @@
                     else if (tab.IsEditing == false && IsDefaultTab(tab) == false)
                     {
                         <!-- Tag Whitelist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Tag WL</label>
-                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagWhitelistDisplayString" />
-                        </div>
+                        @if (!string.IsNullOrEmpty(tab.TagWhitelistDisplayString))
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Include Tags</label>
+                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagWhitelistDisplayString" />
+                            </div>
+                        }
 
                         <!-- Tag Blacklist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Tag BL</label>
-                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagBlacklistDisplayString" />
-                        </div>
+                        @if (!string.IsNullOrEmpty(tab.TagBlacklistDisplayString))
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Exclude Tags</label>
+                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagBlacklistDisplayString" />
+                            </div>
+                        }
 
                         <!-- Actress Whitelist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Act WL</label>
-                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressWhitelistDisplayString" />
-                        </div>
+                        @if (!string.IsNullOrEmpty(tab.ActressWhitelistDisplayString))
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Include Actresses</label>
+                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressWhitelistDisplayString" />
+                            </div>
+                        }
 
                         <!-- Actress Blacklist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Act BL</label>
-                            <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressBlacklistDisplayString" />
-                        </div>
+                        @if (!string.IsNullOrEmpty(tab.ActressBlacklistDisplayString))
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Exclude Actresses</label>
+                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressBlacklistDisplayString" />
+                            </div>
+                        }
                     }
                     else
                     {
                         //nope
                     }
 
-                    <div class="d-flex justify-content-end">
-                        <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
-                            <i class="bi bi-floppy"></i>
-                        </button>
-                    </div>
+                    @if (!IsDefaultTab(tab) || tab.IsDirty)
+                    {
+                        <div class="d-flex justify-content-end">
+                            <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
+                                <i class="bi bi-floppy"></i>
+                            </button>
+                        </div>
+                    }
                 </div>
             </div>
 

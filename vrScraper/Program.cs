@@ -90,6 +90,7 @@ namespace vrScraper
       builder.Services.AddSingleton<ITabService, TabService>();
       builder.Services.AddSingleton<ISettingService, SettingService>();
       builder.Services.AddSingleton<ITabFilteringService, TabFilteringService>();
+      builder.Services.AddSingleton<IRecommendationService, RecommendationService>();
       builder.Services.AddBootstrapSelect();
 
       // Add scheduled scraping background service

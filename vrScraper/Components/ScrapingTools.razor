@@ -8,22 +8,22 @@
 <div class="scraper">
     <div class="pe-2">
         <label for="startPage">Start Page:</label>
-        <InputNumber @bind-Value="startPage" id="startPage" class="form-control input-width-small" disabled="@Scraper.ScrapingInProgress" />
+        <InputNumber @bind-Value="startPage" id="startPage" class="form-control input-width-small page-number-input" disabled="@Scraper.ScrapingInProgress" />
     </div>
     <div class="pe-2">
         <label for="count">Pages:</label>
-        <InputNumber @bind-Value="count" id="count" class="form-control input-width-small" disabled="@Scraper.ScrapingInProgress" />
+        <InputNumber @bind-Value="count" id="count" class="form-control input-width-small page-number-input" disabled="@Scraper.ScrapingInProgress" />
     </div>
     <div class="pe-2">
         <button class="btn btn-primary" @onclick="Scrape" disabled="@Scraper.ScrapingInProgress">Scrape</button>
     </div>
 
     <div class="pe-2">
-        <button class="btn btn-primary" @onclick="Rescrape" disabled="@Scraper.ScrapingInProgress">Rescrape</button>
+        <button class="btn btn-outline-primary" @onclick="Rescrape" disabled="@Scraper.ScrapingInProgress">Rescrape</button>
     </div>
 
     <div class="pe-2">
-        <button class="btn btn-primary" @onclick="RemoveDead" disabled="@Scraper.ScrapingInProgress">Check Dead Thumbnails</button>
+        <button class="btn btn-outline-secondary" @onclick="RemoveDead" disabled="@Scraper.ScrapingInProgress">Check Dead Thumbnails</button>
     </div>
 
     <div class="pe-2">

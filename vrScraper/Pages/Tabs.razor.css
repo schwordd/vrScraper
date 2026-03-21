@@ -1,5 +1,13 @@
 .card.p-2.default {
-    opacity: 0.6;
+    opacity: 0.85;
+    padding: 8px !important;
+}
+
+.btn-success:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .fake-select {
@@ -32,14 +40,14 @@
 }
 
 .order-input {
-    width: 140px;
+    width: 70px;
 }
 
 .watchlist-card {
-    border-left: 3px solid #198754;
+    border-left: 4px solid #20c997;
 }
 
 .watchlist-icon {
-    color: #198754;
+    color: #20c997;
     margin-right: 4px;
 }

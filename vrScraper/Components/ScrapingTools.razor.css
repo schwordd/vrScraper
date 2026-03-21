@@ -20,6 +20,10 @@
     font-weight: 500;
 }
 
+.page-number-input {
+    width: 70px;
+}
+
 .input-width-small {
     width: 120px;
     background: #ffffff;

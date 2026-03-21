@@ -28,7 +28,6 @@
 </div>
 
 <div class="stats-section mt-4">
-    <h5>Library Statistics</h5>
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value">@TotalVideos</div>
@@ -52,7 +51,7 @@
         </div>
         <div class="stat-card">
             <div class="stat-value">@AverageRating</div>
-            <div class="stat-label">Average Rating</div>
+            <div class="stat-label">Avg. Rating</div>
         </div>
     </div>
 </div>
@@ -61,7 +60,7 @@
     private int TotalVideos;
     private int WatchedVideos;
     private int UnwatchedVideos;
-    private string TotalWatchTime = "0 hours 0 minutes";
+    private string TotalWatchTime = "0h 0m";
     private int LikedVideos;
     private string AverageRating = "N/A";
 
@@ -77,12 +76,13 @@
         var totalDuration = TimeSpan.FromTicks(videos.Sum(v => v.PlayDurationEst.Ticks));
         var totalHours = (int)totalDuration.TotalHours;
         var totalMinutes = totalDuration.Minutes;
-        TotalWatchTime = $"{totalHours} hours {totalMinutes} minutes";
+        TotalWatchTime = $"{totalHours}h {totalMinutes}m";
 
         var rated = videos.Where(v => v.SiteRating.HasValue && v.SiteRating.Value > 0).ToList();
         if (rated.Any())
         {
-            AverageRating = rated.Average(v => v.SiteRating!.Value).ToString("F1");
+            var averageRating = rated.Average(v => v.SiteRating!.Value);
+            AverageRating = $"{(averageRating * 5).ToString("F1")} / 5";
         }
     }
 }

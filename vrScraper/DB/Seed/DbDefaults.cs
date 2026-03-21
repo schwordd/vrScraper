@@ -47,6 +47,16 @@ namespace vrScraper.DB.Seed
         });
       }
 
+      if (defaultSettings.Exists(a => a.Key == "RecommendationsEnabled") == false)
+      {
+        db.Settings.Add(new Models.DbSetting()
+        {
+          Key = "RecommendationsEnabled",
+          Type = "System.Boolean",
+          Value = "true"
+        });
+      }
+
       if (defaultSettings.Exists(a => a.Key == "LastScheduledScrape") == false)
       {
         db.Settings.Add(new Models.DbSetting()
@@ -128,6 +138,28 @@ namespace vrScraper.DB.Seed
       {
         var tab = db.Tabs.Where(a => a.Name == "Random").FirstOrDefault();
         tab!.Order = -80;
+      }
+
+      if (defaultTabs.Exists(a => a.Name == "Recommended") == false)
+      {
+        db.Tabs.Add(new Models.DbVrTab()
+        {
+          Type = "DEFAULT",
+          Name = "Recommended",
+          Active = true,
+          Order = -70,
+          ActressBlacklist = "[]",
+          ActressWhitelist = "[]",
+          TagBlacklist = "[]",
+          TagWhitelist = "[]",
+          VideoBlacklist = "[]",
+          VideoWhitelist = "[]"
+        });
+      }
+      else
+      {
+        var tab = db.Tabs.Where(a => a.Name == "Recommended").FirstOrDefault();
+        tab!.Order = -70;
       }
 
       if (defaultTabs.Exists(a => a.Name == "Liked") == false)

@@ -6,6 +6,8 @@
 @using Blzr.BootstrapSelect
 @implements IDisposable
 
+<h3>Now Playing</h3>
+
 @if (LiveVideo != null)
 {
     <div class="video-item">
@@ -48,6 +50,14 @@
                 <i class="bi bi-check-circle-fill"></i> Stopped
             </button>
         </div>
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <i class="bi bi-broadcast" style="font-size: 48px; color: var(--gray-color, #64748b);"></i>
+        <h5>No video currently playing</h5>
+        <p class="text-muted">Start a video from DeoVR or HereSphere to see live playback info here.</p>
     </div>
 }
 

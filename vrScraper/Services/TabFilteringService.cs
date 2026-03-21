@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace vrScraper.Services
 {
-  public class TabFilteringService(IServiceScopeFactory scopeFactory) : ITabFilteringService
+  public class TabFilteringService(IServiceScopeFactory scopeFactory, IRecommendationService recommendationService, ISettingService settingService) : ITabFilteringService
   {
     public async Task<List<(string Name, List<DbVideoItem> Videos)>> GetFilteredTabVideos(
         List<DbVideoItem> allItems,
@@ -20,7 +20,7 @@ namespace vrScraper.Services
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
       var tabConfigs = await context.Tabs.Where(t => t.Active).OrderBy(t => t.Order).ToListAsync();
-      tabConfigs.ForEach(t =>
+      foreach (var t in tabConfigs)
       {
         switch (t.Type)
         {
@@ -86,6 +86,18 @@ namespace vrScraper.Services
                   ).ToList();
 
               tabs.Add((t.Name, list));
+            }
+            else if (t.Name == "Recommended")
+            {
+              var recommendedSetting = await settingService.GetSetting("RecommendationsEnabled");
+              if (recommendedSetting != null && bool.TryParse(recommendedSetting.Value, out bool recEnabled) && recEnabled)
+              {
+                var recommended = recommendationService.GetRecommendedVideos(allItems);
+                if (recommended.Any())
+                {
+                  tabs.Add((t.Name, recommended));
+                }
+              }
             }
 
             break;
@@ -157,7 +169,7 @@ namespace vrScraper.Services
             }
             break;
         }
-      });
+      }
 
       return tabs;
     }
