@@ -46,7 +46,7 @@ namespace vrScraper.Services
 
       // Check if scheduled scraping is enabled
       var enabledSetting = await settingService.GetSetting("ScheduledScrapingEnabled");
-      if (!bool.TryParse(enabledSetting.Value, out bool isEnabled) || !isEnabled)
+      if (enabledSetting == null || !bool.TryParse(enabledSetting.Value, out bool isEnabled) || !isEnabled)
       {
         return; // Scheduled scraping is disabled
       }
@@ -60,17 +60,19 @@ namespace vrScraper.Services
 
       // Check if it's time to scrape
       var timeSetting = await settingService.GetSetting("ScheduledScrapingTime");
-      if (!TimeSpan.TryParse(timeSetting.Value, out TimeSpan scheduledTime))
+      if (timeSetting == null || !TimeSpan.TryParse(timeSetting.Value, out TimeSpan scheduledTime))
       {
-        _logger.LogWarning("Invalid scheduled scraping time format: {Time}", timeSetting.Value);
+        _logger.LogWarning("Invalid scheduled scraping time format: {Time}", timeSetting?.Value);
         return;
       }
 
       var now = DateTime.Now;
       var currentTime = now.TimeOfDay;
       
-      // Check if we're within 1 hour of the scheduled time
-      var timeDifference = Math.Abs((currentTime - scheduledTime).TotalMinutes);
+      // Check if we're within 1 hour of the scheduled time (circular/midnight-safe)
+      var diff = (scheduledTime - currentTime).TotalMinutes;
+      if (diff < 0) diff += 24 * 60; // wrap around midnight
+      var timeDifference = Math.Min(diff, 24 * 60 - diff); // shortest distance
       if (timeDifference > 60)
       {
         return; // Not time to scrape yet
@@ -78,7 +80,7 @@ namespace vrScraper.Services
 
       // Check if we already scraped today
       var lastScrapeSetting = await settingService.GetSetting("LastScheduledScrape");
-      if (DateTime.TryParse(lastScrapeSetting.Value, out DateTime lastScrape))
+      if (lastScrapeSetting != null && DateTime.TryParse(lastScrapeSetting.Value, out DateTime lastScrape))
       {
         if (lastScrape.Date == now.Date)
         {
@@ -97,7 +99,7 @@ namespace vrScraper.Services
       {
         // Get max pages setting
         var maxPagesSetting = await settingService.GetSetting("ScheduledScrapingMaxPages");
-        if (!int.TryParse(maxPagesSetting.Value, out int maxPages))
+        if (maxPagesSetting == null || !int.TryParse(maxPagesSetting.Value, out int maxPages))
         {
           maxPages = 50; // Default fallback
         }
@@ -112,11 +114,11 @@ namespace vrScraper.Services
 
         // Wait for completion (with timeout)
         var timeout = TimeSpan.FromHours(6); // Max 6 hours
-        var start = DateTime.UtcNow;
+        var start = DateTime.Now;
 
         while (scraper.ScrapingInProgress && !cancellationToken.IsCancellationRequested)
         {
-          if (DateTime.UtcNow - start > timeout)
+          if (DateTime.Now - start > timeout)
           {
             _logger.LogWarning("Scheduled scraping timeout reached, stopping");
             scraper.StopScraping();
@@ -127,9 +129,12 @@ namespace vrScraper.Services
         }
 
         // Update last scrape date
-        var lastScrapeSetting = await settingService.GetSetting("LastScheduledScrape");
-        lastScrapeSetting.Value = DateTime.Now.ToString("yyyy-MM-dd");
-        await settingService.UpdateSetting(lastScrapeSetting);
+        var lastScrapeSetting2 = await settingService.GetSetting("LastScheduledScrape");
+        if (lastScrapeSetting2 != null)
+        {
+          lastScrapeSetting2.Value = DateTime.Now.ToString("yyyy-MM-dd");
+          await settingService.UpdateSetting(lastScrapeSetting2);
+        }
 
         _logger.LogInformation("Scheduled scraping completed. Status: {Status}", scraper.ScrapingStatus);
       }

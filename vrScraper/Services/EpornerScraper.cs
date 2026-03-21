@@ -378,31 +378,39 @@ namespace vrScraper.Services
       {
         foreach (var node in jsonNodes)
         {
-          // JSON parsen
-          var jsonObject = JsonDocument.Parse(node.InnerText);
-
-          // Prüfen, ob @type = "VideoObject" existiert
-          if (jsonObject.RootElement.TryGetProperty("@type", out var typeProperty) && typeProperty.GetString() == "VideoObject")
+          try
           {
-            jsonObject.RootElement.TryGetProperty("name", out var nameCandidate);
-            videoDetails.Name = nameCandidate.GetString();
+            // JSON parsen
+            var jsonObject = JsonDocument.Parse(node.InnerText);
 
-            jsonObject.RootElement.TryGetProperty("bitrate", out var bitrateCandidate);
-            videoDetails.Bitrate = bitrateCandidate.GetString();
+            // Prüfen, ob @type = "VideoObject" existiert
+            if (jsonObject.RootElement.TryGetProperty("@type", out var typeProperty) && typeProperty.GetString() == "VideoObject")
+            {
+              jsonObject.RootElement.TryGetProperty("name", out var nameCandidate);
+              videoDetails.Name = nameCandidate.GetString();
 
-            jsonObject.RootElement.TryGetProperty("width", out var widthCandidate);
-            videoDetails.Width = Convert.ToUInt16(widthCandidate.GetString());
+              jsonObject.RootElement.TryGetProperty("bitrate", out var bitrateCandidate);
+              videoDetails.Bitrate = bitrateCandidate.GetString();
 
-            jsonObject.RootElement.TryGetProperty("height", out var heightCandidate);
-            videoDetails.Height = Convert.ToUInt16(heightCandidate.GetString());
+              jsonObject.RootElement.TryGetProperty("width", out var widthCandidate);
+              videoDetails.Width = Convert.ToUInt16(widthCandidate.GetString());
 
-            jsonObject.RootElement.TryGetProperty("description", out var descriptionCandidate);
-            videoDetails.Description = descriptionCandidate.GetString();
+              jsonObject.RootElement.TryGetProperty("height", out var heightCandidate);
+              videoDetails.Height = Convert.ToUInt16(heightCandidate.GetString());
 
-            jsonObject.RootElement.TryGetProperty("uploadDate", out var uploadDateCandidate);
+              jsonObject.RootElement.TryGetProperty("description", out var descriptionCandidate);
+              videoDetails.Description = descriptionCandidate.GetString();
 
-            if (uploadDateCandidate.GetString() != null)
-              videoDetails.UploadDate = DateTime.ParseExact(uploadDateCandidate.GetString()!, "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+              jsonObject.RootElement.TryGetProperty("uploadDate", out var uploadDateCandidate);
+
+              if (uploadDateCandidate.GetString() != null)
+                videoDetails.UploadDate = DateTime.ParseExact(uploadDateCandidate.GetString()!, "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+            }
+          }
+          catch (System.Text.Json.JsonException ex)
+          {
+            logger.LogWarning(ex, "Failed to parse JSON-LD node for video {VideoId}", item.SiteVideoId);
+            continue;
           }
         }
       }
@@ -893,7 +901,7 @@ namespace vrScraper.Services
           return ThumbnailStatus.Success;
         }
       }
-      catch (TaskCanceledException tcEx)
+      catch (TaskCanceledException)
       {
         // Timeout - KEINEN ErrorCount erhöhen, könnte temporär sein
         logger.LogDebug($"Timeout checking thumbnail for video {item.Id}: {item.Title} - No error count increase");
@@ -972,6 +980,12 @@ namespace vrScraper.Services
         var duration = ParseDuration(durationNode?.InnerText.Trim());
         var rating = ParseRating(ratingNode?.InnerText.Trim()) ?? 0;
         var views = ParseViews(viewsNode?.InnerText.Trim()) ?? 0;
+
+        if (thumbnailNode == null)
+        {
+          logger.LogWarning("Skipping video item with missing thumbnail node, videoId: {VideoId}", videoIdNode);
+          continue;
+        }
 
         var videoItem = new VideoItem
         {

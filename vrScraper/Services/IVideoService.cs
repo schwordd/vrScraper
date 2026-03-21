@@ -9,12 +9,13 @@ namespace vrScraper.Services
     Task Initialize();
     Task ReloadVideos();
     Task<List<DbVideoItem>> GetVideoItems();
-    Task<DbVideoItem> GetVideoById(long id);
+    Task<DbVideoItem?> GetVideoById(long id);
     Task<List<(DbTag Tag, long Count)>> GetTagInfos();
     Task<List<(DbStar Star, long Count)>> GetActorInfos();
     Task DeleteVideo(long id);
     Task<bool> UpdateVideoLikeStatus(long id, bool liked);
     Task<bool> UpdateVideoErrorCount(long id);
+    Task<bool> UpdateVideoRating(long id, double rating);
 
     void SetPlayedVideo(DbVideoItem vid);
     DbVideoItem? FinishCurrentPlayback();

@@ -38,6 +38,7 @@ namespace vrScraper.Controllers
         [HttpGet("{videoId}")]
         public async Task<IActionResult> Get(long videoId)
         {
+            HttpResponseMessage? response = null;
             try
             {
                 _logger.LogInformation("Video proxy request for videoId {VideoId}", videoId);
@@ -83,7 +84,6 @@ namespace vrScraper.Controllers
                     _logger.LogInformation("Range-Request erkannt: {Range}", rangeHeader);
                 }
 
-                HttpResponseMessage response;
                 try
                 {
                     // Stream die Video-Datei durch
@@ -92,8 +92,11 @@ namespace vrScraper.Controllers
                     // Prüfe, ob der Request erfolgreich war
                     if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
                     {
+                        var statusCode = (int)response.StatusCode;
                         _logger.LogWarning("Fehler beim Abrufen des Videos: StatusCode {StatusCode}", response.StatusCode);
-                        return StatusCode((int)response.StatusCode, "Fehler beim Abrufen des Videos");
+                        response.Dispose();
+                        response = null;
+                        return StatusCode(statusCode, "Fehler beim Abrufen des Videos");
                     }
                 }
                 catch (HttpRequestException ex)
@@ -135,11 +138,14 @@ namespace vrScraper.Controllers
                 }
 
                 // Content-Range für Partial-Content setzen, wenn vorhanden
-                string? contentRangeHeader = response.Content.Headers.GetValues("Content-Range").FirstOrDefault();
-                if (!string.IsNullOrEmpty(contentRangeHeader))
+                if (response.Content.Headers.TryGetValues("Content-Range", out var contentRangeValues))
                 {
-                    Response.Headers["Content-Range"] = contentRangeHeader;
-                    _logger.LogInformation("Content-Range gesetzt: {ContentRange}", contentRangeHeader);
+                    string? contentRangeHeader = contentRangeValues.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(contentRangeHeader))
+                    {
+                        Response.Headers["Content-Range"] = contentRangeHeader;
+                        _logger.LogInformation("Content-Range gesetzt: {ContentRange}", contentRangeHeader);
+                    }
                 }
 
                 // Wichtige Streaming-Header hinzufügen
@@ -153,7 +159,11 @@ namespace vrScraper.Controllers
                 Response.Headers["Cross-Origin-Resource-Policy"] = "cross-origin";
 
                 // Stream die Daten
+                // Note: FileStreamResult will dispose the stream when done.
+                // The response object is intentionally not disposed here because
+                // the stream is owned by the response and must remain alive.
                 var videoStream = await response.Content.ReadAsStreamAsync();
+                response = null; // Prevent disposal in finally block; stream ownership transfers to FileStreamResult
                 return new FileStreamResult(videoStream, Response.ContentType);
             }
             catch (Exception ex)
@@ -161,12 +171,17 @@ namespace vrScraper.Controllers
                 _logger.LogError(ex, "Ein Fehler ist beim Verarbeiten der Proxy-Anfrage aufgetreten");
                 return StatusCode(500, "Ein interner Serverfehler ist aufgetreten");
             }
+            finally
+            {
+                response?.Dispose();
+            }
         }
 
         // GET: api/VideoProxy/download/{videoId}
         [HttpGet("download/{videoId}")]
         public async Task<IActionResult> Download(long videoId)
         {
+            HttpResponseMessage? response = null;
             try
             {
                 _logger.LogInformation("Video download request for videoId {VideoId}", videoId);
@@ -199,21 +214,19 @@ namespace vrScraper.Controllers
                 client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
                 client.DefaultRequestHeaders.Add("Origin", "https://www.eporner.com");
 
-                HttpResponseMessage response;
                 try
                 {
-                    // Download die Video-Datei mit HEAD Request für Größe
-                    var headResponse = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, source.Src));
-                    long? contentLength = headResponse.Content.Headers.ContentLength;
-
                     // Jetzt hole das eigentliche Video
                     response = await client.GetAsync(source.Src, HttpCompletionOption.ResponseHeadersRead);
 
                     // Prüfe, ob der Request erfolgreich war
                     if (!response.IsSuccessStatusCode)
                     {
+                        var statusCode = (int)response.StatusCode;
                         _logger.LogWarning("Fehler beim Herunterladen des Videos: StatusCode {StatusCode}", response.StatusCode);
-                        return StatusCode((int)response.StatusCode, "Fehler beim Herunterladen des Videos");
+                        response.Dispose();
+                        response = null;
+                        return StatusCode(statusCode, "Fehler beim Herunterladen des Videos");
                     }
                 }
                 catch (HttpRequestException ex)
@@ -245,6 +258,10 @@ namespace vrScraper.Controllers
                 var videoStream = await response.Content.ReadAsStreamAsync();
 
                 // Verwende FileStreamResult mit enableRangeProcessing für bessere Download-Performance
+                // Note: FileStreamResult will dispose the stream when done.
+                // The response object is intentionally not disposed here because
+                // the stream is owned by the response and must remain alive.
+                response = null; // Prevent disposal in finally block; stream ownership transfers to FileStreamResult
                 return new FileStreamResult(videoStream, Response.ContentType)
                 {
                     EnableRangeProcessing = false,
@@ -255,6 +272,10 @@ namespace vrScraper.Controllers
             {
                 _logger.LogError(ex, "Ein Fehler ist beim Verarbeiten der Download-Anfrage aufgetreten");
                 return StatusCode(500, "Ein interner Serverfehler ist aufgetreten");
+            }
+            finally
+            {
+                response?.Dispose();
             }
         }
     }
