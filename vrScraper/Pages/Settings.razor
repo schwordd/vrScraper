@@ -1,6 +1,7 @@
 @page "/settings"
 
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @using vrScraper.DB.Models
 @using Blzr.BootstrapSelect
 @using vrScraper.Services
@@ -75,8 +76,8 @@
                     <i class="fas fa-clock me-1"></i>
                     Scraping Time
                 </label>
-                <input type="text" class="form-control form-control-lg" id="scheduledScrapingTime" 
-                       @bind="ScheduledScrapingTime" placeholder="HH:MM (e.g., 02:00)" />
+                <input type="text" class="form-control form-control-lg" id="scheduledScrapingTime"
+                       @bind="ScheduledScrapingTime" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="HH:MM" />
                 <small class="form-text text-muted">
                     Time when daily scraping should start (24h format)
                 </small>
@@ -159,6 +160,9 @@
         }
         set
         {
+            if (!Regex.IsMatch(value, @"^([01]\d|2[0-3]):[0-5]\d$"))
+                return; // Don't persist invalid values
+
             var s = AllSettings.Single(s => s.Key == "ScheduledScrapingTime");
             s.Value = value;
             this.SettingService.UpdateSetting(s);

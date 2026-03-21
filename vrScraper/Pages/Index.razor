@@ -4,6 +4,7 @@
 @using vrScraper.DB.Models
 @using vrScraper.Services
 @inject IEpornerScraper Scraper
+@inject IVideoService VideoService
 
 <h3>Home</h3>
 
@@ -25,3 +26,63 @@
         <ActorOverview />
     </div>
 </div>
+
+<div class="stats-section mt-4">
+    <h5>Library Statistics</h5>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">@TotalVideos</div>
+            <div class="stat-label">Total Videos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@WatchedVideos</div>
+            <div class="stat-label">Watched</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@UnwatchedVideos</div>
+            <div class="stat-label">Unwatched</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@TotalWatchTime</div>
+            <div class="stat-label">Total Watch Time</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@LikedVideos</div>
+            <div class="stat-label">Liked Videos</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@AverageRating</div>
+            <div class="stat-label">Average Rating</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int TotalVideos;
+    private int WatchedVideos;
+    private int UnwatchedVideos;
+    private string TotalWatchTime = "0 hours 0 minutes";
+    private int LikedVideos;
+    private string AverageRating = "N/A";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var videos = await VideoService.GetVideoItems();
+
+        TotalVideos = videos.Count;
+        WatchedVideos = videos.Count(v => v.PlayCount > 0);
+        UnwatchedVideos = videos.Count(v => v.PlayCount == 0);
+        LikedVideos = videos.Count(v => v.Liked);
+
+        var totalDuration = TimeSpan.FromTicks(videos.Sum(v => v.PlayDurationEst.Ticks));
+        var totalHours = (int)totalDuration.TotalHours;
+        var totalMinutes = totalDuration.Minutes;
+        TotalWatchTime = $"{totalHours} hours {totalMinutes} minutes";
+
+        var rated = videos.Where(v => v.SiteRating.HasValue && v.SiteRating.Value > 0).ToList();
+        if (rated.Any())
+        {
+            AverageRating = rated.Average(v => v.SiteRating!.Value).ToString("F1");
+        }
+    }
+}
