@@ -1,0 +1,99 @@
+<div class="pager-info">
+    <div class="pager">
+        <button class="btn btn-sm btn-outline-primary" @onclick="OnPreviousPage" disabled="@IsFirstPage">
+            <i class="bi bi-chevron-left"></i>
+        </button>
+
+        @{
+            const int maxVisiblePages = 5;
+            var startPage = Math.Max(1, CurrentPage - maxVisiblePages / 2);
+            var endPage = Math.Min(TotalPages, startPage + maxVisiblePages - 1);
+
+            if (startPage > 1)
+            {
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(1)">1</button>
+                if (startPage > 2)
+                {
+                    <span class="page-ellipsis">...</span>
+                }
+            }
+
+            @for (int i = startPage; i <= endPage; i++)
+            {
+                var pageNumber = i;
+                <button class="btn btn-sm @(pageNumber == CurrentPage ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => GoToPage(pageNumber)">
+                    @pageNumber
+                </button>
+            }
+
+            if (endPage < TotalPages)
+            {
+                if (endPage < TotalPages - 1)
+                {
+                    <span class="page-ellipsis">...</span>
+                }
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToPage(TotalPages)">@TotalPages</button>
+            }
+        }
+
+        <button class="btn btn-sm btn-outline-primary" @onclick="OnNextPage" disabled="@IsLastPage">
+            <i class="bi bi-chevron-right"></i>
+        </button>
+    </div>
+    <div class="page-size">
+        <select class="form-select form-select-sm" @onchange="HandlePageSizeChanged">
+            <option value="10" selected="@IsSelected(10)">10</option>
+            <option value="20" selected="@IsSelected(20)">20</option>
+            <option value="30" selected="@IsSelected(30)">30</option>
+            <option value="40" selected="@IsSelected(40)">40</option>
+            <option value="50" selected="@IsSelected(50)">50</option>
+            <option value="100" selected="@IsSelected(100)">100</option>
+        </select>
+        <span class="text-muted small">per page</span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public int PageSize { get; set; }
+    [Parameter] public bool IsFirstPage { get; set; }
+    [Parameter] public bool IsLastPage { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+
+    private async Task GoToPage(int page)
+    {
+        await OnPageChanged.InvokeAsync(page);
+    }
+
+    private async Task OnPreviousPage()
+    {
+        if (!IsFirstPage)
+        {
+            await OnPageChanged.InvokeAsync(CurrentPage - 1);
+        }
+    }
+
+    private async Task OnNextPage()
+    {
+        if (!IsLastPage)
+        {
+            await OnPageChanged.InvokeAsync(CurrentPage + 1);
+        }
+    }
+
+    private async Task HandlePageSizeChanged(ChangeEventArgs e)
+    {
+        if (e?.Value == null) return;
+        var val = e.Value.ToString();
+        if (val == null) return;
+        await OnPageSizeChanged.InvokeAsync(int.Parse(val));
+    }
+
+    private bool IsSelected(int size)
+    {
+        return PageSize == size;
+    }
+}

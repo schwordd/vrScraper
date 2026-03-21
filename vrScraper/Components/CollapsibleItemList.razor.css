@@ -1,0 +1,17 @@
+.clickable-header {
+    cursor: pointer;
+}
+
+.item-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.item-pill {
+    color: white;
+    padding: 5px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    white-space: nowrap;
+}

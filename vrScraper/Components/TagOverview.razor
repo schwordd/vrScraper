@@ -2,54 +2,16 @@
 @using vrScraper.Services
 @inject IVideoService Videos
 
-<div class="card mt-2">
-    <div class="card-header clickable-header" @onclick="ToggleCollapse">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="bi @(isCollapsed ? "bi-caret-right-fill" : "bi-caret-down-fill")"></i>
-                Tags
-                <span class="badge rounded-pill text-bg-light">@tagInfos.Count</span>
-            </h5>
-        </div>
-    </div>
-
-    <div class="@(isCollapsed ? "collapse" : "")">
-        <div class="card-body">
-            @if (tagInfos != null)
-            {
-                <div class="tag-container">
-                    @foreach (var tagInfo in tagInfos)
-                    {
-                        <button type="button" class="btn btn-sm btn-primary tag-pill">
-                            @tagInfo.Tag.Name <span class="badge text-bg-secondary">@tagInfo.Count</span>
-                        </button>
-                    }
-                </div>
-            }
-            else
-            {
-                <p>Loading...</p>
-            }
-        </div>
-    </div>
-</div>
+<CollapsibleItemList Title="Tags"
+                     Items="@items"
+                     BadgeColor="#007bff" />
 
 @code {
-    private List<(DbTag Tag, long Count)> tagInfos = new List<(DbTag Tag, long Count)>();
-    private bool isCollapsed = true;
+    private List<(string Name, long Count)> items = new();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadTagInfos();
-    }
-
-    private async Task LoadTagInfos()
-    {
-        tagInfos = await Videos.GetTagInfos();
-    }
-
-    private void ToggleCollapse()
-    {
-        isCollapsed = !isCollapsed;
+        var tagInfos = await Videos.GetTagInfos();
+        items = tagInfos.Select(t => (t.Tag.Name, t.Count)).ToList();
     }
 }

@@ -1,0 +1,43 @@
+.pager-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-size {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-size select {
+    width: 70px;
+}
+
+.pager .btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-ellipsis {
+    color: #6c757d;
+    margin: 0 2px;
+    user-select: none;
+    font-size: 12px;
+}
+
+.text-muted.small {
+    font-size: 12px;
+}
