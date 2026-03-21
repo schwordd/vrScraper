@@ -5,7 +5,15 @@
       "Bash(dotnet build:*)",
       "Bash(del:*)",
       "Bash(git checkout:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(find /d/Source/vrScraper -name *.test.* -o -name *Test* -type f)",
+      "Bash(ls -la C:/Users/joerg/AppData/Local/Temp/claude/D--Source-vrScraper/0a5137f1-57e2-4b54-8673-9ce49d1692d3/tasks/*.output)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//d/Source/vrScraper/**)",
+      "Bash(done)",
+      "Bash(wc -c C:/Users/joerg/AppData/Local/Temp/claude/D--Source-vrScraper/0a5137f1-57e2-4b54-8673-9ce49d1692d3/tasks/*.output)",
+      "Bash(dotnet ef:*)"
     ],
     "deny": []
   }
