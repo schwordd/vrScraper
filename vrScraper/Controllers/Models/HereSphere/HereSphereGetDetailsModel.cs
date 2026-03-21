@@ -9,6 +9,7 @@ namespace vrScraper.Controllers.Models.HereSphere
 
     public double? Rating { get; set; }
     public bool? IsFavorite { get; set; }
+    public bool? DeleteFile { get; set; }
   }
 }
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
