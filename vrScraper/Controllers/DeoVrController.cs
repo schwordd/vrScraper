@@ -13,7 +13,7 @@ namespace vrScraper.Controllers
 {
   [Route("[controller]")]
   [ApiController]
-  public class DeoVrController(ILogger<DeoVrController> logger, IEpornerScraper scraper, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
+  public class DeoVrController(ILogger<DeoVrController> logger, IScraperRegistry scraperRegistry, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
   {
     // GET: <DeoVrController>
     [HttpGet]
@@ -60,6 +60,9 @@ namespace vrScraper.Controllers
       if (foundVideo == null) return NotFound();
 
       videoService.SetPlayedVideo(foundVideo);
+
+      var scraper = scraperRegistry.GetScraperForSite(foundVideo.Site);
+      if (scraper == null) return NotFound();
 
       VideoSource? source;
       source = await scraper.GetSource(foundVideo, context);

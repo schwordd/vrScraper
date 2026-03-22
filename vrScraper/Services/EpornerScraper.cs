@@ -15,6 +15,15 @@ namespace vrScraper.Services
 {
   public class EpornerScraper(ILogger<EpornerScraper> logger, IServiceProvider serviceProvider, IVideoService vs) : IEpornerScraper
   {
+    public string SiteName => "eporner.com";
+    public string DisplayName => "Eporner";
+
+    public Dictionary<string, string> GetProxyHeaders() => new()
+    {
+      { "Referer", "https://www.eporner.com/" },
+      { "Origin", "https://www.eporner.com" }
+    };
+
     public bool ScrapingInProgress => this._scrapingInprogress;
 
     public string ScrapingStatus => this._scrapingStatus;
@@ -266,6 +275,20 @@ namespace vrScraper.Services
       cancellationToken.ThrowIfCancellationRequested();
 
       totalList = totalList.Where(v => v.IsVr == true && v.Quality.Contains("4K")).ToList();
+
+      // Filter by per-site minimum duration setting
+      var settingService = serviceProvider.GetRequiredService<ISettingService>();
+      var minDurationSetting = await settingService.GetSetting($"Site:{SiteName}:MinDuration");
+      var minDurationSeconds = 0;
+      if (minDurationSetting != null && int.TryParse(minDurationSetting.Value, out int parsedMin))
+      {
+        minDurationSeconds = parsedMin;
+      }
+      if (minDurationSeconds > 0)
+      {
+        totalList = totalList.Where(v => v.Duration == null || v.Duration.Value.TotalSeconds >= minDurationSeconds).ToList();
+        logger.LogInformation($"After min-duration filter ({minDurationSeconds}s): {totalList.Count} videos remain.");
+      }
 
       try
       {

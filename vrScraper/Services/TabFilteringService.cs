@@ -27,7 +27,7 @@ namespace vrScraper.Services
           case "DEFAULT":
             if (t.Name == "Latest")
             {
-              var list = allItems.OrderByDescending(v => long.Parse(v.SiteVideoId)).ToList();
+              var list = allItems.OrderByDescending(v => v.Id).ToList();
               tabs.Add((t.Name, list));
             }
             else if (t.Name == "Rating")
@@ -71,7 +71,7 @@ namespace vrScraper.Services
             else if (t.Name == "Latest Unwatched")
             {
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
-              var list = allUnwatched.OrderByDescending(v => long.Parse(v.SiteVideoId)).ToList();
+              var list = allUnwatched.OrderByDescending(v => v.Id).ToList();
               tabs.Add((t.Name, list));
             }
             else if (t.Name == "Best Unwatched")
@@ -105,6 +105,12 @@ namespace vrScraper.Services
           case "CUSTOM":
 
             var matchingItems = allItems.AsQueryable();
+
+            var siteFilter = JsonConvert.DeserializeObject<List<string>>(t.SiteFilter ?? "[]") ?? new List<string>();
+            if (siteFilter.Any())
+            {
+              matchingItems = matchingItems.Where(v => siteFilter.Contains(v.Site));
+            }
 
             var tagsWL = JsonConvert.DeserializeObject<List<string>>(t.TagWhitelist) ?? new List<string>();
             var tagsBL = JsonConvert.DeserializeObject<List<string>>(t.TagBlacklist) ?? new List<string>();
@@ -153,11 +159,18 @@ namespace vrScraper.Services
             break;
 
           case "WATCHLIST":
+            var wlSiteFilter = JsonConvert.DeserializeObject<List<string>>(t.SiteFilter ?? "[]") ?? new List<string>();
+            var wlItems = allItems;
+            if (wlSiteFilter.Any())
+            {
+              wlItems = wlItems.Where(v => wlSiteFilter.Contains(v.Site)).ToList();
+            }
+
             var wlVideoIds = JsonConvert.DeserializeObject<List<string>>(t.VideoWhitelist);
             if (wlVideoIds != null && wlVideoIds.Any())
             {
               var wlIdSet = wlVideoIds.Select(v => Convert.ToInt64(v)).ToHashSet();
-              var wlMatching = allItems.Where(a => wlIdSet.Contains(a.Id)).ToDictionary(a => a.Id);
+              var wlMatching = wlItems.Where(a => wlIdSet.Contains(a.Id)).ToDictionary(a => a.Id);
 
               var wlOrdered = wlVideoIds
                   .Select(v => Convert.ToInt64(v))

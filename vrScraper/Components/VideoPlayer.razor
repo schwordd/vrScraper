@@ -3,7 +3,7 @@
 @using vrScraper.DB.Models
 @using vrScraper.Services
 @inject IJSRuntime JSRuntime
-@inject IEpornerScraper scraper
+@inject IScraperRegistry scraperRegistry
 @inject VrScraperContext context
 
 <div class="video-player-overlay @(_isVisible ? "visible" : "")" @onclick="ClosePlayer">
@@ -97,6 +97,14 @@
                 return;
             }
 
+            var scraper = scraperRegistry.GetScraperForSite(foundVideo.Site);
+            if (scraper == null)
+            {
+                _errorMessage = "No scraper for this site";
+                _isLoading = false;
+                StateHasChanged();
+                return;
+            }
             _videoSource = await scraper.GetSource(foundVideo, context);
             if (_videoSource == null)
             {

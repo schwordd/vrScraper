@@ -8,6 +8,7 @@
 
 @inject IVideoService VideoService
 @inject ISettingService SettingService
+@inject IScraperRegistry ScraperRegistry
 
 <h3>Settings</h3>
 
@@ -35,72 +36,84 @@
                 Select tags that should be filtered out from all video listings and API responses
             </small>
         </div>
+
     </div>
 
-    <!-- Scheduled Scraping Settings -->
-    <div class="settings-section">
-        <h5 class="section-title">
-            <i class="fas fa-clock me-2"></i>
-            Automated Daily Scraping
-        </h5>
+    <!-- Per-Site Configuration -->
+    @foreach (var scraper in ScraperRegistry.GetAllScrapers())
+    {
+        var site = scraper.SiteName;
+        <div class="settings-section">
+            <h5 class="section-title">
+                <i class="fas fa-globe me-2"></i>
+                @scraper.DisplayName
+                <span class="badge @(GetSiteSetting(site, "Enabled", "true") == "true" ? "bg-success" : "bg-secondary") ms-2" style="font-size: 11px;">
+                    @(GetSiteSetting(site, "Enabled", "true") == "true" ? "Active" : "Disabled")
+                </span>
+            </h5>
 
-        <div class="settings-grid">
-            <div class="setting-card">
-                <div class="setting-header">
+            @{
+                var s = site;
+                var isEnabled = GetSiteSetting(s, "Enabled", "true") == "true";
+                var minDur = GetSiteSetting(s, "MinDuration", "0");
+                var autoEnabled = GetSiteSetting(s, "AutoScrapeEnabled", "false") == "true";
+                var autoTime = GetSiteSetting(s, "AutoScrapeTime", "02:00");
+                var autoMaxPages = GetSiteSetting(s, "AutoScrapeMaxPages", "50");
+            }
+            <div class="settings-grid">
+                <div class="setting-card">
                     <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="scheduledScrapingEnabled" @bind="ScheduledScrapingEnabled" />
-                        <label class="form-check-label fw-semibold" for="scheduledScrapingEnabled">
-                            Enable Automated Daily Scraping
-                        </label>
+                        <input class="form-check-input" type="checkbox"
+                               checked="@isEnabled"
+                               @onchange="(e) => OnSiteCheckboxChanged(s, nameof(isEnabled), e)" />
+                        <label class="form-check-label fw-semibold">Enabled</label>
                     </div>
+                    <small class="text-muted">Show videos from this source</small>
                 </div>
-                <small class="text-muted">
-                    Automatically scrape new videos daily until a known video is found
-                </small>
-            </div>
 
-            <div class="setting-card">
-                <label class="form-label fw-semibold" for="scheduledScrapingTime">
-                    <i class="fas fa-clock me-1"></i>
-                    Scraping Time
-                </label>
-                <input type="text" class="form-control form-control-lg" id="scheduledScrapingTime"
-                       @bind="ScheduledScrapingTime" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="HH:MM" />
-                <small class="form-text text-muted">
-                    Time when daily scraping should start (24h format)
-                </small>
-            </div>
+                <div class="setting-card">
+                    <label class="form-label fw-semibold">
+                        <i class="fas fa-hourglass-half me-1"></i>
+                        Min. Duration (seconds)
+                    </label>
+                    <input type="number" class="form-control" min="0" max="3600"
+                           value="@minDur"
+                           @onchange="(e) => OnSiteInputChanged(s, nameof(minDur), e)" />
+                    <small class="text-muted">0 = no filter</small>
+                </div>
 
-            <div class="setting-card">
-                <label class="form-label fw-semibold" for="scheduledScrapingMaxPages">
-                    <i class="fas fa-shield-alt me-1"></i>
-                    Maximum Pages per Run
-                </label>
-                <input type="number" class="form-control form-control-lg" id="scheduledScrapingMaxPages"
-                       @bind="ScheduledScrapingMaxPages" min="1" max="100" />
-                <small class="form-text text-muted">
-                    Safety limit to prevent infinite scraping (recommended: 50)
-                </small>
-            </div>
+                <div class="setting-card">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               checked="@autoEnabled"
+                               @onchange="(e) => OnSiteCheckboxChanged(s, nameof(autoEnabled), e)" />
+                        <label class="form-check-label fw-semibold">Auto-Scrape</label>
+                    </div>
+                    <small class="text-muted">Include in daily automated scraping</small>
+                </div>
 
-            <div class="setting-card status-card">
-                <label class="form-label fw-semibold">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Last Scheduled Scrape
-                </label>
-                <div class="status-value">
-                    @if (string.IsNullOrEmpty(LastScheduledScrape))
-                    {
-                        <span class="badge bg-secondary">Never</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-success">@LastScheduledScrape</span>
-                    }
+                <div class="setting-card">
+                    <label class="form-label fw-semibold">
+                        <i class="fas fa-clock me-1"></i>
+                        Scrape Time
+                    </label>
+                    <input type="text" class="form-control" placeholder="HH:MM"
+                           value="@autoTime"
+                           @onchange="(e) => OnSiteTimeChanged(s, e)" />
+                </div>
+
+                <div class="setting-card">
+                    <label class="form-label fw-semibold">
+                        <i class="fas fa-file-alt me-1"></i>
+                        Max Pages
+                    </label>
+                    <input type="number" class="form-control" min="1" max="500"
+                           value="@autoMaxPages"
+                           @onchange="(e) => OnSiteInputChanged(s, nameof(autoMaxPages), e)" />
                 </div>
             </div>
         </div>
-    </div>
+    }
 
     <!-- Recommendations Settings -->
     <div class="settings-section">
@@ -148,76 +161,72 @@
         }
     }
 
-    public bool ScheduledScrapingEnabled
-    {
-        get
-        {
-            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingEnabled");
-            return bool.TryParse(s.Value, out bool result) && result;
-        }
-        set
-        {
-            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingEnabled");
-            s.Value = value.ToString();
-            this.SettingService.UpdateSetting(s);
-        }
-    }
-
-    public string ScheduledScrapingTime
-    {
-        get
-        {
-            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingTime");
-            return s.Value;
-        }
-        set
-        {
-            if (!Regex.IsMatch(value, @"^([01]\d|2[0-3]):[0-5]\d$"))
-                return; // Don't persist invalid values
-
-            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingTime");
-            s.Value = value;
-            this.SettingService.UpdateSetting(s);
-        }
-    }
-
-    public int ScheduledScrapingMaxPages
-    {
-        get
-        {
-            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingMaxPages");
-            return int.TryParse(s.Value, out int result) ? result : 50;
-        }
-        set
-        {
-            var s = AllSettings.Single(s => s.Key == "ScheduledScrapingMaxPages");
-            s.Value = value.ToString();
-            this.SettingService.UpdateSetting(s);
-        }
-    }
-
-    public string LastScheduledScrape
-    {
-        get
-        {
-            var s = AllSettings.Single(s => s.Key == "LastScheduledScrape");
-            return s.Value;
-        }
-    }
-
     public bool RecommendationsEnabled
     {
         get
         {
-            var s = AllSettings.Single(s => s.Key == "RecommendationsEnabled");
-            return bool.TryParse(s.Value, out bool result) && result;
+            var s = AllSettings.FirstOrDefault(s => s.Key == "RecommendationsEnabled");
+            return s != null && bool.TryParse(s.Value, out bool result) && result;
         }
         set
         {
-            var s = AllSettings.Single(s => s.Key == "RecommendationsEnabled");
+            var s = AllSettings.FirstOrDefault(s => s.Key == "RecommendationsEnabled");
+            if (s == null) return;
             s.Value = value.ToString();
             this.SettingService.UpdateSetting(s);
         }
+    }
+
+    private string GetSiteSetting(string site, string key, string defaultValue)
+    {
+        var settingKey = $"Site:{site}:{key}";
+        var s = AllSettings.FirstOrDefault(s => s.Key == settingKey);
+        return s?.Value ?? defaultValue;
+    }
+
+    private void SetSiteSetting(string site, string key, string value)
+    {
+        var settingKey = $"Site:{site}:{key}";
+        var s = AllSettings.FirstOrDefault(s => s.Key == settingKey);
+        if (s == null)
+        {
+            s = new DbSetting { Key = settingKey, Type = "System.String", Value = value };
+            AllSettings.Add(s);
+        }
+        s.Value = value;
+        SettingService.UpdateSetting(s);
+        StateHasChanged();
+    }
+
+    private void OnSiteCheckboxChanged(string site, string field, ChangeEventArgs e)
+    {
+        var key = field switch
+        {
+            nameof(Boolean) => "Enabled",
+            "isEnabled" => "Enabled",
+            "autoEnabled" => "AutoScrapeEnabled",
+            _ => field
+        };
+        SetSiteSetting(site, key, e.Value?.ToString() ?? "false");
+    }
+
+    private void OnSiteInputChanged(string site, string field, ChangeEventArgs e)
+    {
+        var key = field switch
+        {
+            "minDur" => "MinDuration",
+            "autoMaxPages" => "AutoScrapeMaxPages",
+            _ => field
+        };
+        SetSiteSetting(site, key, e.Value?.ToString() ?? "");
+    }
+
+    private void OnSiteTimeChanged(string site, ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+        if (!Regex.IsMatch(value, @"^([01]\d|2[0-3]):[0-5]\d$"))
+            return;
+        SetSiteSetting(site, "AutoScrapeTime", value);
     }
 
     protected override async Task OnInitializedAsync()

@@ -67,6 +67,11 @@ namespace vrScraper.DB.Seed
         });
       }
 
+      if (defaultSettings.Exists(a => a.Key == "Site:xhamster.com:MinDuration") == false)
+      {
+        db.Settings.Add(new Models.DbSetting() { Key = "Site:xhamster.com:MinDuration", Type = "System.String", Value = "660" });
+      }
+
       db.SaveChanges();
     }
     public static void SeedDefaultTabs(VrScraperContext db)
@@ -87,7 +92,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -109,7 +115,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -131,7 +138,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -153,7 +161,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -175,7 +184,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -197,7 +207,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -219,7 +230,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -241,7 +253,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -263,7 +276,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else
@@ -285,7 +299,8 @@ namespace vrScraper.DB.Seed
           TagBlacklist = "[]",
           TagWhitelist = "[]",
           VideoBlacklist = "[]",
-          VideoWhitelist = "[]"
+          VideoWhitelist = "[]",
+          SiteFilter = "[]"
         });
       }
       else

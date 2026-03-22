@@ -87,6 +87,10 @@ namespace vrScraper
       builder.Services.AddSwaggerGen();
       builder.Services.AddSingleton<IVideoService, VideoService>();
       builder.Services.AddSingleton<IEpornerScraper, EpornerScraper>();
+      builder.Services.AddSingleton<IVideoScraper>(sp => sp.GetRequiredService<IEpornerScraper>());
+      builder.Services.AddSingleton<IXhamsterVrScraper, XhamsterVrScraper>();
+      builder.Services.AddSingleton<IVideoScraper>(sp => sp.GetRequiredService<IXhamsterVrScraper>());
+      builder.Services.AddSingleton<IScraperRegistry, ScraperRegistry>();
       builder.Services.AddSingleton<ITabService, TabService>();
       builder.Services.AddSingleton<ISettingService, SettingService>();
       builder.Services.AddSingleton<ITabFilteringService, TabFilteringService>();
@@ -157,6 +161,9 @@ namespace vrScraper
 
       var epornerScraper = app.Services.GetRequiredService<IEpornerScraper>();
       epornerScraper.Initialize();
+
+      var xhamsterScraper = app.Services.GetRequiredService<IXhamsterVrScraper>();
+      xhamsterScraper.Initialize();
 
       var tabService = app.Services.GetRequiredService<ITabService>();
       await tabService.Initialize();

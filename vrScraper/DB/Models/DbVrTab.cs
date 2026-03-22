@@ -163,6 +163,31 @@ namespace vrScraper.DB.Models
         this.IsDirty = true;
       }
     }
+
+    [Required]
+    public string SiteFilter { get; set; }
+
+    [NotMapped]
+    public IEnumerable<string> SiteFilterList
+    {
+      get => string.IsNullOrEmpty(SiteFilter) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(SiteFilter) ?? new List<string>();
+      set
+      {
+        SiteFilter = JsonSerializer.Serialize(value);
+        this.IsDirty = true;
+      }
+    }
+
+    [NotMapped]
+    public string SiteFilterDisplayString
+    {
+      get
+      {
+        var list = string.IsNullOrEmpty(SiteFilter) ? new List<string>() : JsonSerializer.Deserialize<List<string>>(SiteFilter) ?? new List<string>();
+        return string.Join(", ", list);
+      }
+      set { }
+    }
   }
 }
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.

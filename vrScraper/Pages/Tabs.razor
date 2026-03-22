@@ -8,6 +8,7 @@
 @inject ITabService TabService
 @inject IVideoService VideoService
 @inject IJSRuntime JSRuntime
+@inject IScraperRegistry ScraperRegistry
 
 <h3>Manage Tabs</h3>
 
@@ -141,6 +142,18 @@
                                              @bind-Value="tab.ActressBlacklistList"
                                              Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
                         </div>
+
+                        <!-- Site Filter -->
+                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                            <label class="mr-2">Sites</label>
+                            <BootstrapSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
+                                             TextField="@((item) => item)"
+                                             ValueField="@((item) => item)"
+                                             ShowSearch="false"
+                                             TType="IEnumerable<string>"
+                                             @bind-Value="tab.SiteFilterList"
+                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
+                        </div>
                     }
                     else if (tab.IsEditing == false && IsDefaultTab(tab) == false)
                     {
@@ -177,6 +190,15 @@
                             <div class="form-group mb-1 d-flex justify-content-between align-items-center">
                                 <label class="mr-2">Exclude Actresses</label>
                                 <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressBlacklistDisplayString" />
+                            </div>
+                        }
+
+                        <!-- Site Filter -->
+                        @if (!string.IsNullOrEmpty(tab.SiteFilterDisplayString))
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Sites</label>
+                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.SiteFilterDisplayString" />
                             </div>
                         }
                     }
@@ -253,6 +275,27 @@
                             <span class="badge bg-secondary">@tab.VideoWhitelistList.Count()</span>
                         </div>
 
+                        @if (tab.IsEditing)
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Sites</label>
+                                <BootstrapSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
+                                                 TextField="@((item) => item)"
+                                                 ValueField="@((item) => item)"
+                                                 ShowSearch="false"
+                                                 TType="IEnumerable<string>"
+                                                 @bind-Value="tab.SiteFilterList"
+                                                 Disabled="@(tab.IsEditing == false)" />
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(tab.SiteFilterDisplayString))
+                        {
+                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
+                                <label class="mr-2">Sites</label>
+                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.SiteFilterDisplayString" />
+                            </div>
+                        }
+
                         <div class="d-flex justify-content-end">
                             <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
                                 <i class="bi bi-floppy"></i>
@@ -271,6 +314,7 @@
     private List<DbVrTab> AvailableTabs { get; set; } = new();
     private List<DbTag> AvailableTags { get; set; } = new();
     private List<DbStar> AvailableActresses { get; set; } = new();
+    private List<string> AvailableSites { get; set; } = new();
     private Dictionary<long, string> _originalNames = new();
 
     protected override async Task OnInitializedAsync()
@@ -278,6 +322,7 @@
         await LoadTabs();
         await LoadTags();
         await LoadActresses();
+        AvailableSites = ScraperRegistry.GetAllSiteNames().ToList();
     }
 
     private async Task LoadTabs()
@@ -308,7 +353,8 @@
                 TagBlacklist = "[]",
                 ActressBlacklist = "[]",
                 VideoWhitelist = "[]",
-                VideoBlacklist = "[]"
+                VideoBlacklist = "[]",
+                SiteFilter = "[]"
             };
 
         await TabService.AddTab(newTab);
@@ -328,7 +374,8 @@
                 TagBlacklist = "[]",
                 ActressBlacklist = "[]",
                 VideoWhitelist = "[]",
-                VideoBlacklist = "[]"
+                VideoBlacklist = "[]",
+                SiteFilter = "[]"
             };
 
         await TabService.AddTab(newTab);

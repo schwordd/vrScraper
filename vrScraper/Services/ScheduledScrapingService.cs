@@ -2,6 +2,7 @@ using vrScraper.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace vrScraper.Services
 {
@@ -42,41 +43,15 @@ namespace vrScraper.Services
     {
       using var scope = _serviceProvider.CreateScope();
       var settingService = scope.ServiceProvider.GetRequiredService<ISettingService>();
-      var scraper = scope.ServiceProvider.GetRequiredService<IEpornerScraper>();
+      var registry = scope.ServiceProvider.GetRequiredService<IScraperRegistry>();
 
-      // Check if scheduled scraping is enabled
-      var enabledSetting = await settingService.GetSetting("ScheduledScrapingEnabled");
-      if (enabledSetting == null || !bool.TryParse(enabledSetting.Value, out bool isEnabled) || !isEnabled)
+      // Check if any scraping is already running
+      if (registry.GetAllScrapers().Any(s => s.ScrapingInProgress))
       {
-        return; // Scheduled scraping is disabled
-      }
-
-      // Check if another scraping is already running
-      if (scraper.ScrapingInProgress)
-      {
-        _logger.LogInformation("Scraping already in progress, skipping scheduled scraping");
-        return;
-      }
-
-      // Check if it's time to scrape
-      var timeSetting = await settingService.GetSetting("ScheduledScrapingTime");
-      if (timeSetting == null || !TimeSpan.TryParse(timeSetting.Value, out TimeSpan scheduledTime))
-      {
-        _logger.LogWarning("Invalid scheduled scraping time format: {Time}", timeSetting?.Value);
         return;
       }
 
       var now = DateTime.Now;
-      var currentTime = now.TimeOfDay;
-      
-      // Check if we're within 1 hour of the scheduled time (circular/midnight-safe)
-      var diff = (scheduledTime - currentTime).TotalMinutes;
-      if (diff < 0) diff += 24 * 60; // wrap around midnight
-      var timeDifference = Math.Min(diff, 24 * 60 - diff); // shortest distance
-      if (timeDifference > 60)
-      {
-        return; // Not time to scrape yet
-      }
 
       // Check if we already scraped today
       var lastScrapeSetting = await settingService.GetSetting("LastScheduledScrape");
@@ -88,44 +63,58 @@ namespace vrScraper.Services
         }
       }
 
-      // Run scheduled scraping
-      _logger.LogInformation("Starting scheduled scraping at {Time}", now);
-      await RunScheduledScraping(scraper, settingService, cancellationToken);
+      // Run per-site auto-scraping (each site has its own enabled/time/maxpages settings)
+      await RunScheduledScraping(registry, settingService, now, cancellationToken);
     }
 
-    private async Task RunScheduledScraping(IEpornerScraper scraper, ISettingService settingService, CancellationToken cancellationToken)
+    private async Task RunScheduledScraping(IScraperRegistry registry, ISettingService settingService, DateTime now, CancellationToken cancellationToken)
     {
       try
       {
-        // Get max pages setting
-        var maxPagesSetting = await settingService.GetSetting("ScheduledScrapingMaxPages");
-        if (maxPagesSetting == null || !int.TryParse(maxPagesSetting.Value, out int maxPages))
+        foreach (var scraper in registry.GetAllScrapers())
         {
-          maxPages = 50; // Default fallback
-        }
+          if (cancellationToken.IsCancellationRequested) break;
+          if (scraper.ScrapingInProgress) continue;
 
-        // Set scraping options
-        scraper.IsScheduledScraping = true;
+          var site = scraper.SiteName;
 
-        _logger.LogInformation("Starting scheduled scraping with max {MaxPages} pages", maxPages);
+          // Check per-site auto-scrape enabled
+          var enabledSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeEnabled");
+          if (enabledSetting == null || enabledSetting.Value != "True") continue;
 
-        // Start scraping from page 1 with high page limit
-        scraper.StartScraping(1, maxPages);
+          // Check per-site scrape time
+          var timeSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeTime");
+          if (timeSetting == null || !TimeSpan.TryParse(timeSetting.Value, out TimeSpan siteScheduledTime))
+            continue;
 
-        // Wait for completion (with timeout)
-        var timeout = TimeSpan.FromHours(6); // Max 6 hours
-        var start = DateTime.Now;
+          var currentTime = now.TimeOfDay;
+          var diff = (siteScheduledTime - currentTime).TotalMinutes;
+          if (diff < 0) diff += 24 * 60;
+          var timeDifference = Math.Min(diff, 24 * 60 - diff);
+          if (timeDifference > 60) continue; // Not time yet for this site
 
-        while (scraper.ScrapingInProgress && !cancellationToken.IsCancellationRequested)
-        {
-          if (DateTime.Now - start > timeout)
+          // Get per-site max pages
+          var maxPagesSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeMaxPages");
+          int maxPages = (maxPagesSetting != null && int.TryParse(maxPagesSetting.Value, out int mp)) ? mp : 50;
+
+          _logger.LogInformation("Starting auto-scrape for {Site} with max {MaxPages} pages", site, maxPages);
+          scraper.IsScheduledScraping = true;
+          scraper.StartScraping(1, maxPages);
+
+          var timeout = DateTime.Now.AddHours(3);
+          while (scraper.ScrapingInProgress && !cancellationToken.IsCancellationRequested)
           {
-            _logger.LogWarning("Scheduled scraping timeout reached, stopping");
-            scraper.StopScraping();
-            break;
+            if (DateTime.Now > timeout)
+            {
+              _logger.LogWarning("Auto-scrape timeout for {Site}, stopping", site);
+              scraper.StopScraping();
+              break;
+            }
+            await Task.Delay(30000, cancellationToken);
           }
 
-          await Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
+          scraper.IsScheduledScraping = false;
+          _logger.LogInformation("Auto-scrape completed for {Site}", site);
         }
 
         // Update last scrape date
@@ -136,16 +125,11 @@ namespace vrScraper.Services
           await settingService.UpdateSetting(lastScrapeSetting2);
         }
 
-        _logger.LogInformation("Scheduled scraping completed. Status: {Status}", scraper.ScrapingStatus);
+        _logger.LogInformation("Scheduled scraping completed for all sites");
       }
       catch (Exception ex)
       {
         _logger.LogError(ex, "Error during scheduled scraping");
-      }
-      finally
-      {
-        // Reset scraping options
-        scraper.IsScheduledScraping = false;
       }
     }
   }

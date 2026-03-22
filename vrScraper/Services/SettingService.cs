@@ -46,8 +46,17 @@ namespace vrScraper.Services
 
       if (dbSetting == null)
       {
-        logger.LogWarning("Setting with key '{Key}' not found", setting.Key);
-        return null;
+        // Create new setting (upsert)
+        dbSetting = new DbSetting { Key = setting.Key, Type = setting.Type ?? "System.String", Value = setting.Value };
+        context.Settings.Add(dbSetting);
+        await context.SaveChangesAsync();
+
+        lock (_settingsLock)
+        {
+          _settings.Add(dbSetting);
+        }
+        logger.LogInformation("Created new setting '{Key}'", setting.Key);
+        return setting;
       }
 
       dbSetting.Value = setting.Value;

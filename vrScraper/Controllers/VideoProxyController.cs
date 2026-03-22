@@ -15,20 +15,20 @@ namespace vrScraper.Controllers
     public class VideoProxyController : ControllerBase
     {
         private readonly ILogger<VideoProxyController> _logger;
-        private readonly IEpornerScraper _scraper;
+        private readonly IScraperRegistry _scraperRegistry;
         private readonly VrScraperContext _context;
         private readonly IVideoService _videoService;
         private readonly IHttpClientFactory _httpClientFactory;
 
         public VideoProxyController(
             ILogger<VideoProxyController> logger,
-            IEpornerScraper scraper,
+            IScraperRegistry scraperRegistry,
             VrScraperContext context,
             IVideoService videoService,
             IHttpClientFactory httpClientFactory)
         {
             _logger = logger;
-            _scraper = scraper;
+            _scraperRegistry = scraperRegistry;
             _context = context;
             _videoService = videoService;
             _httpClientFactory = httpClientFactory;
@@ -51,8 +51,16 @@ namespace vrScraper.Controllers
                     return NotFound("Video nicht gefunden");
                 }
 
+                // Scraper für die Site ermitteln
+                var scraper = _scraperRegistry.GetScraperForSite(video.Site);
+                if (scraper == null)
+                {
+                    _logger.LogWarning("Kein Scraper für Site {Site} gefunden", video.Site);
+                    return NotFound("Kein Scraper für diese Site");
+                }
+
                 // Video-Quelle abrufen
-                var source = await _scraper.GetSource(video, _context);
+                var source = await scraper.GetSource(video, _context);
                 if (source == null)
                 {
                     _logger.LogWarning("Keine Video-Quelle für Video {VideoId} gefunden", videoId);
@@ -72,10 +80,11 @@ namespace vrScraper.Controllers
 
                 // Standard-Headers
                 client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                client.DefaultRequestHeaders.Add("Referer", "https://www.eporner.com/");
+                var proxyHeaders = scraper.GetProxyHeaders();
+                foreach (var header in proxyHeaders)
+                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
                 client.DefaultRequestHeaders.Add("Accept", "*/*");
                 client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
-                client.DefaultRequestHeaders.Add("Origin", "https://www.eporner.com");
 
                 // Range-Header hinzufügen, falls vorhanden
                 if (hasRangeHeader)
@@ -194,8 +203,16 @@ namespace vrScraper.Controllers
                     return NotFound("Video nicht gefunden");
                 }
 
+                // Scraper für die Site ermitteln
+                var scraper = _scraperRegistry.GetScraperForSite(video.Site);
+                if (scraper == null)
+                {
+                    _logger.LogWarning("Kein Scraper für Site {Site} gefunden", video.Site);
+                    return NotFound("Kein Scraper für diese Site");
+                }
+
                 // Video-Quelle abrufen
-                var source = await _scraper.GetSource(video, _context);
+                var source = await scraper.GetSource(video, _context);
                 if (source == null)
                 {
                     _logger.LogWarning("Keine Video-Quelle für Video {VideoId} gefunden", videoId);
@@ -209,10 +226,11 @@ namespace vrScraper.Controllers
 
                 // Standard-Headers
                 client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                client.DefaultRequestHeaders.Add("Referer", "https://www.eporner.com/");
+                var proxyHeaders = scraper.GetProxyHeaders();
+                foreach (var header in proxyHeaders)
+                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
                 client.DefaultRequestHeaders.Add("Accept", "*/*");
                 client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
-                client.DefaultRequestHeaders.Add("Origin", "https://www.eporner.com");
 
                 try
                 {

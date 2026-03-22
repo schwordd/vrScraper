@@ -1,37 +1,47 @@
 @using vrScraper.Services
-@inject IEpornerScraper Scraper
+@inject IScraperRegistry ScraperRegistry
+@inject IEpornerScraper EpornerScraper
 
-<h4>
-    Scrape eporner.com
-</h4>
+<div class="d-flex align-items-center gap-2 mb-2">
+    <h5 class="mb-0">Scraping</h5>
+    <select class="form-select form-select-sm" style="width: auto;" @bind="_selectedSite">
+        @foreach (var scraper in ScraperRegistry.GetAllScrapers())
+        {
+            <option value="@scraper.SiteName">@scraper.DisplayName</option>
+        }
+    </select>
+</div>
 
 <div class="scraper">
     <div class="pe-2">
         <label for="startPage">Start Page:</label>
-        <InputNumber @bind-Value="startPage" id="startPage" class="form-control input-width-small page-number-input" disabled="@Scraper.ScrapingInProgress" />
+        <InputNumber @bind-Value="startPage" id="startPage" class="form-control input-width-small page-number-input" disabled="@(SelectedScraper?.ScrapingInProgress ?? false)" />
     </div>
     <div class="pe-2">
         <label for="count">Pages:</label>
-        <InputNumber @bind-Value="count" id="count" class="form-control input-width-small page-number-input" disabled="@Scraper.ScrapingInProgress" />
+        <InputNumber @bind-Value="count" id="count" class="form-control input-width-small page-number-input" disabled="@(SelectedScraper?.ScrapingInProgress ?? false)" />
     </div>
     <div class="pe-2">
-        <button class="btn btn-primary" @onclick="Scrape" disabled="@Scraper.ScrapingInProgress">Scrape</button>
-    </div>
-
-    <div class="pe-2">
-        <button class="btn btn-outline-primary" @onclick="Rescrape" disabled="@Scraper.ScrapingInProgress">Rescrape</button>
+        <button class="btn btn-primary" @onclick="Scrape" disabled="@(SelectedScraper?.ScrapingInProgress ?? false)">Scrape</button>
     </div>
 
-    <div class="pe-2">
-        <button class="btn btn-outline-secondary" @onclick="RemoveDead" disabled="@Scraper.ScrapingInProgress">Check Dead Thumbnails</button>
-    </div>
+    @if (IsEpornerSelected)
+    {
+        <div class="pe-2">
+            <button class="btn btn-outline-primary" @onclick="Rescrape" disabled="@(SelectedScraper?.ScrapingInProgress ?? false)">Rescrape</button>
+        </div>
+
+        <div class="pe-2">
+            <button class="btn btn-outline-secondary" @onclick="RemoveDead" disabled="@(SelectedScraper?.ScrapingInProgress ?? false)">Check Dead Thumbnails</button>
+        </div>
+
+        <div class="pe-2">
+            <button class="btn btn-danger" @onclick="DeleteErrorItems" disabled="@(SelectedScraper?.ScrapingInProgress ?? false)">Delete Items With Errors</button>
+        </div>
+    }
 
     <div class="pe-2">
-        <button class="btn btn-danger" @onclick="DeleteErrorItems" disabled="@Scraper.ScrapingInProgress">Delete Items With Errors</button>
-    </div>
-
-    <div class="pe-2">
-        <button class="btn btn-warning stop-button" @onclick="StopScraping" disabled="@(!Scraper.ScrapingInProgress)">
+        <button class="btn btn-warning stop-button" @onclick="StopScraping" disabled="@(!(SelectedScraper?.ScrapingInProgress ?? false))">
             <i class="bi bi-stop-fill"></i> Stop
         </button>
     </div>
@@ -70,18 +80,18 @@
                 </div>
                 <p class="status-text mb-0">@scrapingStatus</p>
 
-                @if (!string.IsNullOrEmpty(Scraper.CurrentVideoThumbnail) && !string.IsNullOrEmpty(Scraper.CurrentVideoTitle))
+                @if (!string.IsNullOrEmpty(SelectedScraper?.CurrentVideoThumbnail) && !string.IsNullOrEmpty(SelectedScraper?.CurrentVideoTitle))
                 {
                     <div class="current-video-preview mt-3">
                         <div class="d-flex align-items-center">
                             <div class="thumbnail-container me-3">
-                                <img src="@GetSafeThumbnailUrl(Scraper.CurrentVideoThumbnail)" 
-                                     alt="@Scraper.CurrentVideoTitle" 
+                                <img src="@GetSafeThumbnailUrl(SelectedScraper.CurrentVideoThumbnail)"
+                                     alt="@SelectedScraper.CurrentVideoTitle"
                                      class="thumbnail-preview"
                                      @onerror="HandleThumbnailError" />
                             </div>
                             <div class="video-info">
-                                <div class="video-title">@Scraper.CurrentVideoTitle</div>
+                                <div class="video-title">@SelectedScraper.CurrentVideoTitle</div>
                                 <div class="video-status">Currently processing...</div>
                             </div>
                         </div>
@@ -112,18 +122,24 @@
     private int count = 5;
     private string scrapingStatus = string.Empty;
     private Timer? timer;
+    private string _selectedSite = "";
+    private IVideoScraper? SelectedScraper => string.IsNullOrEmpty(_selectedSite) ? null : ScraperRegistry.GetScraperForSite(_selectedSite);
+    private bool IsEpornerSelected => _selectedSite == "eporner.com";
 
     protected override void OnInitialized()
     {
+        _selectedSite = ScraperRegistry.GetAllSiteNames().FirstOrDefault() ?? "";
         timer = new Timer(UpdateScrapingStatus, null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
     }
 
     private void Scrape(MouseEventArgs e)
     {
+        if (SelectedScraper == null) return;
+
         // Set scraping options before starting
-        this.Scraper.IsScheduledScraping = false; // This is manual scraping
-        
-        this.Scraper.StartScraping(startPage, count);
+        SelectedScraper.IsScheduledScraping = false; // This is manual scraping
+
+        SelectedScraper.StartScraping(startPage, count);
         scrapingStatus = "Starting...";
         StartStatusUpdates();
     }
@@ -131,9 +147,9 @@
     private void Rescrape(MouseEventArgs e)
     {
         // Reset scraping options for rescrape (no stopping at known videos)
-        this.Scraper.IsScheduledScraping = false;
-        
-        this.Scraper.StartReparseInformations();
+        EpornerScraper.IsScheduledScraping = false;
+
+        EpornerScraper.StartReparseInformations();
         scrapingStatus = "Starting...";
         StartStatusUpdates();
     }
@@ -141,9 +157,9 @@
     private void RemoveDead(MouseEventArgs e)
     {
         // Reset scraping options
-        this.Scraper.IsScheduledScraping = false;
-        
-        this.Scraper.StartRemoveByDeadPicture();
+        EpornerScraper.IsScheduledScraping = false;
+
+        EpornerScraper.StartRemoveByDeadPicture();
         scrapingStatus = "Starting...";
         StartStatusUpdates();
     }
@@ -151,19 +167,21 @@
     private void DeleteErrorItems(MouseEventArgs e)
     {
         // Reset scraping options
-        this.Scraper.IsScheduledScraping = false;
-        
-        this.Scraper.StartDeleteErrorItems();
+        EpornerScraper.IsScheduledScraping = false;
+
+        EpornerScraper.StartDeleteErrorItems();
         scrapingStatus = "Starting...";
         StartStatusUpdates();
     }
 
     private void StopScraping(MouseEventArgs e)
     {
-        this.Scraper.StopScraping();
-        
+        if (SelectedScraper == null) return;
+
+        SelectedScraper.StopScraping();
+
         // Reset scraping options when manually stopping
-        this.Scraper.IsScheduledScraping = false;
+        SelectedScraper.IsScheduledScraping = false;
     }
 
     private void StartStatusUpdates()
@@ -178,9 +196,9 @@
 
     private void UpdateScrapingStatus(object? state)
     {
-        scrapingStatus = Scraper.ScrapingStatus;
+        scrapingStatus = SelectedScraper?.ScrapingStatus ?? "";
 
-        if (!Scraper.ScrapingInProgress)
+        if (!(SelectedScraper?.ScrapingInProgress ?? false))
         {
             StopStatusUpdates();
         }
@@ -263,4 +281,3 @@
         timer?.Dispose();
     }
 }
-

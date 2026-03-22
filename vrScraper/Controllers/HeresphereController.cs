@@ -10,7 +10,7 @@ namespace vrScraper.Controllers
 {
   [Route("[controller]")]
   [ApiController]
-  public class HeresphereController(ILogger<HeresphereController> logger, IEpornerScraper scraper, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
+  public class HeresphereController(ILogger<HeresphereController> logger, IScraperRegistry scraperRegistry, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
   {
     // Post: <HeresphereController>
     [HttpPost]
@@ -39,7 +39,7 @@ namespace vrScraper.Controllers
         access = 1,
         banner = new
         {
-          image = $"{BaseUrl}/logo1.png",
+          image = $"{BaseUrl}/banner.png",
           link = $"{BaseUrl}/heresphere"
         },
         library = tabs
@@ -103,6 +103,8 @@ namespace vrScraper.Controllers
 
       if (model.NeedsMediaSource)
       {
+        var scraper = scraperRegistry.GetScraperForSite(foundVideo.Site);
+        if (scraper == null) return NotFound();
         source = await scraper.GetSource(foundVideo, context);
 
         if (source == null)

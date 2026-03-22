@@ -511,36 +511,6 @@
     font-size: 16px;
 }
 
-.similar-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 10px;
-}
-
-.similar-item {
-    cursor: pointer;
-    text-align: center;
-    transition: transform 0.2s;
-}
-
-.similar-item:hover {
-    transform: scale(1.05);
-}
-
-.similar-item img {
-    width: 100%;
-    height: auto;
-    border-radius: 4px;
-}
-
-.similar-item-title {
-    font-size: 11px;
-    margin-top: 4px;
-    color: #333;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
 
 @media (max-width: 1200px) {
     .video-gallery {

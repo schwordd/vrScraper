@@ -62,6 +62,37 @@ namespace vrScraper.Services
       foreach (var key in starAffinity.Keys.ToList())
         starAffinity[key] /= totalSignalVideos;
 
+      // Apply IDF weighting: common tags (on many videos) count less, rare tags count more
+      double totalVideos = allItems.Count;
+      var tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      var starCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      foreach (var video in allItems)
+      {
+        if (video.Tags != null)
+          foreach (var tag in video.Tags)
+          {
+            tagCounts.TryGetValue(tag.Name, out int c);
+            tagCounts[tag.Name] = c + 1;
+          }
+        if (video.Stars != null)
+          foreach (var star in video.Stars)
+          {
+            starCounts.TryGetValue(star.Name, out int c);
+            starCounts[star.Name] = c + 1;
+          }
+      }
+
+      foreach (var key in tagAffinity.Keys.ToList())
+      {
+        if (tagCounts.TryGetValue(key, out int count) && count > 0)
+          tagAffinity[key] *= Math.Log(totalVideos / count);
+      }
+      foreach (var key in starAffinity.Keys.ToList())
+      {
+        if (starCounts.TryGetValue(key, out int count) && count > 0)
+          starAffinity[key] *= Math.Log(totalVideos / count);
+      }
+
       // Step 3: Score each candidate video (exclude disliked)
       var scored = new List<(DbVideoItem Video, double Score)>();
 
@@ -98,9 +129,9 @@ namespace vrScraper.Services
         double siteRating = video.SiteRating ?? 0.5;
         combinedScore *= (0.8 + 0.2 * siteRating);
 
-        // Already watched penalty
+        // Skip already watched videos
         if (video.PlayCount > 0)
-          combinedScore *= 0.3;
+          continue;
 
         if (combinedScore > 0)
           scored.Add((video, combinedScore));
