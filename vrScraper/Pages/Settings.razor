@@ -47,14 +47,14 @@
             <h5 class="section-title">
                 <i class="fas fa-globe me-2"></i>
                 @scraper.DisplayName
-                <span class="badge @(GetSiteSetting(site, "Enabled", "true") == "true" ? "bg-success" : "bg-secondary") ms-2" style="font-size: 11px;">
-                    @(GetSiteSetting(site, "Enabled", "true") == "true" ? "Active" : "Disabled")
+                <span class="badge @(GetSiteSetting(site, "Enabled", site == "eporner.com" ? "true" : "false") == "true" ? "bg-success" : "bg-secondary") ms-2" style="font-size: 11px;">
+                    @(GetSiteSetting(site, "Enabled", site == "eporner.com" ? "true" : "false") == "true" ? "Active" : "Disabled")
                 </span>
             </h5>
 
             @{
                 var s = site;
-                var isEnabled = GetSiteSetting(s, "Enabled", "true") == "true";
+                var isEnabled = GetSiteSetting(s, "Enabled", s == "eporner.com" ? "true" : "false") == "true";
                 var minDur = GetSiteSetting(s, "MinDuration", "0");
                 var autoEnabled = GetSiteSetting(s, "AutoScrapeEnabled", "false") == "true";
                 var autoTime = GetSiteSetting(s, "AutoScrapeTime", "02:00");

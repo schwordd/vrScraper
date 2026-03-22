@@ -18,7 +18,15 @@
       "Bash(taskkill //F //IM vrScraper.exe)",
       "Bash(taskkill //F //IM dotnet.exe)",
       "Bash(curl:*)",
-      "Bash(magick D:/Source/vrScraper/vrScraper/wwwroot/logo1.png -resize x200 -gravity center -background none -extent 1920x200 D:/Source/vrScraper/vrScraper/wwwroot/banner.png)"
+      "Bash(magick D:/Source/vrScraper/vrScraper/wwwroot/logo1.png -resize x200 -gravity center -background none -extent 1920x200 D:/Source/vrScraper/vrScraper/wwwroot/banner.png)",
+      "Bash(grep -oP 'js-video-item[\\\\s\\\\S]{0,2000}')",
+      "Bash(grep -Pzo 'js-video-item[\\\\s\\\\S]{1500,3000}' /tmp/sb.html)",
+      "Bash(grep -oP 'alt=\"\"\"\"[^\"\"\"\"]{20,}\"\"\"\"' /tmp/sb.html)",
+      "Bash(grep -Pzo 'video-item-length[\\\\s\\\\S]{0,100}' /tmp/sb.html)",
+      "Bash(grep -oP href=\"\"/[^\"\"]*pornstar[^\"\"]*\"\" /tmp/sb_detail.html)",
+      "Bash(grep -Pzo 'data-testid=\"\"\"\"tag\"\"\"\"[\\\\s\\\\S]{0,200}' /tmp/sb_detail.html)",
+      "Bash(grep -Pzo 'class=\"\"\"\"[^\"\"\"\"]*info[^\"\"\"\"]*\"\"\"\"[\\\\s\\\\S]{0,2000}' /tmp/sb_detail.html)",
+      "Bash(grep -oP 'data-testid=\"\"\"\"tag\"\"\"\"[\\\\s\\\\S]{0,50}' /tmp/sb_detail.html)"
     ],
     "deny": []
   }

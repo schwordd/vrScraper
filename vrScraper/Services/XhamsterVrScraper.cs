@@ -470,7 +470,8 @@ namespace vrScraper.Services
           var tagName = catName.Trim();
           if (string.IsNullOrEmpty(tagName)) continue;
 
-          var tag = await context.Tags.Where(t => t.Name == tagName).FirstOrDefaultAsync(cancellationToken);
+          var tag = await context.Tags.Where(t => t.Name == tagName).FirstOrDefaultAsync(cancellationToken)
+            ?? context.Tags.Local.FirstOrDefault(t => t.Name == tagName);
           if (tag == null)
           {
             tag = new DbTag() { Name = tagName };
@@ -504,7 +505,8 @@ namespace vrScraper.Services
           if (starName.Contains("Studio") || starName.Contains("Taboo") || starName.Contains("VR "))
             continue;
 
-          var star = await context.Stars.Where(s => s.Name == starName).FirstOrDefaultAsync(cancellationToken);
+          var star = await context.Stars.Where(s => s.Name == starName).FirstOrDefaultAsync(cancellationToken)
+            ?? context.Stars.Local.FirstOrDefault(s => s.Name == starName);
           if (star == null)
           {
             star = new DbStar() { Name = starName };

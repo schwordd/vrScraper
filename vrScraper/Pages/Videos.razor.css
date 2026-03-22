@@ -221,23 +221,23 @@
 }
 
 .star-pill {
-    background-color: transparent;
-    color: #d63384;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 1px 4px;
+    background-color: #1e293b;
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
     border: none;
     box-shadow: none;
     text-transform: none;
-    gap: 2px;
+    gap: 3px;
+    border-radius: 10px;
 }
 
 .star-pill:hover {
-    background-color: rgba(214, 51, 132, 0.1);
-    color: #b02a6e;
+    background-color: #0f172a;
+    color: #fcd34d;
     box-shadow: none;
     transform: none;
-    text-decoration: underline;
 }
 
 .star-pill:hover {
@@ -297,6 +297,10 @@
 
 .thumbnail-container:hover .thumbnail-overlay {
     opacity: 1;
+}
+
+.thumbnail-container:hover .duration-badge {
+    opacity: 0;
 }
 
 .delete-btn {

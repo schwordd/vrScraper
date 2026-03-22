@@ -72,6 +72,11 @@ namespace vrScraper.DB.Seed
         db.Settings.Add(new Models.DbSetting() { Key = "Site:xhamster.com:MinDuration", Type = "System.String", Value = "660" });
       }
 
+      if (defaultSettings.Exists(a => a.Key == "Site:spankbang.com:MinDuration") == false)
+      {
+        db.Settings.Add(new Models.DbSetting() { Key = "Site:spankbang.com:MinDuration", Type = "System.String", Value = "660" });
+      }
+
       db.SaveChanges();
     }
     public static void SeedDefaultTabs(VrScraperContext db)
