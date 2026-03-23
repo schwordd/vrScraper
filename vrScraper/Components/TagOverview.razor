@@ -4,7 +4,7 @@
 
 <CollapsibleItemList Title="Tags"
                      Items="@items"
-                     BadgeColor="#007bff" />
+                     PillClass="item-pill item-pill-tag" />
 
 @code {
     private List<(string Name, long Count)> items = new();

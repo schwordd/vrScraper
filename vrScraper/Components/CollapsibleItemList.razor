@@ -1,47 +1,20 @@
 @using Microsoft.AspNetCore.Components
 
-<div class="card mt-2">
-    <div class="card-header clickable-header" @onclick="ToggleCollapse">
-        <div class="d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="bi @(isCollapsed ? "bi-caret-right-fill" : "bi-caret-down-fill")"></i>
-                @Title
-                <span class="badge rounded-pill text-bg-light">@Items.Count</span>
-            </h5>
-        </div>
-    </div>
-
-    <div class="@(isCollapsed ? "collapse" : "")">
-        <div class="card-body">
-            @if (Items != null)
-            {
-                <div class="item-container">
-                    @foreach (var item in Items)
-                    {
-                        <button type="button" class="btn btn-sm btn-primary item-pill"
-                                style="background-color: @BadgeColor; border-color: @BadgeColor;">
-                            @item.Name <span class="badge text-bg-secondary">@item.Count</span>
-                        </button>
-                    }
-                </div>
-            }
-            else
-            {
-                <p>Loading...</p>
-            }
-        </div>
-    </div>
+<div class="item-container">
+    @if (Items != null)
+    {
+        @foreach (var item in Items)
+        {
+            <span class="@PillClass">
+                @item.Name <span class="item-count">@item.Count</span>
+            </span>
+        }
+    }
 </div>
 
 @code {
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public List<(string Name, long Count)> Items { get; set; } = new();
     [Parameter] public string BadgeColor { get; set; } = "#007bff";
-
-    private bool isCollapsed = true;
-
-    private void ToggleCollapse()
-    {
-        isCollapsed = !isCollapsed;
-    }
+    [Parameter] public string PillClass { get; set; } = "item-pill";
 }

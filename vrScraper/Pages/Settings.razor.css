@@ -5,16 +5,16 @@
 
 /* Unified section style */
 .settings-section {
-    background: #f8f9fa;
-    border-radius: 12px;
+    background: var(--color-surface-raised);
+    border-radius: var(--radius-xl);
     padding: 2rem;
     margin-bottom: 1.5rem;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-md);
 }
 
 .section-title {
-    color: #495057;
+    color: var(--color-text-secondary);
     font-weight: 600;
     margin-bottom: 1.5rem;
     text-align: left;
@@ -27,17 +27,17 @@
 }
 
 .setting-card {
-    background: white;
-    border-radius: 8px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
-    border: 1px solid #e9ecef;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-base) ease, box-shadow var(--transition-base) ease;
 }
 
 .setting-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-lg);
 }
 
 .setting-header {
@@ -45,26 +45,26 @@
 }
 
 .form-check-input:checked {
-    background-color: #28a745;
-    border-color: #28a745;
+    background-color: var(--color-success);
+    border-color: var(--color-success);
 }
 
 .form-control-lg {
     font-size: 1rem;
     padding: 0.75rem 1rem;
-    border-radius: 6px;
-    border: 2px solid #e9ecef;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    border-radius: var(--radius-md);
+    border: 2px solid var(--color-border);
+    transition: border-color var(--transition-base) ease, box-shadow var(--transition-base) ease;
 }
 
 .form-control-lg:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.2rem rgba(217, 119, 6, 0.25);
 }
 
 .status-card {
-    background: #f0f4f8;
-    border: 1px solid #d0d7de;
+    background: var(--color-surface-sunken);
+    border: 1px solid var(--color-border-strong);
 }
 
 .status-value {
@@ -74,23 +74,27 @@
 .badge {
     font-size: 0.9rem;
     padding: 0.5rem 1rem;
-    border-radius: 20px;
+    border-radius: var(--radius-full);
 }
 
 .bg-secondary {
-    background-color: #6c757d !important;
+    background-color: var(--color-text-secondary) !important;
 }
 
 .bg-success {
-    background-color: #28a745 !important;
+    background-color: var(--color-success) !important;
 }
 
-.fas {
-    color: #007bff;
+.site-disabled {
+    opacity: 0.5;
+}
+
+.site-input-sm {
+    width: 90px;
 }
 
 .form-label.fw-semibold {
-    color: #495057;
+    color: var(--color-text-secondary);
     margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
@@ -99,6 +103,62 @@
 .text-muted {
     font-size: 0.875rem;
     line-height: 1.4;
+}
+
+.vr-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.vr-table th,
+.vr-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.vr-table th {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    font-size: var(--font-size-sm, 0.8125rem);
+    white-space: nowrap;
+}
+
+.vr-table tr.site-disabled {
+    opacity: 0.5;
+}
+
+.site-input-sm {
+    max-width: 100px;
+}
+
+.password-card {
+    grid-column: 1 / -1;
+    max-width: 500px;
+}
+
+.password-card:hover {
+    transform: none;
+}
+
+.password-form .btn-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.password-form .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.password-form .btn-primary:disabled {
+    opacity: 0.6;
 }
 
 @media (max-width: 768px) {

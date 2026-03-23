@@ -9,7 +9,7 @@
 <div class="video-player-overlay @(_isVisible ? "visible" : "")" @onclick="ClosePlayer">
     <div class="video-player-container" @onclick:stopPropagation>
         <div class="close-button" @onclick="ClosePlayer">
-            <i class="bi bi-x-lg"></i>
+            <i class="icon-x"></i>
         </div>
 
         @if (_isLoading)
@@ -25,7 +25,7 @@
         @if (_errorMessage != null)
         {
             <div class="error-message">
-                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                <i class="icon-triangle-alert text-warning"></i>
                 <div>@_errorMessage</div>
                 <button class="btn btn-sm btn-light mt-3" @onclick="ClosePlayer">Schließen</button>
             </div>
