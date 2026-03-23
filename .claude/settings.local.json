@@ -26,7 +26,14 @@
       "Bash(grep -oP href=\"\"/[^\"\"]*pornstar[^\"\"]*\"\" /tmp/sb_detail.html)",
       "Bash(grep -Pzo 'data-testid=\"\"\"\"tag\"\"\"\"[\\\\s\\\\S]{0,200}' /tmp/sb_detail.html)",
       "Bash(grep -Pzo 'class=\"\"\"\"[^\"\"\"\"]*info[^\"\"\"\"]*\"\"\"\"[\\\\s\\\\S]{0,2000}' /tmp/sb_detail.html)",
-      "Bash(grep -oP 'data-testid=\"\"\"\"tag\"\"\"\"[\\\\s\\\\S]{0,50}' /tmp/sb_detail.html)"
+      "Bash(grep -oP 'data-testid=\"\"\"\"tag\"\"\"\"[\\\\s\\\\S]{0,50}' /tmp/sb_detail.html)",
+      "Bash(find /d/Source/vrScraper -type f -name *.csproj)",
+      "Bash(find /d/Source/vrScraper -type f -name *.razor.css)",
+      "Bash(find /d/Source/vrScraper/vrScraper/Services -type f -name *.cs)",
+      "Bash(dotnet --version)",
+      "Bash(dotnet:*)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(tasklist)"
     ],
     "deny": []
   }
