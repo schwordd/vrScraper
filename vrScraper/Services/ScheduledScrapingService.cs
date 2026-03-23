@@ -78,9 +78,15 @@ namespace vrScraper.Services
 
           var site = scraper.SiteName;
 
+          // Check if site is globally enabled
+          var siteEnabledSetting = await settingService.GetSetting($"Site:{site}:Enabled");
+          var siteEnabledDefault = site.Equals("eporner.com", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
+          var siteEnabled = siteEnabledSetting?.Value ?? siteEnabledDefault;
+          if (!siteEnabled.Equals("true", StringComparison.OrdinalIgnoreCase)) continue;
+
           // Check per-site auto-scrape enabled
           var enabledSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeEnabled");
-          if (enabledSetting == null || enabledSetting.Value != "True") continue;
+          if (enabledSetting == null || !enabledSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase)) continue;
 
           // Check per-site scrape time
           var timeSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeTime");

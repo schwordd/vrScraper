@@ -38,6 +38,14 @@ namespace vrScraper.Services
       }
     }
 
+    public string? GetSettingValue(string key)
+    {
+      lock (_settingsLock)
+      {
+        return this._settings.Where(a => a.Key == key).FirstOrDefault()?.Value;
+      }
+    }
+
     public async Task<DbSetting?> UpdateSetting(DbSetting setting)
     {
       using var scope = serviceProvider.CreateScope();
@@ -72,6 +80,11 @@ namespace vrScraper.Services
       }
 
       return setting;
+    }
+
+    public async Task SaveSetting(string key, string value)
+    {
+      await UpdateSetting(new DbSetting { Key = key, Type = "System.String", Value = value });
     }
   }
 }

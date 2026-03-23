@@ -7,6 +7,8 @@ namespace vrScraper.Services
     Task Initialize();
     Task<List<DbSetting>> GetAllSettings();
     Task<DbSetting?> GetSetting(string key);
+    string? GetSettingValue(string key);
     Task<DbSetting?> UpdateSetting(DbSetting setting);
+    Task SaveSetting(string key, string value);
   }
 }
