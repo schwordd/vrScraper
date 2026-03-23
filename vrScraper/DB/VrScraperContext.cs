@@ -10,6 +10,8 @@ namespace vrScraper.DB
     public DbSet<DbTag> Tags { get; set; }
     public DbSet<DbVrTab> Tabs { get; set; }
     public DbSet<DbSetting> Settings { get; set; }
+    public DbSet<DbScrapeLog> ScrapeLogs { get; set; }
+    public DbSet<DbPlaybackEvent> PlaybackEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
