@@ -1,7 +1,8 @@
-using Blzr.BootstrapSelect;
+using Scalar.AspNetCore;
 using vrScraper.DB;
 using vrScraper.DB.Seed;
 using vrScraper.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Serilog;
@@ -72,6 +73,22 @@ namespace vrScraper
       // Füge HttpClient-Factory hinzu
       builder.Services.AddHttpClient();
 
+      builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+          .AddCookie(options =>
+          {
+              options.LoginPath = "/login";
+              options.LogoutPath = "/api/auth/logout";
+              options.ExpireTimeSpan = TimeSpan.FromDays(30);
+              options.SlidingExpiration = true;
+              options.Cookie.HttpOnly = true;
+              options.Cookie.SameSite = SameSiteMode.Lax;
+          });
+      builder.Services.AddAuthorization(options =>
+      {
+          options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+              .RequireAuthenticatedUser().Build();
+      });
+
       // Add services to the container.
       builder.Services.AddControllers().AddNewtonsoftJson(options =>
       {
@@ -83,8 +100,7 @@ namespace vrScraper
       builder.Services.AddRazorPages(); // Fügt Razor Pages hinzu
       builder.Services.AddServerSideBlazor(); // Fügt Blazor Server hinzu
 
-      builder.Services.AddEndpointsApiExplorer();
-      builder.Services.AddSwaggerGen();
+      builder.Services.AddOpenApi();
       builder.Services.AddSingleton<IVideoService, VideoService>();
       builder.Services.AddSingleton<IEpornerScraper, EpornerScraper>();
       builder.Services.AddSingleton<IVideoScraper>(sp => sp.GetRequiredService<IEpornerScraper>());
@@ -97,8 +113,8 @@ namespace vrScraper
       builder.Services.AddSingleton<ISettingService, SettingService>();
       builder.Services.AddSingleton<ITabFilteringService, TabFilteringService>();
       builder.Services.AddSingleton<IRecommendationService, RecommendationService>();
-      builder.Services.AddBootstrapSelect();
-
+      builder.Services.AddSingleton<IScrapeLogService, ScrapeLogService>();
+      builder.Services.AddSingleton<ITagNormalizationService, TagNormalizationService>();
       // Add scheduled scraping background service
       builder.Services.AddHostedService<ScheduledScrapingService>();
 
@@ -123,8 +139,8 @@ namespace vrScraper
       // Configure the HTTP request pipeline.
       if (app.Environment.IsDevelopment())
       {
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        app.MapOpenApi();
+        app.MapScalarApiReference();
       }
 
       // Apply any pending migrations
@@ -141,15 +157,16 @@ namespace vrScraper
       // Enable CORS
       app.UseCors("AllowAll");
 
-      app.UseRouting();
-      app.UseAuthorization();
-
       app.UseStaticFiles();
 
+      app.UseRouting();
+      app.UseAuthentication();
+      app.UseAuthorization();
 
-      // Map Blazor Hub
-      app.MapBlazorHub(); // Blazor Hub
-      app.MapFallbackToPage("/_Host"); // Fallback auf Blazor-Seite
+
+      // Map Blazor Hub (AllowAnonymous so login page works; Blazor handles auth via AuthorizeRouteView)
+      app.MapBlazorHub().AllowAnonymous();
+      app.MapFallbackToPage("/_Host").AllowAnonymous();
 
       app.MapControllers();
 
