@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace vrScraper.Services
 {
-  public class XhamsterVrScraper(ILogger<XhamsterVrScraper> logger, IServiceProvider serviceProvider, IVideoService vs) : IXhamsterVrScraper
+  public class XhamsterVrScraper(ILogger<XhamsterVrScraper> logger, IServiceProvider serviceProvider, IVideoService vs, ITagNormalizationService tagNorm) : IXhamsterVrScraper
   {
     public string SiteName => "xhamster.com";
     public string DisplayName => "xHamster VR";
@@ -22,6 +22,13 @@ namespace vrScraper.Services
     public string? CurrentVideoThumbnail => _currentVideoThumbnail;
     public string? CurrentVideoTitle => _currentVideoTitle;
     public bool IsScheduledScraping { get; set; } = false;
+
+    public bool SupportsRescrape => false;
+    public bool SupportsDeadThumbnailCheck => false;
+    public bool SupportsDeleteErrors => false;
+    public Task StartRescrape() => throw new NotSupportedException();
+    public Task StartDeadThumbnailCheck() => throw new NotSupportedException();
+    public Task StartDeleteErrors() => throw new NotSupportedException();
 
     private bool _scrapingInProgress = false;
     private string _scrapingStatus = string.Empty;
@@ -467,7 +474,7 @@ namespace vrScraper.Services
 
         foreach (var catName in categories)
         {
-          var tagName = catName.Trim();
+          var tagName = tagNorm.NormalizeTag(catName.Trim());
           if (string.IsNullOrEmpty(tagName)) continue;
 
           var tag = await context.Tags.Where(t => t.Name == tagName).FirstOrDefaultAsync(cancellationToken)

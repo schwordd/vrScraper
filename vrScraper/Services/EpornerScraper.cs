@@ -13,7 +13,7 @@ using System.Threading;
 
 namespace vrScraper.Services
 {
-  public class EpornerScraper(ILogger<EpornerScraper> logger, IServiceProvider serviceProvider, IVideoService vs) : IEpornerScraper
+  public class EpornerScraper(ILogger<EpornerScraper> logger, IServiceProvider serviceProvider, IVideoService vs, ITagNormalizationService tagNorm) : IEpornerScraper
   {
     public string SiteName => "eporner.com";
     public string DisplayName => "Eporner";
@@ -34,6 +34,13 @@ namespace vrScraper.Services
 
     // Scraping Options
     public bool IsScheduledScraping { get; set; } = false;
+
+    public bool SupportsRescrape => true;
+    public bool SupportsDeadThumbnailCheck => true;
+    public bool SupportsDeleteErrors => true;
+    public Task StartRescrape() { StartReparseInformations(); return Task.CompletedTask; }
+    public Task StartDeadThumbnailCheck() { StartRemoveByDeadPicture(); return Task.CompletedTask; }
+    public Task StartDeleteErrors() { StartDeleteErrorItems(); return Task.CompletedTask; }
 
     private bool _scrapingInprogress = false;
     private string _scrapingStatus = string.Empty;
@@ -553,8 +560,9 @@ namespace vrScraper.Services
         }
       }
 
-      foreach (var tagParsed in Tags.Distinct().ToList())
+      foreach (var tagRaw in Tags.Distinct().ToList())
       {
+        var tagParsed = tagNorm.NormalizeTag(tagRaw);
         var tag = await context.Tags.Where(s => s.Name == tagParsed).FirstOrDefaultAsync();
         if (tag == null)
         {

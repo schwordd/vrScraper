@@ -17,5 +17,12 @@ namespace vrScraper.Services
     string? CurrentVideoThumbnail { get; }
     string? CurrentVideoTitle { get; }
     bool IsScheduledScraping { get; set; }
+
+    bool SupportsRescrape { get; }
+    bool SupportsDeadThumbnailCheck { get; }
+    bool SupportsDeleteErrors { get; }
+    Task StartRescrape();
+    Task StartDeadThumbnailCheck();
+    Task StartDeleteErrors();
   }
 }

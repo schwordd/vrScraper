@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace vrScraper.Services
 {
-  public class SpankBangVrScraper(ILogger<SpankBangVrScraper> logger, IServiceProvider serviceProvider, IVideoService vs) : ISpankBangVrScraper
+  public class SpankBangVrScraper(ILogger<SpankBangVrScraper> logger, IServiceProvider serviceProvider, IVideoService vs, ITagNormalizationService tagNorm) : ISpankBangVrScraper
   {
     public string SiteName => "spankbang.com";
     public string DisplayName => "SpankBang VR";
@@ -22,6 +22,13 @@ namespace vrScraper.Services
     public string? CurrentVideoThumbnail => _currentVideoThumbnail;
     public string? CurrentVideoTitle => _currentVideoTitle;
     public bool IsScheduledScraping { get; set; } = false;
+
+    public bool SupportsRescrape => false;
+    public bool SupportsDeadThumbnailCheck => false;
+    public bool SupportsDeleteErrors => false;
+    public Task StartRescrape() => throw new NotSupportedException();
+    public Task StartDeadThumbnailCheck() => throw new NotSupportedException();
+    public Task StartDeleteErrors() => throw new NotSupportedException();
 
     private bool _scrapingInProgress = false;
     private string _scrapingStatus = string.Empty;
@@ -417,8 +424,9 @@ namespace vrScraper.Services
       {
         foreach (var tagNode in tagNodes)
         {
-          var tagName = HtmlEntity.DeEntitize(tagNode.InnerText?.Trim() ?? "");
-          if (string.IsNullOrEmpty(tagName) || tagName.Length > 50 || tagName == "Tags") continue;
+          var tagNameRaw = HtmlEntity.DeEntitize(tagNode.InnerText?.Trim() ?? "");
+          if (string.IsNullOrEmpty(tagNameRaw) || tagNameRaw.Length > 50 || tagNameRaw == "Tags") continue;
+          var tagName = tagNorm.NormalizeTag(tagNameRaw);
 
           var tag = await context.Tags.Where(t => t.Name == tagName).FirstOrDefaultAsync(ct)
             ?? context.Tags.Local.FirstOrDefault(t => t.Name == tagName);
