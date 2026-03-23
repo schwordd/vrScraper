@@ -196,6 +196,19 @@ namespace vrScraper.Services
         this.currentVideoId = vid.Id;
         this.currentVideo = vid;
 
+        // Update LastPlayedUtc
+        {
+          using var scope2 = serviceProvider.CreateScope();
+          var ctx2 = scope2.ServiceProvider.GetRequiredService<VrScraperContext>();
+          var dbVid = ctx2.VideoItems.Find(vid.Id);
+          if (dbVid != null) { dbVid.LastPlayedUtc = DateTime.UtcNow; ctx2.SaveChanges(); }
+          lock (_videoLock)
+          {
+            var memVid = this.videoItems.FirstOrDefault(v => v.Id == vid.Id);
+            if (memVid != null) memVid.LastPlayedUtc = DateTime.UtcNow;
+          }
+        }
+
         if (OnLiveVideoChanged != null)
         {
           OnLiveVideoChanged(this, new VideoChangedEventArgs(vid));

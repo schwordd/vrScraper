@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using vrScraper.DB;
 
@@ -10,9 +11,11 @@ using vrScraper.DB;
 namespace vrScraper.DB.Migrations
 {
     [DbContext(typeof(VrScraperContext))]
-    partial class VrScraperContextModelSnapshot : ModelSnapshot
+    [Migration("20260323171317_AddLastPlayedUtc")]
+    partial class AddLastPlayedUtc
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
@@ -45,73 +48,6 @@ namespace vrScraper.DB.Migrations
                     b.HasIndex("VideosId");
 
                     b.ToTable("DbTagDbVideoItem");
-                });
-
-            modelBuilder.Entity("vrScraper.DB.Models.DbPlaybackEvent", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("EventType")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<double>("Speed")
-                        .HasColumnType("REAL");
-
-                    b.Property<double>("TimeMs")
-                        .HasColumnType("REAL");
-
-                    b.Property<DateTime>("UtcTimestamp")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("VideoId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PlaybackEvents");
-                });
-
-            modelBuilder.Entity("vrScraper.DB.Models.DbScrapeLog", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("DuplicatesSkipped")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Errors")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("FinishedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("NewVideos")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("PagesScraped")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Site")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("StartedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TriggerType")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ScrapeLogs");
                 });
 
             modelBuilder.Entity("vrScraper.DB.Models.DbSetting", b =>

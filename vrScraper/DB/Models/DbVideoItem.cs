@@ -48,6 +48,8 @@ namespace vrScraper.DB.Models
 
     public int? ErrorCount { get; set; }
 
+    public DateTime? LastPlayedUtc { get; set; }
+
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public bool IsThumbnailNotAvailable { get; set; }
   }
