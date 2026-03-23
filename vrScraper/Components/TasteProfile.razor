@@ -68,13 +68,22 @@
         var videos = await VideoService.GetVideoItems();
         var (tagAffinities, starAffinities) = RecommendationService.GetAffinities(videos);
 
-        // Build tag stats
-        var tagMax = tagAffinities.Values.Any() ? tagAffinities.Values.Max() : 1;
-        _topTags = tagAffinities
+        // Build tag stats — exclude ubiquitous tags (>40% of all videos)
+        var totalVideoCount = videos.Count;
+        var tagCounts = videos
+            .SelectMany(v => v.Tags.Select(t => t.Name))
+            .GroupBy(n => n)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var noiseTags = tagCounts.Where(kv => (double)kv.Value / totalVideoCount > 0.4).Select(kv => kv.Key).ToHashSet();
+
+        var filteredTagAffinities = tagAffinities.Where(kv => !noiseTags.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+        var tagMax = filteredTagAffinities.Values.Any() ? filteredTagAffinities.Values.Max() : 1;
+        _topTags = filteredTagAffinities
             .OrderByDescending(kv => kv.Value)
             .Take(10)
             .Select(kv =>
             {
+                var count = tagCounts.GetValueOrDefault(kv.Key, 0);
                 var tagVideos = videos.Where(v => v.Tags.Any(t => t.Name == kv.Key)).ToList();
                 var watched = tagVideos.Count(v => v.PlayCount > 0);
                 var liked = tagVideos.Count(v => v.Liked);

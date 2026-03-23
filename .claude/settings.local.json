@@ -33,7 +33,12 @@
       "Bash(dotnet --version)",
       "Bash(dotnet:*)",
       "WebFetch(domain:cdn.jsdelivr.net)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Bash(magick --version)",
+      "Bash(cmd.exe /c \"magick --version\")",
+      "Bash(cmd.exe /c \"where magick\" 2>&1)",
+      "Bash(\"/c/Program Files/ImageMagick-7.1.1-Q16-HDRI/magick.exe\" --version)",
+      "Bash(\"/c/Program Files/ImageMagick-7.1.2-Q16-HDRI/magick.exe\" --version)"
     ],
     "deny": []
   }

@@ -78,9 +78,10 @@
 
 .filter-select {
     width: auto;
+    min-width: 160px;
     height: 30px;
     font-size: 13px;
-    padding: 4px 8px;
+    padding: 4px 28px 4px 8px;
 }
 
 .filter-duration {

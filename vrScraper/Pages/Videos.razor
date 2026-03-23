@@ -545,6 +545,13 @@
                 var filteredIds = filteredItems.Select(v => v.Id).ToHashSet();
                 sortedItems = recommended.Where(v => filteredIds.Contains(v.Id)).ToList();
             }
+            else if (_currentSortOption == "recentlywatched")
+            {
+                sortedItems = filteredItems
+                    .Where(v => v.LastPlayedUtc.HasValue)
+                    .OrderByDescending(v => v.LastPlayedUtc!.Value)
+                    .ToList();
+            }
             else
             {
                 sortedItems = filteredItems
@@ -554,7 +561,6 @@
                         "rating" => v.SiteRating ?? 0,
                         "playtime" => v.PlayDurationEst.TotalSeconds,
                         "playcount" => v.PlayCount,
-                        "recentlywatched" => (double)(v.LastPlayedUtc?.Ticks ?? 0),
                         _ => (double)v.Id
                     })
                     .ToList();
@@ -580,15 +586,65 @@
     private bool IsFirstPage => CurrentPage == 1;
     private bool IsLastPage => CurrentPage == TotalPages;
 
-    private List<(DbTag Tag, long Count)> SortedTags => AvailableTags
-        .OrderByDescending(t => SelectedTags.Contains(t.Tag.Name))
-        .ThenBy(t => t.Tag.Name)
-        .ToList();
+    private List<DbVideoItem> BaseFilteredItems
+    {
+        get
+        {
+            var items = VideoItems;
+            items = items.Where(item => !item.Tags.Exists(a => _globalBlackList.Any(b => b == a.Name))).ToList();
+            if (_selectedSites.Any())
+                items = items.Where(v => _selectedSites.Contains(v.Site)).ToList();
+            return items
+                .Where(v => (!_showOnlyLiked || v.Liked) &&
+                        (!_showOnlyUnwatched || v.PlayCount == 0) &&
+                        (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
+                        (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
+                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) &&
+                        (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
+                        (_maxDurationMinutes <= 0 || v.Duration.TotalMinutes <= _maxDurationMinutes))
+                .ToList();
+        }
+    }
 
-    private List<(DbStar Star, long Count)> SortedActresses => AvailableActresses
-        .OrderByDescending(a => SelectedActresses.Contains(a.Star.Name))
-        .ThenBy(a => a.Star.Name)
-        .ToList();
+    private List<(DbTag Tag, long Count)> SortedTags
+    {
+        get
+        {
+            var baseItems = BaseFilteredItems;
+            if (SelectedActresses.Count > 0)
+                baseItems = baseItems.Where(v => SelectedActresses.All(a => v.Stars.Any(s => s.Name == a))).ToList();
+            var tagCounts = baseItems
+                .SelectMany(v => v.Tags)
+                .GroupBy(t => t.Name)
+                .ToDictionary(g => g.Key, g => (long)g.Count());
+            return AvailableTags
+                .Select(t => (t.Tag, Count: tagCounts.GetValueOrDefault(t.Tag.Name, 0)))
+                .Where(t => t.Count > 0 || SelectedTags.Contains(t.Tag.Name))
+                .OrderByDescending(t => SelectedTags.Contains(t.Tag.Name))
+                .ThenByDescending(t => t.Count)
+                .ToList();
+        }
+    }
+
+    private List<(DbStar Star, long Count)> SortedActresses
+    {
+        get
+        {
+            var baseItems = BaseFilteredItems;
+            if (SelectedTags.Count > 0)
+                baseItems = baseItems.Where(v => SelectedTags.All(t => v.Tags.Any(a => a.Name == t))).ToList();
+            var starCounts = baseItems
+                .SelectMany(v => v.Stars)
+                .GroupBy(s => s.Name)
+                .ToDictionary(g => g.Key, g => (long)g.Count());
+            return AvailableActresses
+                .Select(a => (a.Star, Count: starCounts.GetValueOrDefault(a.Star.Name, 0)))
+                .Where(a => a.Count > 0 || SelectedActresses.Contains(a.Star.Name))
+                .OrderByDescending(a => SelectedActresses.Contains(a.Star.Name))
+                .ThenByDescending(a => a.Count)
+                .ToList();
+        }
+    }
 
     private List<DbVrTab> WatchlistTabs { get; set; } = new();
     private long _selectedWatchlistId;
@@ -878,6 +934,7 @@
         {
             _dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("addPageKeyListener", _dotNetRef);
+            _urlSyncReady = true;
         }
     }
 
@@ -924,51 +981,51 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("removePageKeyListener");
+            if (_urlSyncReady)
+                await JSRuntime.InvokeVoidAsync("removePageKeyListener");
         }
-        catch (JSDisconnectedException)
+        catch (Exception)
         {
-            // Circuit already disconnected, ignore
+            // Circuit disconnected or prerendering, ignore
         }
         _dotNetRef?.Dispose();
     }
 
     // --- URL Sync ---
-    private bool _suppressUrlSync = false;
+    private bool _urlSyncReady = false;
 
     private void RestoreFiltersFromUrl()
     {
-        _suppressUrlSync = true;
-        try
-        {
-            var uri = new Uri(NavigationManager.Uri);
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        var uri = new Uri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.Count == 0) return;
 
-            if (query.TryGetValue("q", out var q)) _searchQuery = q.ToString();
-            if (query.TryGetValue("sort", out var sort)) _currentSortOption = sort.ToString();
-            if (query.TryGetValue("tags", out var tags) && !string.IsNullOrEmpty(tags))
-                _selectedTags = tags.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            if (query.TryGetValue("actresses", out var actresses) && !string.IsNullOrEmpty(actresses))
-                _selectedActresses = actresses.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            if (query.TryGetValue("sites", out var sites) && !string.IsNullOrEmpty(sites))
-                _selectedSites = sites.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            if (query.TryGetValue("liked", out var liked)) _showOnlyLiked = liked == "1";
-            if (query.TryGetValue("unwatched", out var unwatched)) _showOnlyUnwatched = unwatched == "1";
-            if (query.TryGetValue("errors", out var errors)) _showOnlyWithErrors = errors == "1";
-            if (query.TryGetValue("page", out var page) && int.TryParse(page, out var p)) CurrentPage = p;
-            if (query.TryGetValue("pageSize", out var ps) && int.TryParse(ps, out var psi)) PageSize = psi;
-            if (query.TryGetValue("minDur", out var minD) && int.TryParse(minD, out var minDi)) _minDurationMinutes = minDi;
-            if (query.TryGetValue("maxDur", out var maxD) && int.TryParse(maxD, out var maxDi)) _maxDurationMinutes = maxDi;
-        }
-        finally
+        if (query.TryGetValue("q", out var q)) _searchQuery = q.ToString();
+        if (query.TryGetValue("sort", out var sort)) _currentSortOption = sort.ToString();
+        if (query.TryGetValue("tags", out var tags) && !string.IsNullOrEmpty(tags))
         {
-            _suppressUrlSync = false;
+            _selectedTags = tags.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            SelectedTags = _selectedTags.ToHashSet();
         }
+        if (query.TryGetValue("actresses", out var actresses) && !string.IsNullOrEmpty(actresses))
+        {
+            _selectedActresses = actresses.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            SelectedActresses = _selectedActresses.ToHashSet();
+        }
+        if (query.TryGetValue("sites", out var sites) && !string.IsNullOrEmpty(sites))
+            _selectedSites = sites.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (query.TryGetValue("liked", out var liked)) _showOnlyLiked = liked == "1";
+        if (query.TryGetValue("unwatched", out var unwatched)) _showOnlyUnwatched = unwatched == "1";
+        if (query.TryGetValue("errors", out var errors)) _showOnlyWithErrors = errors == "1";
+        if (query.TryGetValue("page", out var page) && int.TryParse(page, out var p)) CurrentPage = p;
+        if (query.TryGetValue("pageSize", out var ps) && int.TryParse(ps, out var psi)) PageSize = psi;
+        if (query.TryGetValue("minDur", out var minD) && int.TryParse(minD, out var minDi)) _minDurationMinutes = minDi;
+        if (query.TryGetValue("maxDur", out var maxD) && int.TryParse(maxD, out var maxDi)) _maxDurationMinutes = maxDi;
     }
 
     private void SyncUrlState()
     {
-        if (_suppressUrlSync) return;
+        if (!_urlSyncReady) return;
 
         var queryParams = new Dictionary<string, string?>();
         if (!string.IsNullOrEmpty(_searchQuery)) queryParams["q"] = _searchQuery;
