@@ -1,20 +1,29 @@
 @inherits LayoutComponentBase
 
-<div class="d-flex">
+<div class="app-layout @(_sidebarOpen ? "sidebar-open" : "")">
 
-    <div class="sidebar sidebar-custom">
+    <button class="hamburger-btn" @onclick="ToggleSidebar">
+        <i class="icon-menu"></i>
+    </button>
 
-        <img class="logo mb-4" src="logo1.png" />
+    <aside class="sidebar">
+        <a href="/" class="sidebar-logo-link"><img class="sidebar-logo" src="logo1.png" alt="VRScraper" /></a>
+        <NavMenu OnNavigated="CloseSidebar" />
+        <a class="sidebar-version" href="https://github.com/schwordd/vrScraper" target="_blank">
+            <span>v@(Program.GetVersion())</span>
+        </a>
+    </aside>
 
-        <NavMenu />
+    <div class="sidebar-overlay" @onclick="CloseSidebar"></div>
 
-        <a class="version" href="https://github.com/schwordd/vrScraper" target="_blank"><span>@Program.GetVersion()</span></a>
-    </div>
-
-    <div class="main main-custom flex-grow-1">
-        <div class="content px-4">
-            @Body
-        </div>
-    </div>
+    <main class="main-content">
+        @Body
+    </main>
 </div>
 
+@code {
+    private bool _sidebarOpen;
+
+    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+    private void CloseSidebar() => _sidebarOpen = false;
+}

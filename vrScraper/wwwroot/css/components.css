@@ -1,0 +1,443 @@
+/* ==========================================================================
+   Components — Reusable Slate & Amber Design System Classes
+   All colours reference CSS custom properties from design-tokens.css.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
+.vr-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-4);
+}
+
+.vr-card-header {
+    display: flex;
+    align-items: center;
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.vr-card-body {
+    padding: var(--space-4);
+}
+
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.vr-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-base);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--transition-fast),
+                color var(--transition-fast),
+                border-color var(--transition-fast),
+                box-shadow var(--transition-fast),
+                transform var(--transition-fast);
+    user-select: none;
+}
+
+.vr-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.vr-btn:disabled,
+.vr-btn[disabled] {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+/* Primary — amber */
+.vr-btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-text-on-primary);
+}
+
+.vr-btn-primary:hover {
+    background-color: var(--color-primary-hover);
+    color: var(--color-text-on-primary);
+}
+
+.vr-btn-primary:active {
+    background-color: var(--color-primary-hover);
+    transform: translateY(1px);
+}
+
+/* Secondary — slate */
+.vr-btn-secondary {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border);
+}
+
+.vr-btn-secondary:hover {
+    background-color: var(--color-border);
+    color: var(--color-text);
+}
+
+.vr-btn-secondary:active {
+    background-color: var(--color-border-strong);
+    transform: translateY(1px);
+}
+
+/* Danger — red */
+.vr-btn-danger {
+    background-color: var(--color-danger);
+    color: var(--color-text-on-primary);
+}
+
+.vr-btn-danger:hover {
+    background-color: #b91c1c; /* red-700 */
+    color: var(--color-text-on-primary);
+}
+
+.vr-btn-danger:active {
+    background-color: #991b1b; /* red-800 */
+    transform: translateY(1px);
+}
+
+/* Success — green */
+.vr-btn-success {
+    background-color: var(--color-success);
+    color: var(--color-text-on-primary);
+}
+
+.vr-btn-success:hover {
+    background-color: #15803d; /* green-700 */
+    color: var(--color-text-on-primary);
+}
+
+.vr-btn-success:active {
+    background-color: #166534; /* green-800 */
+    transform: translateY(1px);
+}
+
+/* Ghost — transparent */
+.vr-btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+}
+
+.vr-btn-ghost:hover {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text);
+}
+
+.vr-btn-ghost:active {
+    background-color: var(--color-border);
+}
+
+/* Small */
+.vr-btn-sm {
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--font-size-sm);
+}
+
+/* Icon — square button for action icons */
+.vr-btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.vr-btn-icon.vr-btn-sm {
+    width: 28px;
+    height: 28px;
+}
+
+
+/* ==========================================================================
+   Pills / Tags
+   ========================================================================== */
+
+.vr-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-base);
+    white-space: nowrap;
+}
+
+/* Tag — amber-subtle */
+.vr-pill--tag {
+    background-color: var(--color-primary-subtle);
+    color: var(--color-primary-hover);
+}
+
+/* Actor — dark background, gold text */
+.vr-pill--actor {
+    background-color: #1e293b; /* slate-800 */
+    color: var(--color-primary-light);
+}
+
+/* Badge — counts / numbers */
+.vr-pill--badge {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-secondary);
+}
+
+/* Site — site names */
+.vr-pill--site {
+    background-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+
+/* ==========================================================================
+   Action Buttons (circular overlay buttons)
+   ========================================================================== */
+
+.vr-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-full);
+    background-color: rgba(0, 0, 0, 0.55);
+    color: #ffffff;
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    transition: transform var(--transition-fast),
+                background-color var(--transition-fast);
+}
+
+.vr-action-btn:hover {
+    background-color: rgba(0, 0, 0, 0.75);
+    transform: scale(1.1);
+}
+
+.vr-action-btn:active {
+    transform: scale(0.95);
+}
+
+
+/* ==========================================================================
+   Stats
+   ========================================================================== */
+
+.vr-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.vr-stat-value {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    line-height: var(--line-height-tight);
+}
+
+.vr-stat-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+}
+
+
+/* ==========================================================================
+   Table
+   ========================================================================== */
+
+.vr-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.vr-table th {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 2px solid var(--color-border);
+    text-align: left;
+}
+
+.vr-table td {
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+    vertical-align: middle;
+}
+
+.vr-table tbody tr {
+    transition: background-color var(--transition-fast);
+}
+
+.vr-table tbody tr:hover {
+    background-color: var(--color-surface-raised);
+}
+
+.vr-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+
+/* ==========================================================================
+   Form Overrides
+   ========================================================================== */
+
+.vr-form-group {
+    margin-bottom: var(--space-4);
+}
+
+.vr-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+
+.vr-switch input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 40px;
+    height: 22px;
+    background-color: var(--color-border-strong);
+    border-radius: var(--radius-full);
+    position: relative;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.vr-switch input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-full);
+    transition: transform var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+}
+
+.vr-switch input[type="checkbox"]:checked {
+    background-color: var(--color-primary);
+}
+
+.vr-switch input[type="checkbox"]:checked::after {
+    transform: translateX(18px);
+}
+
+.vr-switch input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.vr-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-12) var(--space-4);
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.vr-empty-state i,
+.vr-empty-state .icon {
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+
+.vr-empty-state p {
+    font-size: var(--font-size-base);
+    max-width: 320px;
+    margin: 0;
+}
+
+
+/* ==========================================================================
+   Filter Bar
+   ========================================================================== */
+
+.vr-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.vr-filter-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.vr-filter-item label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    margin-bottom: 0;
+}
+
+
+/* ==========================================================================
+   Section Headers
+   ========================================================================== */
+
+.vr-section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.vr-section-title i,
+.vr-section-title .icon {
+    color: var(--color-primary);
+}

@@ -1,38 +1,51 @@
-<aside class="menu">
-    <ul class="nav flex-column">
+@using Microsoft.AspNetCore.Components.Routing
+
+<nav class="nav-menu">
+    <ul class="nav-list">
         <li class="nav-item">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <i class="nav-icon fas fa-home"></i>
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="HandleNavigation">
+                <i class="nav-icon icon-house"></i>
                 <span class="nav-text">Home</span>
             </NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="live">
-                <i class="nav-icon fas fa-broadcast-tower"></i>
+            <NavLink class="nav-link" href="live" @onclick="HandleNavigation">
+                <i class="nav-icon icon-radio"></i>
                 <span class="nav-text">Live</span>
             </NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="videos">
-                <i class="nav-icon fas fa-video"></i>
+            <NavLink class="nav-link" href="videos" @onclick="HandleNavigation">
+                <i class="nav-icon icon-film"></i>
                 <span class="nav-text">Videos</span>
             </NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="tabs">
-                <i class="nav-icon fas fa-vr-cardboard"></i>
+            <NavLink class="nav-link" href="tabs" @onclick="HandleNavigation">
+                <i class="nav-icon icon-layout-list"></i>
                 <span class="nav-text">VR Tabs</span>
             </NavLink>
         </li>
         <li class="nav-item">
-            <NavLink class="nav-link" href="settings">
-                <i class="nav-icon fas fa-cog"></i>
+            <NavLink class="nav-link" href="settings" @onclick="HandleNavigation">
+                <i class="nav-icon icon-settings"></i>
                 <span class="nav-text">Settings</span>
             </NavLink>
         </li>
     </ul>
-</aside>
+    <div class="nav-logout">
+        <a class="nav-link" href="api/auth/logout" @onclick="HandleNavigation">
+            <i class="nav-icon icon-log-out"></i>
+            <span class="nav-text">Logout</span>
+        </a>
+    </div>
+</nav>
 
 @code {
-    // Hier kannst du, falls nötig, Backend-Logik hinzufügen
+    [Parameter] public EventCallback OnNavigated { get; set; }
+
+    private async Task HandleNavigation()
+    {
+        await OnNavigated.InvokeAsync();
+    }
 }
