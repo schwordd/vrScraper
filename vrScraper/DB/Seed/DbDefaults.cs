@@ -77,6 +77,16 @@ namespace vrScraper.DB.Seed
         db.Settings.Add(new Models.DbSetting() { Key = "Site:spankbang.com:MinDuration", Type = "System.String", Value = "660" });
       }
 
+      if (defaultSettings.Exists(a => a.Key == "TagSynonymMap") == false)
+      {
+        db.Settings.Add(new Models.DbSetting() { Key = "TagSynonymMap", Type = "System.String", Value = "{}" });
+      }
+
+      if (defaultSettings.Exists(a => a.Key == "AuthPasswordHash") == false)
+      {
+        db.Settings.Add(new Models.DbSetting() { Key = "AuthPasswordHash", Type = "System.String", Value = "" });
+      }
+
       db.SaveChanges();
     }
     public static void SeedDefaultTabs(VrScraperContext db)

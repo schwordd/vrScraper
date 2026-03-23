@@ -2,6 +2,7 @@ using vrScraper.Controllers.Models.HereSphere;
 using vrScraper.DB;
 using vrScraper.DB.Models;
 using vrScraper.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using vrScraper.Controllers.@base;
@@ -10,6 +11,7 @@ namespace vrScraper.Controllers
 {
   [Route("[controller]")]
   [ApiController]
+  [AllowAnonymous]
   public class HeresphereController(ILogger<HeresphereController> logger, IScraperRegistry scraperRegistry, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
   {
     // Post: <HeresphereController>
@@ -173,7 +175,8 @@ namespace vrScraper.Controllers
         writeFavorite = true,
         writeRating = true,
         writeTags = false,
-        writeHSP = false
+        writeHSP = false,
+        eventServer = $"{BaseUrl}/api/events"
       };
     }
 

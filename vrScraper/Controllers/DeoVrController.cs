@@ -1,6 +1,7 @@
 using vrScraper.DB;
 using vrScraper.DB.Models;
 using vrScraper.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System.Collections.Generic;
@@ -13,6 +14,7 @@ namespace vrScraper.Controllers
 {
   [Route("[controller]")]
   [ApiController]
+  [AllowAnonymous]
   public class DeoVrController(ILogger<DeoVrController> logger, IScraperRegistry scraperRegistry, VrScraperContext context, IVideoService videoService, ISettingService settings, ITabFilteringService tabFilteringService) : VrScraperBaseController
   {
     // GET: <DeoVrController>

@@ -1,0 +1,251 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@layout LoginLayout
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <img class="login-logo" src="logo1.png" alt="VRScraper" />
+            @if (_isLoading)
+            {
+                <p class="login-subtitle">Loading...</p>
+            }
+            else if (!_isSetup)
+            {
+                <h4 class="login-title">Set Password</h4>
+                <p class="login-subtitle">Create a password to protect your VRScraper instance.</p>
+            }
+            else
+            {
+                <h4 class="login-title">Login</h4>
+                <p class="login-subtitle">Enter your password to continue.</p>
+            }
+        </div>
+
+        @if (!_isLoading)
+        {
+            <div class="login-form">
+                @if (!_isSetup)
+                {
+                    <!-- Setup form -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="icon-lock"></i>
+                            Password
+                        </label>
+                        <input type="password" class="form-control" placeholder="Enter password (min. 4 characters)"
+                               @bind="_password" @bind:event="oninput" @onkeydown="HandleKeyDown" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="icon-lock"></i>
+                            Confirm Password
+                        </label>
+                        <input type="password" class="form-control" placeholder="Confirm password"
+                               @bind="_confirmPassword" @bind:event="oninput" @onkeydown="HandleKeyDown" />
+                    </div>
+                    <button class="btn-login" @onclick="DoSetup" disabled="@_submitting">
+                        @if (_submitting)
+                        {
+                            <span>Setting up...</span>
+                        }
+                        else
+                        {
+                            <i class="icon-shield-check"></i>
+                            <span>Set Password</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <!-- Login form -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="icon-lock"></i>
+                            Password
+                        </label>
+                        <input type="password" class="form-control" placeholder="Enter your password"
+                               @bind="_password" @bind:event="oninput" @onkeydown="HandleKeyDown" />
+                    </div>
+                    <button class="btn-login" @onclick="DoLogin" disabled="@_submitting">
+                        @if (_submitting)
+                        {
+                            <span>Logging in...</span>
+                        }
+                        else
+                        {
+                            <i class="icon-log-in"></i>
+                            <span>Login</span>
+                        }
+                    </button>
+                }
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="error-message">
+                        <i class="icon-alert-circle"></i>
+                        @_error
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSetup;
+    private bool _submitting;
+    private string _password = "";
+    private string _confirmPassword = "";
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckStatus();
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CheckStatus()
+    {
+        try
+        {
+            var result = await JS.InvokeAsync<string>("authHelpers.getStatus");
+            if (!string.IsNullOrEmpty(result))
+            {
+                var doc = System.Text.Json.JsonDocument.Parse(result);
+                _isSetup = doc.RootElement.GetProperty("isSetup").GetBoolean();
+                var isAuth = doc.RootElement.GetProperty("isAuthenticated").GetBoolean();
+                if (isAuth)
+                {
+                    Navigation.NavigateTo("/", forceLoad: true);
+                }
+            }
+        }
+        catch
+        {
+            _error = "Failed to check auth status";
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            if (!_isSetup)
+                await DoSetup();
+            else
+                await DoLogin();
+        }
+    }
+
+    private async Task DoSetup()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_password) || _password.Length < 4)
+        {
+            _error = "Password must be at least 4 characters";
+            return;
+        }
+
+        if (_password != _confirmPassword)
+        {
+            _error = "Passwords do not match";
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var payload = System.Text.Json.JsonSerializer.Serialize(new { password = _password });
+            var result = await JS.InvokeAsync<string>("authHelpers.postAuth", "/api/auth/setup", payload);
+
+            var doc = System.Text.Json.JsonDocument.Parse(result);
+            var ok = doc.RootElement.GetProperty("ok").GetBoolean();
+
+            if (ok)
+            {
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                var body = doc.RootElement.GetProperty("body").GetString() ?? "";
+                try
+                {
+                    var bodyDoc = System.Text.Json.JsonDocument.Parse(body);
+                    _error = bodyDoc.RootElement.GetProperty("error").GetString() ?? "Setup failed";
+                }
+                catch
+                {
+                    _error = "Setup failed";
+                }
+            }
+        }
+        catch
+        {
+            _error = "Failed to connect to server";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task DoLogin()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_password))
+        {
+            _error = "Please enter your password";
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var payload = System.Text.Json.JsonSerializer.Serialize(new { password = _password });
+            var result = await JS.InvokeAsync<string>("authHelpers.postAuth", "/api/auth/login", payload);
+
+            var doc = System.Text.Json.JsonDocument.Parse(result);
+            var ok = doc.RootElement.GetProperty("ok").GetBoolean();
+
+            if (ok)
+            {
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                var body = doc.RootElement.GetProperty("body").GetString() ?? "";
+                try
+                {
+                    var bodyDoc = System.Text.Json.JsonDocument.Parse(body);
+                    _error = bodyDoc.RootElement.GetProperty("error").GetString() ?? "Login failed";
+                }
+                catch
+                {
+                    _error = "Login failed";
+                }
+            }
+        }
+        catch
+        {
+            _error = "Failed to connect to server";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

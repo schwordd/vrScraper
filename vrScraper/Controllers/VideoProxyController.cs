@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using vrScraper.DB;
@@ -12,6 +13,7 @@ namespace vrScraper.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class VideoProxyController : ControllerBase
     {
         private readonly ILogger<VideoProxyController> _logger;

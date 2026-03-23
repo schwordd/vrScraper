@@ -1,4 +1,5 @@
 using vrScraper.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 
@@ -6,6 +7,7 @@ namespace vrScraper.Controllers
 {
   [Route("api/[controller]")]
   [ApiController]
+  [AllowAnonymous]
   public class RecommendationController(IVideoService videoService, IRecommendationService recommendationService, ISettingService settingService) : ControllerBase
   {
     [HttpGet("similar/{videoId}")]
