@@ -2,7 +2,7 @@
 
 @using vrScraper.DB.Models
 @using vrScraper.Services
-@using Blzr.BootstrapSelect
+@using vrScraper.Components
 @using System.Text.Json
 
 @inject ITabService TabService
@@ -10,324 +10,356 @@
 @inject IJSRuntime JSRuntime
 @inject IScraperRegistry ScraperRegistry
 
-<h3>Manage Tabs</h3>
+@implements IDisposable
 
-<button class="btn btn-primary btn-sm mb-2" @onclick="AddNewTab">
-    <i class="bi bi-plus-lg"></i> Add new user defined tab
-</button>
-<button class="btn btn-success btn-sm mb-2 ms-2" @onclick="AddNewWatchlist">
-    <i class="bi bi-bookmark-plus"></i> Add new watchlist
-</button>
+<div class="tabs-page">
 
-<div class="row">
-    @if (AvailableTabs != null && AvailableTabs.Any())
-    {
+    <!-- Top Toolbar -->
+    <div class="tabs-toolbar">
+        <h3 class="tabs-title">Manage Tabs</h3>
+        <div class="tabs-toolbar-actions">
+            <button class="vr-btn vr-btn-primary vr-btn-sm" @onclick="AddNewTab">
+                <i class="icon-plus"></i> Add Tab
+            </button>
+            <button class="vr-btn vr-btn-success vr-btn-sm" @onclick="AddNewWatchlist">
+                <i class="icon-bookmark"></i> Add Watchlist
+            </button>
+            <button class="vr-btn vr-btn-secondary vr-btn-sm" @onclick="SaveAllDirty" disabled="@(!HasAnyDirty)">
+                <i class="icon-save"></i> Save All
+            </button>
+        </div>
+    </div>
 
-        bool lastTabWasDefault = true; // Initialzustand annehmen, dass der erste Tab ein DefaultTab sein könnte
-
-        <h5>Default Tabs</h5>
-
-        foreach (var tab in AvailableTabs.Where(t => t.Type != "WATCHLIST").OrderBy(t => t.Order))
-        {
-            // Check for transition from IsDefaultTab == true to false
-            if (lastTabWasDefault && !IsDefaultTab(tab))
+    <!-- Section 1: Default Tabs -->
+    <div class="default-tabs-section">
+        <h5 class="vr-section-title">
+            <i class="icon-lock"></i> Default Tabs
+        </h5>
+        <div class="default-tabs-list">
+            @foreach (var tab in DefaultTabs)
             {
-                // Insert the div here when the transition occurs
-                <div class="w-100 my-2"></div> <!-- New row starts here -->
-
-                <h5>User Defined Tabs</h5>
-            }
-
-            <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
-                <div class="@(IsDefaultTab(tab) ? "card p-2 default" : "card p-2")">
-                    <div class="d-flex justify-content-between align-items-center">
-                        @if (!IsDefaultTab(tab))
+                <div class="default-tab-row">
+                    <span class="default-tab-name">
+                        @if (tab.Name == "Recommended")
                         {
-                            @if (!tab.IsEditing)
-                            {
-                                <div class="d-flex align-items-center">
-                                    <h6 class="card-title card-title-flexible mb-1 me-1">
-                                        @tab.Name
-                                    </h6>
-                                    <button class="btn btn-link btn-sm p-0 ml-1 edit-btn" @onclick="() => StartEditing(tab)">
-                                        <i class="bi bi-pencil edit-icon"></i>
-                                    </button>
-                                </div>
-                            }
-                            else
-                            {
-                                <input type="text" class="form-control form-control-sm ml-auto me-1 tab-name-input" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
-                                <button class="btn btn-sm btn-outline-secondary ml-2 me-1" @onclick="() => StopEditing(tab)">
-                                    <i class="bi bi-check-lg"></i>
-                                </button>
-                            }
+                            <i class="icon-sparkles recommended-icon"></i>
                         }
-                        else
-                        {
-                            <h6 class="card-title card-title-min mb-1">
-                                @if (tab.Name == "Recommended")
+                        @tab.Name
+                    </span>
+                    <label class="vr-switch">
+                        <input type="checkbox" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Section 2: Custom Tabs -->
+    <div class="custom-tabs-section">
+        <h5 class="vr-section-title">
+            <i class="icon-layout-grid"></i> Custom Tabs
+        </h5>
+
+        @if (CustomTabs.Any())
+        {
+            <div class="tab-list" id="custom-tabs-sortable">
+                @foreach (var tab in CustomTabs)
+                {
+                    <div class="tab-card" data-tab-id="@tab.Id">
+                        <div class="tab-card-header">
+                            <div class="drag-handle" title="Drag to reorder">
+                                <i class="icon-grip-vertical"></i>
+                            </div>
+
+                            <div class="tab-card-title-area">
+                                @if (!tab.IsEditing)
                                 {
-                                    <i class="bi bi-stars" title="Algorithm-powered"></i>
+                                    <span class="tab-card-name">@tab.Name</span>
+                                    <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => StartEditing(tab)" title="Edit name">
+                                        <i class="icon-pencil"></i>
+                                    </button>
                                 }
-                                @tab.Name
-                            </h6>
-                        }
-
-                        @if (tab.Type != "DEFAULT")
-                        {
-                            <button class="btn btn-sm btn-outline-danger ml-2" @onclick="() => DeleteTab(tab.Id)">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        }
-                    </div>
-
-                    <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                        <label class="mr-2">Active</label>
-                        <input type="checkbox" class="form-check-input form-check-sm ml-auto" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
-                    </div>
-                    @if (!IsDefaultTab(tab))
-                    {
-                      <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                          <label class="mr-2">Order</label>
-                          <input type="number" min="0" class="form-control form-control-sm input-sm ml-auto order-input" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" disabled="@IsDefaultTab(tab)" />
-                      </div>
-                    }
-
-                    @if (tab.IsEditing)
-                    {
-                        <!-- Tag Whitelist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Include Tags</label>
-                            <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
-                                             TextField="@((item) => item.Name)"
-                                             ValueField="@((item) => item.Name)"
-                                             ShowSearch="true"
-                                             TType="IEnumerable<string>"
-                                             @bind-Value="tab.TagWhitelistList"
-                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
-                        </div>
-
-                        <!-- Tag Blacklist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Exclude Tags</label>
-                            <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
-                                             TextField="@((item) => item.Name)"
-                                             ValueField="@((item) => item.Name)"
-                                             ShowSearch="true"
-                                             TType="IEnumerable<string>"
-                                             @bind-Value="tab.TagBlacklistList"
-                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
-                        </div>
-
-                        <!-- Actress Whitelist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Include Actresses</label>
-                            <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
-                                             TextField="@((item) => item.Name)"
-                                             ValueField="@((item) => item.Name)"
-                                             ShowSearch="true"
-                                             TType="IEnumerable<string>"
-                                             @bind-Value="tab.ActressWhitelistList"
-                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
-                        </div>
-
-                        <!-- Actress Blacklist -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Exclude Actresses</label>
-                            <BootstrapSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
-                                             TextField="@((item) => item.Name)"
-                                             ValueField="@((item) => item.Name)"
-                                             ShowSearch="true"
-                                             TType="IEnumerable<string>"
-                                             @bind-Value="tab.ActressBlacklistList"
-                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
-                        </div>
-
-                        <!-- Site Filter -->
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Sites</label>
-                            <BootstrapSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
-                                             TextField="@((item) => item)"
-                                             ValueField="@((item) => item)"
-                                             ShowSearch="false"
-                                             TType="IEnumerable<string>"
-                                             @bind-Value="tab.SiteFilterList"
-                                             Disabled="@(IsDefaultTab(tab) || tab.IsEditing == false)" />
-                        </div>
-                    }
-                    else if (tab.IsEditing == false && IsDefaultTab(tab) == false)
-                    {
-                        <!-- Tag Whitelist -->
-                        @if (!string.IsNullOrEmpty(tab.TagWhitelistDisplayString))
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Include Tags</label>
-                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagWhitelistDisplayString" />
+                                else
+                                {
+                                    <input type="text" class="form-control form-control-sm tab-name-input" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
+                                    <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => StopEditing(tab)" title="Confirm">
+                                        <i class="icon-check"></i>
+                                    </button>
+                                    <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => CancelEditing(tab)" title="Cancel">
+                                        <i class="icon-x"></i>
+                                    </button>
+                                }
                             </div>
-                        }
 
-                        <!-- Tag Blacklist -->
-                        @if (!string.IsNullOrEmpty(tab.TagBlacklistDisplayString))
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Exclude Tags</label>
-                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.TagBlacklistDisplayString" />
+                            <div class="tab-card-badges">
+                                @{ var tagCount = tab.TagWhitelistList.Count(); }
+                                @{ var exTagCount = tab.TagBlacklistList.Count(); }
+                                @{ var actCount = tab.ActressWhitelistList.Count(); }
+                                @{ var exActCount = tab.ActressBlacklistList.Count(); }
+                                @{ var siteCount = tab.SiteFilterList.Count(); }
+
+                                @if (tagCount > 0)
+                                {
+                                    <span class="filter-badge filter-badge--include">@tagCount Tags</span>
+                                }
+                                @if (exTagCount > 0)
+                                {
+                                    <span class="filter-badge filter-badge--exclude">@exTagCount Excl. Tags</span>
+                                }
+                                @if (actCount > 0)
+                                {
+                                    <span class="filter-badge filter-badge--include">@actCount Actresses</span>
+                                }
+                                @if (exActCount > 0)
+                                {
+                                    <span class="filter-badge filter-badge--exclude">@exActCount Excl. Actresses</span>
+                                }
+                                @if (siteCount > 0)
+                                {
+                                    <span class="filter-badge filter-badge--site">@siteCount Sites</span>
+                                }
                             </div>
-                        }
 
-                        <!-- Actress Whitelist -->
-                        @if (!string.IsNullOrEmpty(tab.ActressWhitelistDisplayString))
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Include Actresses</label>
-                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressWhitelistDisplayString" />
+                            <div class="tab-card-actions">
+                                <label class="vr-switch">
+                                    <input type="checkbox" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
+                                </label>
+                                <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => ToggleFilterPanel(tab)" title="@(IsFilterExpanded(tab) ? "Collapse filters" : "Expand filters")">
+                                    <i class="@(IsFilterExpanded(tab) ? "icon-chevron-up" : "icon-pencil")"></i>
+                                </button>
+                                <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm tab-delete-btn" @onclick="() => DeleteTab(tab.Id)" title="Delete tab">
+                                    <i class="icon-trash-2"></i>
+                                </button>
                             </div>
-                        }
-
-                        <!-- Actress Blacklist -->
-                        @if (!string.IsNullOrEmpty(tab.ActressBlacklistDisplayString))
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Exclude Actresses</label>
-                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.ActressBlacklistDisplayString" />
-                            </div>
-                        }
-
-                        <!-- Site Filter -->
-                        @if (!string.IsNullOrEmpty(tab.SiteFilterDisplayString))
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Sites</label>
-                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.SiteFilterDisplayString" />
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        //nope
-                    }
-
-                    @if (!IsDefaultTab(tab) || tab.IsDirty)
-                    {
-                        <div class="d-flex justify-content-end">
-                            <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
-                                <i class="bi bi-floppy"></i>
-                            </button>
                         </div>
-                    }
-                </div>
-            </div>
 
-            // Update the lastTabWasDefault value for the next iteration
-            lastTabWasDefault = IsDefaultTab(tab);
-        }
-    }
-    else
-    {
-        <p>No tabs available.</p>
-    }
-
-    @{
-        var watchlistTabs = (AvailableTabs ?? new List<DbVrTab>()).Where(t => t.Type == "WATCHLIST").OrderBy(t => t.Order).ToList();
-        if (watchlistTabs.Any())
-        {
-            <div class="w-100 my-2"></div>
-            <h5><i class="bi bi-bookmark"></i> Watchlists</h5>
-
-            foreach (var tab in watchlistTabs)
-            {
-                <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
-                    <div class="card p-2 watchlist-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            @if (!tab.IsEditing)
-                            {
-                                <div class="d-flex align-items-center">
-                                    <h6 class="card-title card-title-flexible mb-1 me-1">
-                                        <i class="bi bi-bookmark-fill watchlist-icon"></i> @tab.Name
-                                    </h6>
-                                    <button class="btn btn-link btn-sm p-0 ml-1 edit-btn" @onclick="() => StartEditing(tab)">
-                                        <i class="bi bi-pencil edit-icon"></i>
+                        @if (IsFilterExpanded(tab))
+                        {
+                            <div class="tab-edit-panel">
+                                <div class="filter-row">
+                                    <label class="filter-label">Include Tags</label>
+                                    <div class="filter-control">
+                                        <MultiSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                                                     TextField="@((item) => item.Name)"
+                                                     ValueField="@((item) => item.Name)"
+                                                     ShowSearch="true"
+                                                     @bind-SelectedValues="tab.TagWhitelistList" />
+                                    </div>
+                                </div>
+                                <div class="filter-row">
+                                    <label class="filter-label">Exclude Tags</label>
+                                    <div class="filter-control">
+                                        <MultiSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+                                                     TextField="@((item) => item.Name)"
+                                                     ValueField="@((item) => item.Name)"
+                                                     ShowSearch="true"
+                                                     @bind-SelectedValues="tab.TagBlacklistList" />
+                                    </div>
+                                </div>
+                                <div class="filter-row">
+                                    <label class="filter-label">Include Actresses</label>
+                                    <div class="filter-control">
+                                        <MultiSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
+                                                     TextField="@((item) => item.Name)"
+                                                     ValueField="@((item) => item.Name)"
+                                                     ShowSearch="true"
+                                                     @bind-SelectedValues="tab.ActressWhitelistList" />
+                                    </div>
+                                </div>
+                                <div class="filter-row">
+                                    <label class="filter-label">Exclude Actresses</label>
+                                    <div class="filter-control">
+                                        <MultiSelect IsMultiple="true" TItem="DbStar" Data="@AvailableActresses"
+                                                     TextField="@((item) => item.Name)"
+                                                     ValueField="@((item) => item.Name)"
+                                                     ShowSearch="true"
+                                                     @bind-SelectedValues="tab.ActressBlacklistList" />
+                                    </div>
+                                </div>
+                                <div class="filter-row">
+                                    <label class="filter-label">Sites</label>
+                                    <div class="filter-control">
+                                        <MultiSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
+                                                     TextField="@((item) => item)"
+                                                     ValueField="@((item) => item)"
+                                                     @bind-SelectedValues="tab.SiteFilterList" />
+                                    </div>
+                                </div>
+                                <div class="filter-actions">
+                                    <button class="vr-btn vr-btn-success vr-btn-sm" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
+                                        <i class="icon-save"></i> Save
                                     </button>
                                 </div>
-                            }
-                            else
-                            {
-                                <input type="text" class="form-control form-control-sm ml-auto me-1 tab-name-input" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
-                                <button class="btn btn-sm btn-outline-secondary ml-2 me-1" @onclick="() => StopEditing(tab)">
-                                    <i class="bi bi-check-lg"></i>
+                            </div>
+                        }
+                        else if (tab.IsDirty)
+                        {
+                            <div class="tab-card-dirty-bar">
+                                <button class="vr-btn vr-btn-success vr-btn-sm" @onclick="() => SaveTab(tab)">
+                                    <i class="icon-save"></i> Save
                                 </button>
-                            }
-                            <button class="btn btn-sm btn-outline-danger ml-2" @onclick="() => DeleteTab(tab.Id)">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Active</label>
-                            <input type="checkbox" class="form-check-input form-check-sm ml-auto" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
-                        </div>
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Order</label>
-                            <input type="number" min="0" class="form-control form-control-sm input-sm ml-auto order-input" value="@tab.Order" @oninput="(e) => OnInputChanged(e, tab, nameof(tab.Order))" />
-                        </div>
-                        <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                            <label class="mr-2">Videos</label>
-                            <span class="badge bg-secondary">@tab.VideoWhitelistList.Count()</span>
-                        </div>
-
-                        @if (tab.IsEditing)
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Sites</label>
-                                <BootstrapSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
-                                                 TextField="@((item) => item)"
-                                                 ValueField="@((item) => item)"
-                                                 ShowSearch="false"
-                                                 TType="IEnumerable<string>"
-                                                 @bind-Value="tab.SiteFilterList"
-                                                 Disabled="@(tab.IsEditing == false)" />
                             </div>
                         }
-                        else if (!string.IsNullOrEmpty(tab.SiteFilterDisplayString))
-                        {
-                            <div class="form-group mb-1 d-flex justify-content-between align-items-center">
-                                <label class="mr-2">Sites</label>
-                                <input type="text" readonly class="form-control fake-select btn btn-light dropdown-toggle" @bind="tab.SiteFilterDisplayString" />
-                            </div>
-                        }
-
-                        <div class="d-flex justify-content-end">
-                            <button class="btn btn-success btn-sm mt-2" @onclick="() => SaveTab(tab)" disabled="@(!tab.IsDirty)">
-                                <i class="bi bi-floppy"></i>
-                            </button>
-                        </div>
                     </div>
-                </div>
-            }
+                }
+            </div>
         }
-    }
+        else
+        {
+            <div class="vr-empty-state">
+                <i class="icon-layout-grid"></i>
+                <p>No custom tabs yet. Click "Add Tab" to create one.</p>
+            </div>
+        }
+    </div>
+
+    <!-- Section 3: Watchlists -->
+    <div class="watchlist-tabs-section">
+        <h5 class="vr-section-title">
+            <i class="icon-bookmark"></i> Watchlists
+        </h5>
+
+        @if (WatchlistTabs.Any())
+        {
+            <div class="tab-list" id="watchlist-tabs-sortable">
+                @foreach (var tab in WatchlistTabs)
+                {
+                    <div class="tab-card tab-card--watchlist" data-tab-id="@tab.Id">
+                        <div class="tab-card-header">
+                            <div class="drag-handle" title="Drag to reorder">
+                                <i class="icon-grip-vertical"></i>
+                            </div>
+
+                            <div class="tab-card-title-area">
+                                @if (!tab.IsEditing)
+                                {
+                                    <i class="icon-bookmark watchlist-title-icon"></i>
+                                    <span class="tab-card-name">@tab.Name</span>
+                                    <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => StartEditing(tab)" title="Edit name">
+                                        <i class="icon-pencil"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <input type="text" class="form-control form-control-sm tab-name-input" @bind="tab.Name" @oninput="() => MarkTabDirty(tab)" />
+                                    <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => StopEditing(tab)" title="Confirm">
+                                        <i class="icon-check"></i>
+                                    </button>
+                                    <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm" @onclick="() => CancelEditing(tab)" title="Cancel">
+                                        <i class="icon-x"></i>
+                                    </button>
+                                }
+                            </div>
+
+                            <div class="tab-card-badges">
+                                @{ var videoCount = tab.VideoWhitelistList.Count(); }
+                                <span class="filter-badge filter-badge--count">
+                                    <i class="icon-film"></i> @videoCount Videos
+                                </span>
+                            </div>
+
+                            <div class="tab-card-actions">
+                                <label class="vr-switch">
+                                    <input type="checkbox" checked="@tab.Active" @onchange="(e) => OnCheckboxChanged(e, tab)" />
+                                </label>
+                                <button class="vr-btn vr-btn-ghost vr-btn-icon vr-btn-sm tab-delete-btn" @onclick="() => DeleteTab(tab.Id)" title="Delete watchlist">
+                                    <i class="icon-trash-2"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (tab.IsDirty)
+                        {
+                            <div class="tab-card-dirty-bar">
+                                <button class="vr-btn vr-btn-success vr-btn-sm" @onclick="() => SaveTab(tab)">
+                                    <i class="icon-save"></i> Save
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="vr-empty-state">
+                <i class="icon-bookmark"></i>
+                <p>No watchlists yet. Click "Add Watchlist" to create one.</p>
+            </div>
+        }
+    </div>
+
 </div>
 
 @code {
-
 
     private List<DbVrTab> AvailableTabs { get; set; } = new();
     private List<DbTag> AvailableTags { get; set; } = new();
     private List<DbStar> AvailableActresses { get; set; } = new();
     private List<string> AvailableSites { get; set; } = new();
     private Dictionary<long, string> _originalNames = new();
+    private HashSet<long> _expandedTabs = new();
+    private DotNetObjectReference<Tabs>? _dotNetRef;
+
+    private IEnumerable<DbVrTab> DefaultTabs => AvailableTabs
+        .Where(t => t.Type == "DEFAULT")
+        .OrderBy(t => t.Order);
+
+    private IEnumerable<DbVrTab> CustomTabs => AvailableTabs
+        .Where(t => t.Type == "CUSTOM")
+        .OrderBy(t => t.Order);
+
+    private IEnumerable<DbVrTab> WatchlistTabs => AvailableTabs
+        .Where(t => t.Type == "WATCHLIST")
+        .OrderBy(t => t.Order);
+
+    private bool HasAnyDirty => AvailableTabs.Any(t => t.IsDirty);
 
     protected override async Task OnInitializedAsync()
     {
         await LoadTabs();
         await LoadTags();
         await LoadActresses();
-        AvailableSites = ScraperRegistry.GetAllSiteNames().ToList();
+        AvailableSites = ScraperRegistry.GetEnabledSiteNames().ToList();
+    }
+
+    private bool _sortableNeedsInit = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        if (_sortableNeedsInit && _dotNetRef != null)
+        {
+            _sortableNeedsInit = false;
+            await JSRuntime.InvokeVoidAsync("tabSortable.init", "custom-tabs-sortable", _dotNetRef);
+            await JSRuntime.InvokeVoidAsync("tabSortable.init", "watchlist-tabs-sortable", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTabOrderChanged(int[] newOrder)
+    {
+        for (int i = 0; i < newOrder.Length; i++)
+        {
+            var tab = AvailableTabs.FirstOrDefault(t => t.Id == newOrder[i]);
+            if (tab != null)
+            {
+                tab.Order = i;
+                tab.IsDirty = true;
+            }
+        }
+        await SaveAllDirty();
+        StateHasChanged();
     }
 
     private async Task LoadTabs()
     {
         AvailableTabs = await this.TabService.GetAllTabs();
+        _sortableNeedsInit = true;
     }
 
     private async Task LoadTags()
@@ -348,7 +380,7 @@
                 Type = "CUSTOM",
                 Active = true,
                 Order = AvailableTabs.Count + 1,
-                TagWhitelist = "[]",  // Leeres JSON-Array
+                TagWhitelist = "[]",
                 ActressWhitelist = "[]",
                 TagBlacklist = "[]",
                 ActressBlacklist = "[]",
@@ -391,6 +423,7 @@
             bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this tab?");
             if (!confirmed) return;
 
+            _expandedTabs.Remove(id);
             await TabService.DeleteTab(id);
             await LoadTabs();
         }
@@ -402,6 +435,16 @@
         tab.IsDirty = false;
         tab.IsEditing = false;
         // Don't call LoadTabs() — the tab is already updated in the singleton cache
+    }
+
+    private async Task SaveAllDirty()
+    {
+        foreach (var tab in AvailableTabs.Where(t => t.IsDirty))
+        {
+            await TabService.UpdateTab(tab);
+            tab.IsDirty = false;
+            tab.IsEditing = false;
+        }
     }
 
     private bool IsDefaultTab(DbVrTab tab)
@@ -448,11 +491,40 @@
 
     private void StopEditing(DbVrTab tab)
     {
+        _originalNames.Remove(tab.Id);
+        tab.IsEditing = false;
+        MarkTabDirty(tab);
+    }
+
+    private void CancelEditing(DbVrTab tab)
+    {
         if (_originalNames.TryGetValue(tab.Id, out var originalName))
         {
             tab.Name = originalName;
             _originalNames.Remove(tab.Id);
         }
         tab.IsEditing = false;
+    }
+
+    private void ToggleFilterPanel(DbVrTab tab)
+    {
+        if (_expandedTabs.Contains(tab.Id))
+        {
+            _expandedTabs.Remove(tab.Id);
+        }
+        else
+        {
+            _expandedTabs.Add(tab.Id);
+        }
+    }
+
+    private bool IsFilterExpanded(DbVrTab tab)
+    {
+        return _expandedTabs.Contains(tab.Id);
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
     }
 }

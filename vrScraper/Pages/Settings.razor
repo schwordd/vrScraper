@@ -3,12 +3,14 @@
 @using System.Text.Json
 @using System.Text.RegularExpressions
 @using vrScraper.DB.Models
-@using Blzr.BootstrapSelect
+@using vrScraper.Components
 @using vrScraper.Services
 
+@using Microsoft.AspNetCore.Identity
 @inject IVideoService VideoService
 @inject ISettingService SettingService
 @inject IScraperRegistry ScraperRegistry
+@inject ITagNormalizationService TagNormalizationService
 
 <h3>Settings</h3>
 
@@ -17,21 +19,20 @@
     <!-- Tag Blacklist Section -->
     <div class="settings-section">
         <h5 class="section-title">
-            <i class="fas fa-ban me-2"></i>
+            <i class="icon-ban me-2"></i>
             Content Filtering
         </h5>
 
         <div class="setting-card">
             <label class="form-label fw-semibold mb-3">
-                <i class="fas fa-filter me-1"></i>
+                <i class="icon-filter me-1"></i>
                 Global Tag Blacklist
             </label>
-            <BootstrapSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
+            <MultiSelect IsMultiple="true" TItem="DbTag" Data="@AvailableTags"
                              TextField="@((item) => item.Name)"
                              ValueField="@((item) => item.Name)"
                              ShowSearch="true"
-                             TType="IEnumerable<string>"
-                             @bind-Value="TagBlacklist" />
+                             @bind-SelectedValues="TagBlacklist" />
             <small class="form-text text-muted mt-2">
                 Select tags that should be filtered out from all video listings and API responses
             </small>
@@ -40,101 +41,172 @@
     </div>
 
     <!-- Per-Site Configuration -->
-    @foreach (var scraper in ScraperRegistry.GetAllScrapers())
-    {
-        var site = scraper.SiteName;
-        <div class="settings-section">
-            <h5 class="section-title">
-                <i class="fas fa-globe me-2"></i>
-                @scraper.DisplayName
-                <span class="badge @(GetSiteSetting(site, "Enabled", site == "eporner.com" ? "true" : "false") == "true" ? "bg-success" : "bg-secondary") ms-2" style="font-size: 11px;">
-                    @(GetSiteSetting(site, "Enabled", site == "eporner.com" ? "true" : "false") == "true" ? "Active" : "Disabled")
-                </span>
-            </h5>
-
-            @{
-                var s = site;
-                var isEnabled = GetSiteSetting(s, "Enabled", s == "eporner.com" ? "true" : "false") == "true";
-                var minDur = GetSiteSetting(s, "MinDuration", "0");
-                var autoEnabled = GetSiteSetting(s, "AutoScrapeEnabled", "false") == "true";
-                var autoTime = GetSiteSetting(s, "AutoScrapeTime", "02:00");
-                var autoMaxPages = GetSiteSetting(s, "AutoScrapeMaxPages", "50");
-            }
-            <div class="settings-grid">
-                <div class="setting-card">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox"
-                               checked="@isEnabled"
-                               @onchange="(e) => OnSiteCheckboxChanged(s, nameof(isEnabled), e)" />
-                        <label class="form-check-label fw-semibold">Enabled</label>
-                    </div>
-                    <small class="text-muted">Show videos from this source</small>
-                </div>
-
-                <div class="setting-card">
-                    <label class="form-label fw-semibold">
-                        <i class="fas fa-hourglass-half me-1"></i>
-                        Min. Duration (seconds)
-                    </label>
-                    <input type="number" class="form-control" min="0" max="3600"
-                           value="@minDur"
-                           @onchange="(e) => OnSiteInputChanged(s, nameof(minDur), e)" />
-                    <small class="text-muted">0 = no filter</small>
-                </div>
-
-                <div class="setting-card">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox"
-                               checked="@autoEnabled"
-                               @onchange="(e) => OnSiteCheckboxChanged(s, nameof(autoEnabled), e)" />
-                        <label class="form-check-label fw-semibold">Auto-Scrape</label>
-                    </div>
-                    <small class="text-muted">Include in daily automated scraping</small>
-                </div>
-
-                <div class="setting-card">
-                    <label class="form-label fw-semibold">
-                        <i class="fas fa-clock me-1"></i>
-                        Scrape Time
-                    </label>
-                    <input type="text" class="form-control" placeholder="HH:MM"
-                           value="@autoTime"
-                           @onchange="(e) => OnSiteTimeChanged(s, e)" />
-                </div>
-
-                <div class="setting-card">
-                    <label class="form-label fw-semibold">
-                        <i class="fas fa-file-alt me-1"></i>
-                        Max Pages
-                    </label>
-                    <input type="number" class="form-control" min="1" max="500"
-                           value="@autoMaxPages"
-                           @onchange="(e) => OnSiteInputChanged(s, nameof(autoMaxPages), e)" />
-                </div>
-            </div>
-        </div>
-    }
-
-    <!-- Recommendations Settings -->
     <div class="settings-section">
         <h5 class="section-title">
-            <i class="fas fa-thumbs-up me-2"></i>
-            Recommendations
+            <i class="icon-globe me-2"></i>
+            Source Sites
+        </h5>
+        <div class="table-responsive">
+            <table class="vr-table">
+                <thead>
+                    <tr>
+                        <th>Site</th>
+                        <th>Enabled</th>
+                        <th>Min Duration</th>
+                        <th>Auto-Scrape</th>
+                        <th>Scrape Time</th>
+                        <th>Max Pages</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var scraper in ScraperRegistry.GetAllScrapers())
+                    {
+                        var s = scraper.SiteName;
+                        var isEnabled = GetSiteSetting(s, "Enabled", s == "eporner.com" ? "true" : "false") == "true";
+                        var minDur = GetSiteSetting(s, "MinDuration", "0");
+                        var autoEnabled = GetSiteSetting(s, "AutoScrapeEnabled", "false") == "true";
+                        var autoTime = GetSiteSetting(s, "AutoScrapeTime", "02:00");
+                        var autoMaxPages = GetSiteSetting(s, "AutoScrapeMaxPages", "50");
+                        <tr class="@(!isEnabled ? "site-disabled" : "")">
+                            <td><span class="fw-semibold">@scraper.DisplayName</span></td>
+                            <td>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" checked="@isEnabled"
+                                           @onchange="(e) => OnSiteCheckboxChanged(s, nameof(isEnabled), e)" />
+                                </div>
+                            </td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm site-input-sm" min="0" max="3600"
+                                       value="@minDur" @onchange="(e) => OnSiteInputChanged(s, nameof(minDur), e)" />
+                            </td>
+                            <td>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" checked="@autoEnabled"
+                                           @onchange="(e) => OnSiteCheckboxChanged(s, nameof(autoEnabled), e)" />
+                                </div>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm site-input-sm" placeholder="HH:MM"
+                                       value="@autoTime" @onchange="(e) => OnSiteTimeChanged(s, e)" />
+                            </td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm site-input-sm" min="1" max="500"
+                                       value="@autoMaxPages" @onchange="(e) => OnSiteInputChanged(s, nameof(autoMaxPages), e)" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tag Synonym Editor -->
+    <div class="settings-section">
+        <h5 class="section-title">
+            <i class="icon-tag me-2"></i>
+            Tag Normalization (Synonyms)
+        </h5>
+        <div class="setting-card">
+            <small class="form-text text-muted mb-3 d-block">
+                Map synonym tags to a canonical name. During scraping, synonyms will be replaced with the canonical tag.
+            </small>
+            @foreach (var entry in _synonymMap)
+            {
+                var canonical = entry.Key;
+                <div class="synonym-row mb-2">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <strong class="text-nowrap">@canonical</strong>
+                        <span class="text-muted">&larr;</span>
+                        <span class="text-muted">@string.Join(", ", entry.Value)</span>
+                        <button class="btn btn-sm btn-outline-danger ms-auto" @onclick="() => RemoveSynonymEntry(canonical)">Remove</button>
+                    </div>
+                </div>
+            }
+            <hr />
+            <div class="d-flex gap-2 align-items-end flex-wrap">
+                <div>
+                    <label class="form-label fw-semibold">Canonical Tag</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_newCanonical" placeholder="e.g. Blonde" />
+                </div>
+                <div>
+                    <label class="form-label fw-semibold">Synonyms (comma-separated)</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_newSynonyms" placeholder="e.g. blond, blondes" />
+                </div>
+                <button class="btn btn-sm btn-primary" @onclick="AddSynonymEntry">Add</button>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveSynonyms">
+                    <i class="icon-save me-1"></i> Save Synonyms
+                </button>
+                <button class="btn btn-warning" @onclick="NormalizeAllTags" disabled="@_normalizing">
+                    @if (_normalizing)
+                    {
+                        <span>Normalizing...</span>
+                    }
+                    else
+                    {
+                        <span>Normalize All Existing Tags</span>
+                    }
+                </button>
+            </div>
+            @if (!string.IsNullOrEmpty(_synonymMessage))
+            {
+                <div class="mt-2 alert @(_synonymSuccess ? "alert-success" : "alert-danger") py-2">
+                    @_synonymMessage
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Change Password Section -->
+    <div class="settings-section">
+        <h5 class="section-title">
+            <i class="icon-lock me-2"></i>
+            Change Password
         </h5>
 
         <div class="settings-grid">
-            <div class="setting-card">
-                <div class="setting-header">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="recommendationsEnabled" @bind="RecommendationsEnabled" />
-                        <label class="form-check-label fw-semibold" for="recommendationsEnabled">
-                            Enable Recommendations
+            <div class="setting-card password-card">
+                <div class="password-form">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="icon-key me-1"></i>
+                            Current Password
                         </label>
+                        <input type="password" class="form-control" @bind="_oldPassword" placeholder="Enter current password" />
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="icon-lock me-1"></i>
+                            New Password
+                        </label>
+                        <input type="password" class="form-control" @bind="_newPassword" placeholder="Enter new password (min. 4 characters)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="icon-lock me-1"></i>
+                            Confirm New Password
+                        </label>
+                        <input type="password" class="form-control" @bind="_confirmNewPassword" placeholder="Confirm new password" />
+                    </div>
+                    <button class="btn btn-primary" @onclick="ChangePassword" disabled="@_changingPassword">
+                        @if (_changingPassword)
+                        {
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <i class="icon-save me-1"></i>
+                            <span>Save Password</span>
+                        }
+                    </button>
+                    @if (!string.IsNullOrEmpty(_passwordMessage))
+                    {
+                        <div class="mt-3 alert @(_passwordSuccess ? "alert-success" : "alert-danger") py-2">
+                            @_passwordMessage
+                        </div>
+                    }
                 </div>
-                <small class="text-muted">
-                    Show a Recommended tab with personalized video suggestions based on your likes and watch history
-                </small>
             </div>
         </div>
     </div>
@@ -149,30 +221,16 @@
     {
         get
         {
-            var s = AllSettings.Single(s => s.Key == "TagBlacklist");
-            return JsonSerializer.Deserialize<List<string>>(s.Value)!;
+            var s = AllSettings.FirstOrDefault(s => s.Key == "TagBlacklist");
+            if (s == null) return Enumerable.Empty<string>();
+            return JsonSerializer.Deserialize<List<string>>(s.Value ?? "[]") ?? new List<string>();
         }
 
         set
         {
-            var s = AllSettings.Single(s => s.Key == "TagBlacklist");
-            s.Value = JsonSerializer.Serialize(value);
-            this.SettingService.UpdateSetting(s);
-        }
-    }
-
-    public bool RecommendationsEnabled
-    {
-        get
-        {
-            var s = AllSettings.FirstOrDefault(s => s.Key == "RecommendationsEnabled");
-            return s != null && bool.TryParse(s.Value, out bool result) && result;
-        }
-        set
-        {
-            var s = AllSettings.FirstOrDefault(s => s.Key == "RecommendationsEnabled");
+            var s = AllSettings.FirstOrDefault(s => s.Key == "TagBlacklist");
             if (s == null) return;
-            s.Value = value.ToString();
+            s.Value = JsonSerializer.Serialize(value);
             this.SettingService.UpdateSetting(s);
         }
     }
@@ -233,6 +291,7 @@
     {
         await LoadTags();
         await LoadSettings();
+        _synonymMap = TagNormalizationService.GetSynonymMap();
     }
 
     private async Task LoadTags()
@@ -243,5 +302,143 @@
     private async Task LoadSettings()
     {
         AllSettings = (await SettingService.GetAllSettings()).ToList();
+    }
+
+    // Synonym editor fields
+    private Dictionary<string, List<string>> _synonymMap = new();
+    private string _newCanonical = "";
+    private string _newSynonyms = "";
+    private bool _normalizing;
+    private string? _synonymMessage;
+    private bool _synonymSuccess;
+
+    private void AddSynonymEntry()
+    {
+        _synonymMessage = null;
+        if (string.IsNullOrWhiteSpace(_newCanonical) || string.IsNullOrWhiteSpace(_newSynonyms)) return;
+        var synonyms = _newSynonyms.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+        if (synonyms.Count == 0) return;
+
+        if (_synonymMap.ContainsKey(_newCanonical))
+        {
+            _synonymMap[_newCanonical] = _synonymMap[_newCanonical].Union(synonyms).ToList();
+        }
+        else
+        {
+            _synonymMap[_newCanonical] = synonyms;
+        }
+        _newCanonical = "";
+        _newSynonyms = "";
+    }
+
+    private void RemoveSynonymEntry(string canonical)
+    {
+        _synonymMap.Remove(canonical);
+    }
+
+    private async Task SaveSynonyms()
+    {
+        _synonymMessage = null;
+        try
+        {
+            await TagNormalizationService.SaveSynonymMap(_synonymMap);
+            _synonymSuccess = true;
+            _synonymMessage = "Synonym map saved successfully.";
+        }
+        catch
+        {
+            _synonymSuccess = false;
+            _synonymMessage = "Error saving synonym map.";
+        }
+    }
+
+    private async Task NormalizeAllTags()
+    {
+        _synonymMessage = null;
+        _normalizing = true;
+        try
+        {
+            await TagNormalizationService.NormalizeAllExistingTags();
+            _synonymSuccess = true;
+            _synonymMessage = "All existing tags normalized.";
+        }
+        catch
+        {
+            _synonymSuccess = false;
+            _synonymMessage = "Error normalizing tags.";
+        }
+        finally
+        {
+            _normalizing = false;
+        }
+    }
+
+    // Password change fields
+    private static readonly PasswordHasher<string> _hasher = new();
+    private string _oldPassword = "";
+    private string _newPassword = "";
+    private string _confirmNewPassword = "";
+    private bool _changingPassword;
+    private string? _passwordMessage;
+    private bool _passwordSuccess;
+
+    private async Task ChangePassword()
+    {
+        _passwordMessage = null;
+        _passwordSuccess = false;
+
+        if (string.IsNullOrWhiteSpace(_oldPassword))
+        {
+            _passwordMessage = "Please enter your current password.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newPassword) || _newPassword.Length < 4)
+        {
+            _passwordMessage = "New password must be at least 4 characters.";
+            return;
+        }
+
+        if (_newPassword != _confirmNewPassword)
+        {
+            _passwordMessage = "New passwords do not match.";
+            return;
+        }
+
+        _changingPassword = true;
+        try
+        {
+            var setting = await SettingService.GetSetting("AuthPasswordHash");
+            var hash = setting?.Value ?? "";
+            if (string.IsNullOrEmpty(hash))
+            {
+                _passwordMessage = "No password set. Please use the initial setup.";
+                return;
+            }
+
+            var result = _hasher.VerifyHashedPassword("admin", hash, _oldPassword);
+            if (result == PasswordVerificationResult.Failed)
+            {
+                _passwordMessage = "Wrong current password.";
+                return;
+            }
+
+            var newHash = _hasher.HashPassword("admin", _newPassword);
+            await SettingService.SaveSetting("AuthPasswordHash", newHash);
+
+            _passwordSuccess = true;
+            _passwordMessage = "Password changed successfully.";
+            _oldPassword = "";
+            _newPassword = "";
+            _confirmNewPassword = "";
+        }
+        catch
+        {
+            _passwordMessage = "An error occurred while changing the password.";
+        }
+        finally
+        {
+            _changingPassword = false;
+        }
     }
 }

@@ -1,0 +1,174 @@
+@typeparam TItem
+
+<div class="multi-select @(IsOpen ? "open" : "") @(Disabled ? "disabled" : "")" @onclick:stopPropagation="true">
+    @if (IsMultiple)
+    {
+        <div class="multi-select-trigger" @onclick="Toggle">
+            @if (SelectedItems.Any())
+            {
+                <div class="multi-select-pills">
+                    @foreach (var item in SelectedItems.Take(MaxVisiblePills))
+                    {
+                        var val = ValueField(item);
+                        <span class="multi-select-pill">
+                            @TextField(item)
+                            @if (!Disabled)
+                            {
+                                <button type="button" class="multi-select-pill-remove" @onclick="() => RemoveItem(val)" @onclick:stopPropagation="true">&times;</button>
+                            }
+                        </span>
+                    }
+                    @if (SelectedItems.Count() > MaxVisiblePills)
+                    {
+                        <span class="multi-select-pill multi-select-pill-more">+@(SelectedItems.Count() - MaxVisiblePills)</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <span class="multi-select-placeholder">@Placeholder</span>
+            }
+            <span class="multi-select-arrow">&#9662;</span>
+        </div>
+    }
+    else
+    {
+        <div class="multi-select-trigger" @onclick="Toggle">
+            @if (!string.IsNullOrEmpty(Value))
+            {
+                var val = Value;
+                var selected = Data?.Cast<object>().FirstOrDefault(item => ValueField((TItem)item) == val);
+                <span class="multi-select-single-value">@(selected != null ? TextField((TItem)selected) : Value)</span>
+            }
+            else
+            {
+                <span class="multi-select-placeholder">@Placeholder</span>
+            }
+            <span class="multi-select-arrow">&#9662;</span>
+        </div>
+    }
+
+    @if (IsOpen)
+    {
+        <div class="multi-select-dropdown">
+            @if (ShowSearch)
+            {
+                <div class="multi-select-search-wrapper">
+                    <input type="text" class="multi-select-search" placeholder="Search..." @bind="SearchTerm" @bind:event="oninput" @ref="SearchInput" />
+                </div>
+            }
+            <div class="multi-select-options">
+                @if (FilteredData != null)
+                {
+                    @foreach (var item in FilteredData)
+                    {
+                        var val = ValueField(item);
+                        var isSelected = IsMultiple ? _selectedValues.Contains(val) : Value == val;
+                        <div class="multi-select-option @(isSelected ? "selected" : "")"
+                             @onclick="() => SelectItem(val)">
+                            @if (IsMultiple)
+                            {
+                                <span class="multi-select-check @(isSelected ? "checked" : "")"></span>
+                            }
+                            <span class="multi-select-option-text">@TextField(item)</span>
+                        </div>
+                    }
+                }
+                @if (FilteredData?.Any() != true)
+                {
+                    <div class="multi-select-empty">No results</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@if (IsOpen)
+{
+    <div class="multi-select-backdrop" @onclick="Close"></div>
+}
+
+@code {
+    [Parameter] public IEnumerable<TItem>? Data { get; set; }
+    [Parameter] public Func<TItem, string> TextField { get; set; } = _ => _?.ToString() ?? "";
+    [Parameter] public Func<TItem, string> ValueField { get; set; } = _ => _?.ToString() ?? "";
+    [Parameter] public bool IsMultiple { get; set; }
+    [Parameter] public bool ShowSearch { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Select...";
+    [Parameter] public int MaxVisiblePills { get; set; } = 5;
+
+    // Multi-select binding
+    [Parameter] public IEnumerable<string>? SelectedValues { get; set; }
+    [Parameter] public EventCallback<IEnumerable<string>> SelectedValuesChanged { get; set; }
+
+    // Single-select binding
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    // Legacy BootstrapSelect compatibility: TType parameter (ignored)
+    [Parameter] public Type? TType { get; set; }
+
+    private bool IsOpen { get; set; }
+    private string SearchTerm { get; set; } = "";
+    private ElementReference SearchInput;
+    private HashSet<string> _selectedValues = new();
+
+    protected override void OnParametersSet()
+    {
+        if (IsMultiple && SelectedValues != null)
+        {
+            _selectedValues = new HashSet<string>(SelectedValues);
+        }
+    }
+
+    private IEnumerable<TItem>? FilteredData =>
+        string.IsNullOrWhiteSpace(SearchTerm)
+            ? Data
+            : Data?.Where(item => TextField(item).Contains(SearchTerm, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<TItem> SelectedItems =>
+        Data?.Where(item => _selectedValues.Contains(ValueField(item))) ?? Enumerable.Empty<TItem>();
+
+    private void Toggle()
+    {
+        if (Disabled) return;
+        IsOpen = !IsOpen;
+        if (!IsOpen) SearchTerm = "";
+    }
+
+    private void Close()
+    {
+        IsOpen = false;
+        SearchTerm = "";
+    }
+
+    private async Task SelectItem(string value)
+    {
+        if (Disabled) return;
+
+        if (IsMultiple)
+        {
+            if (_selectedValues.Contains(value))
+                _selectedValues.Remove(value);
+            else
+                _selectedValues.Add(value);
+
+            var newValues = _selectedValues.ToList().AsEnumerable();
+            await SelectedValuesChanged.InvokeAsync(newValues);
+        }
+        else
+        {
+            Value = value;
+            await ValueChanged.InvokeAsync(value);
+            Close();
+        }
+    }
+
+    private async Task RemoveItem(string value)
+    {
+        if (Disabled) return;
+        _selectedValues.Remove(value);
+        await SelectedValuesChanged.InvokeAsync(_selectedValues.ToList().AsEnumerable());
+    }
+}

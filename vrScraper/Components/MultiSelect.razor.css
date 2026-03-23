@@ -1,0 +1,211 @@
+.multi-select {
+    position: relative;
+    min-width: 180px;
+    font-size: 0.875rem;
+}
+
+.multi-select.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.multi-select-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-md, 6px);
+    background: var(--color-surface, #fff);
+    cursor: pointer;
+    min-height: 38px;
+    transition: border-color 0.15s ease;
+}
+
+.multi-select-trigger:hover {
+    border-color: var(--color-border-strong, #cbd5e1);
+}
+
+.multi-select.open .multi-select-trigger {
+    border-color: var(--color-primary, #d97706);
+    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+}
+
+.multi-select-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1;
+}
+
+.multi-select-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--color-surface-sunken, #f1f5f9);
+    border-radius: var(--radius-full, 9999px);
+    font-size: 0.75rem;
+    color: var(--color-text, #0f172a);
+    line-height: 1.4;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.multi-select-pill-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0 -2px 0 0;
+    font-size: 0.875rem;
+    line-height: 1;
+    color: var(--color-text-muted, #94a3b8);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.multi-select-pill-remove:hover {
+    color: var(--color-danger, #dc2626);
+}
+
+.multi-select-pill-more {
+    background: var(--color-primary, #d97706);
+    color: #fff;
+}
+
+.multi-select-placeholder {
+    color: var(--color-text-muted, #94a3b8);
+    flex: 1;
+}
+
+.multi-select-single-value {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.multi-select-arrow {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #94a3b8);
+    transition: transform 0.15s ease;
+}
+
+.multi-select.open .multi-select-arrow {
+    transform: rotate(180deg);
+}
+
+.multi-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    min-width: 100%;
+    background: var(--color-surface, #fff);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: var(--shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.08));
+    z-index: 1050;
+    max-height: 300px;
+    display: flex;
+    flex-direction: column;
+}
+
+.multi-select-search-wrapper {
+    padding: 8px;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.multi-select-search {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--radius-sm, 4px);
+    font-size: 0.8125rem;
+    outline: none;
+}
+
+.multi-select-search:focus {
+    border-color: var(--color-primary, #d97706);
+}
+
+.multi-select-options {
+    overflow-y: auto;
+    max-height: 250px;
+    padding: 4px;
+}
+
+.multi-select-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.multi-select-option:hover {
+    background: var(--color-surface-sunken, #f1f5f9);
+}
+
+.multi-select-option.selected {
+    background: rgba(217, 119, 6, 0.08);
+    color: var(--color-primary, #d97706);
+    font-weight: 500;
+}
+
+.multi-select-check {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--color-border-strong, #cbd5e1);
+    border-radius: 3px;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.multi-select-check.checked {
+    background: var(--color-primary, #d97706);
+    border-color: var(--color-primary, #d97706);
+}
+
+.multi-select-check.checked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 0;
+    width: 5px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.multi-select-option-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.multi-select-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--color-text-muted, #94a3b8);
+    font-size: 0.8125rem;
+}
+
+.multi-select-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1040;
+}

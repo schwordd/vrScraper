@@ -12,9 +12,8 @@
 @inject IServiceProvider serviceProvider
 @inject IRecommendationService RecommendationService
 @inject IScraperRegistry ScraperRegistry
+@inject NavigationManager NavigationManager
 @implements IAsyncDisposable
-
-@using Blzr.BootstrapSelect
 
 <div class="main-container">
 
@@ -22,7 +21,7 @@
         <div class="filter-row">
             <span class="filter-item">
                 <div class="search-wrapper">
-                    <i class="bi bi-search search-icon"></i>
+                    <i class="icon-search search-icon"></i>
                     <input type="text" class="form-control filter-search" id="search"
                            placeholder="Search title..."
                            @bind="SearchQuery"
@@ -37,6 +36,7 @@
                     <option value="random">Random</option>
                     <option value="playtime">Most played time</option>
                     <option value="playcount">Most played count</option>
+                    <option value="recentlywatched">Recently watched</option>
                     <option value="bestunwatched">Best unwatched</option>
                     <option value="recommended">Recommended</option>
                 </select>
@@ -64,16 +64,15 @@
             <span class="filter-item">
                 <label>Tags:</label>
                 <div class="d-flex align-items-center gap-2">
-                    <BootstrapSelect IsMultiple="true"
+                    <MultiSelect IsMultiple="true"
                                     TItem="(DbTag Tag, long Count)"
                                     Data="@SortedTags"
                                     TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
                                     ValueField="@((item) => item.Tag.Name)"
                                     ShowSearch="true"
-                                    TType="IEnumerable<string>"
-                                    @bind-Value="@SelectedTagValues" />
+                                    @bind-SelectedValues="@SelectedTagValues" />
                     <button class="btn btn-sm btn-clear" @onclick="ClearTags" disabled="@(SelectedTags.Count == 0)" title="Clear tags">
-                        <i class="bi bi-x-lg"></i>
+                        <i class="icon-x"></i>
                     </button>
                 </div>
             </span>
@@ -81,16 +80,15 @@
             <span class="filter-item">
                 <label>Actresses:</label>
                 <div class="d-flex align-items-center gap-2">
-                    <BootstrapSelect IsMultiple="true"
+                    <MultiSelect IsMultiple="true"
                                     TItem="(DbStar Star, long Count)"
                                     Data="@SortedActresses"
                                     TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
                                     ValueField="@((item) => item.Star.Name)"
                                     ShowSearch="true"
-                                    TType="IEnumerable<string>"
-                                    @bind-Value="@SelectedActressesValues" />
+                                    @bind-SelectedValues="@SelectedActressesValues" />
                     <button class="btn btn-sm btn-clear" @onclick="ClearActresses" disabled="@(SelectedActresses.Count == 0)" title="Clear actresses">
-                        <i class="bi bi-x-lg"></i>
+                        <i class="icon-x"></i>
                     </button>
                 </div>
             </span>
@@ -98,19 +96,18 @@
             @if (WatchlistTabs.Any())
             {
                 <span class="filter-item">
-                    <label><i class="bi bi-bookmark"></i> Watchlist:</label>
-                    <BootstrapSelect TItem="DbVrTab"
+                    <label><i class="icon-bookmark"></i> Watchlist:</label>
+                    <MultiSelect TItem="DbVrTab"
                                     Data="@WatchlistTabs"
                                     TextField="@((item) => item.Name)"
                                     ValueField="@((item) => item.Id.ToString())"
-                                    TType="string"
                                     @bind-Value="@SelectedWatchlistValue" />
                     @if (_selectedWatchlistId > 0)
                     {
                         <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success" : "btn-outline-success")"
                                 @onclick="() => ToggleShowOnlyWatchlist()"
                                 title="Nur Watchlist-Videos anzeigen">
-                            <i class="bi bi-funnel-fill"></i>
+                            <i class="icon-filter"></i>
                         </button>
                     }
                 </span>
@@ -121,16 +118,25 @@
                 <span class="filter-item">
                     <label>Site:</label>
                     <div class="d-flex align-items-center gap-2">
-                        <BootstrapSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
+                        <MultiSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
                                         TextField="@((item) => item)" ValueField="@((item) => item)"
-                                        ShowSearch="false" TType="IEnumerable<string>"
-                                        @bind-Value="@SelectedSitesValues" />
+                                        @bind-SelectedValues="@SelectedSitesValues" />
                         <button class="btn btn-sm btn-clear" @onclick="ClearSites" disabled="@(_selectedSites.Count == 0)" title="Clear sites">
-                            <i class="bi bi-x-lg"></i>
+                            <i class="icon-x"></i>
                         </button>
                     </div>
                 </span>
             }
+
+            <span class="filter-item">
+                <label>Duration:</label>
+                <div class="d-flex align-items-center gap-1">
+                    <input type="number" class="form-control form-control-sm filter-duration" min="0" placeholder="Min" @bind="MinDurationMinutes" />
+                    <span>-</span>
+                    <input type="number" class="form-control form-control-sm filter-duration" min="0" placeholder="Max" @bind="MaxDurationMinutes" />
+                    <span class="text-muted" style="font-size:12px">min</span>
+                </div>
+            </span>
         </div>
     </div>
 
@@ -139,86 +145,95 @@
                IsFirstPage="IsFirstPage" IsLastPage="IsLastPage"
                OnPageChanged="GoToPage" OnPageSizeChanged="PageSizeChanged" />
 
-        <div class="video-gallery">
-            @foreach (var item in PagedItems)
-            {
-                <div class="video-item">
-                    <div class="thumbnail-container @(item.IsThumbnailNotAvailable == true ? "not-available" : "")"
-                         @onclick="(async () => { if (item.IsThumbnailNotAvailable != true) await PlayVideo(item); })">
-                        @{
-                            if (string.IsNullOrEmpty(item.Thumbnail))
-                            {
-                                item.IsThumbnailNotAvailable = true;
+        @if (_isLoading)
+        {
+            <div class="video-gallery">
+                <SkeletonCard Count="@PageSize" />
+            </div>
+        }
+        else
+        {
+            <div class="video-gallery">
+                @foreach (var item in PagedItems)
+                {
+                    <div class="video-item">
+                        <div class="thumbnail-container @(item.IsThumbnailNotAvailable == true ? "not-available" : "")"
+                             @onclick="(async () => { if (item.IsThumbnailNotAvailable != true) await PlayVideo(item); })">
+                            @{
+                                if (string.IsNullOrEmpty(item.Thumbnail))
+                                {
+                                    item.IsThumbnailNotAvailable = true;
+                                }
                             }
-                        }
-                        <img src="@(string.IsNullOrEmpty(item.Thumbnail) ? "/images/thumbnail-not-available.svg" : item.Thumbnail)"
-                             alt="@item.Title"
-                             @onerror="e => HandleImageError(e, item)" />
-                        @if (item.IsThumbnailNotAvailable != true)
+                            <img src="@(string.IsNullOrEmpty(item.Thumbnail) ? "/images/thumbnail-not-available.svg" : item.Thumbnail)"
+                                 alt="@item.Title"
+                                 @onerror="e => HandleImageError(e, item)" />
+                            @if (item.IsThumbnailNotAvailable != true)
+                            {
+                                <div class="play-overlay">
+                                    <i class="icon-play-circle"></i>
+                                </div>
+                            }
+                            <div class="duration-badge">@FormatDuration(item.Duration)</div>
+                            <div class="thumbnail-overlay">
+                                <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
+                                    <i class="icon-trash-2"></i>
+                                </button>
+                                <button class="btn btn-info btn-sm similar-btn" @onclick:stopPropagation="true" @onclick="() => ShowSimilar(item)" title="Find similar videos">
+                                    <i class="icon-sparkles"></i>
+                                </button>
+                                <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => DownloadVideo(item)" title="Download video">
+                                    <i class="icon-download"></i>
+                                </button>
+                            </div>
+                            <div class="like-btn-container">
+                                <button class="like-btn @(item.Liked ? "liked" : "not-liked")"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => ToggleLike(item)"
+                                        title="@(item.Liked ? "Entfernen von Favoriten" : "Zu Favoriten hinzufügen")">
+                                    <i class="icon-heart"></i>
+                                </button>
+                                <span class="play-count" title="Anzahl der Wiedergaben">
+                                    <i class="icon-play"></i>
+                                    @item.PlayCount
+                                </span>
+                            </div>
+                            <div class="watchlist-btn-container @(_selectedWatchlistId > 0 ? "visible" : "")">
+                                <button class="watchlist-btn @(IsInSelectedWatchlist(item.Id) ? "in-watchlist" : "not-in-watchlist")"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => ToggleWatchlist(item.Id)"
+                                        title="@(IsInSelectedWatchlist(item.Id) ? "Aus Watchlist entfernen" : "Zur Watchlist hinzufügen")">
+                                    <i class="icon-bookmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <h3>@item.Title</h3>
+                        @if (item.Stars != null && item.Stars.Any())
                         {
-                            <div class="play-overlay">
-                                <i class="bi bi-play-circle-fill"></i>
+                            <div class="star-container">
+                                @foreach (var starInfo in item.Stars)
+                                {
+                                    <button type="button" class="btn btn-primary star-pill" @onclick="() => AddStarFilter(starInfo.Name)">
+                                        <i class="icon-user"></i> @starInfo.Name
+                                    </button>
+                                }
                             </div>
                         }
-                        <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.75);color:white;font-size:11px;font-weight:600;padding:1px 5px;border-radius:3px;z-index:3;pointer-events:none" class="duration-badge">@FormatDuration(item.Duration)</div>
-                        <div class="thumbnail-overlay">
-                            <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                            <button class="btn btn-info btn-sm similar-btn" @onclick:stopPropagation="true" @onclick="() => ShowSimilar(item)" title="Find similar videos">
-                                <i class="bi bi-stars"></i>
-                            </button>
-                            <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => DownloadVideo(item)" title="Download video">
-                                <i class="bi bi-download"></i>
-                            </button>
-                        </div>
-                        <div class="like-btn-container">
-                            <button class="like-btn @(item.Liked ? "liked" : "not-liked")"
-                                    @onclick:stopPropagation="true"
-                                    @onclick="() => ToggleLike(item)"
-                                    title="@(item.Liked ? "Entfernen von Favoriten" : "Zu Favoriten hinzufügen")">
-                                <i class="bi bi-heart-fill"></i>
-                            </button>
-                            <span class="play-count" title="Anzahl der Wiedergaben">
-                                <i class="bi bi-play-fill"></i>
-                                @item.PlayCount
-                            </span>
-                        </div>
-                        <div class="watchlist-btn-container @(_selectedWatchlistId > 0 ? "visible" : "")">
-                            <button class="watchlist-btn @(IsInSelectedWatchlist(item.Id) ? "in-watchlist" : "not-in-watchlist")"
-                                    @onclick:stopPropagation="true"
-                                    @onclick="() => ToggleWatchlist(item.Id)"
-                                    title="@(IsInSelectedWatchlist(item.Id) ? "Aus Watchlist entfernen" : "Zur Watchlist hinzufügen")">
-                                <i class="bi @(IsInSelectedWatchlist(item.Id) ? "bi-bookmark-fill" : "bi-bookmark")"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <h3>@item.Title</h3>
-                    @if (item.Stars != null && item.Stars.Any())
-                    {
-                        <div class="star-container">
-                            @foreach (var starInfo in item.Stars)
+                        <div class="tag-container">
+                            @if (item.Tags != null)
                             {
-                                <button type="button" class="btn btn-primary star-pill" @onclick="() => AddStarFilter(starInfo.Name)">
-                                    <i class="bi bi-person-fill"></i> @starInfo.Name
-                                </button>
+                                @foreach (var tagInfo in item.Tags)
+                                {
+                                    <button type="button" class="btn btn-primary tag-pill" @onclick="() => AddTagFilter(tagInfo.Name)">
+                                        @tagInfo.Name
+                                    </button>
+                                }
                             }
                         </div>
-                    }
-                    <div class="tag-container">
-                        @if (item.Tags != null)
-                        {
-                            @foreach (var tagInfo in item.Tags)
-                            {
-                                <button type="button" class="btn btn-primary tag-pill" @onclick="() => AddTagFilter(tagInfo.Name)">
-                                    @tagInfo.Name
-                                </button>
-                            }
-                        }
                     </div>
-                </div>
-            }
-        </div>
+                }
+            </div>
+        }
 
         <Pager CurrentPage="CurrentPage" TotalPages="TotalPages" PageSize="PageSize"
                IsFirstPage="IsFirstPage" IsLastPage="IsLastPage"
@@ -230,9 +245,9 @@
 {
     <div class="similar-panel">
         <div class="similar-header">
-            <h5><i class="bi bi-stars"></i> Similar to: @_similarToTitle</h5>
+            <h5><i class="icon-sparkles"></i> Similar to: @_similarToTitle</h5>
             <button class="btn btn-sm btn-outline-secondary" @onclick="CloseSimilar">
-                <i class="bi bi-x-lg"></i>
+                <i class="icon-x"></i>
             </button>
         </div>
         <div class="video-gallery">
@@ -246,19 +261,19 @@
                         @if (item.IsThumbnailNotAvailable != true)
                         {
                             <div class="play-overlay">
-                                <i class="bi bi-play-circle-fill"></i>
+                                <i class="icon-play-circle"></i>
                             </div>
                         }
-                        <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.75);color:white;font-size:11px;font-weight:600;padding:1px 5px;border-radius:3px;z-index:3;pointer-events:none" class="duration-badge">@FormatDuration(item.Duration)</div>
+                        <div class="duration-badge">@FormatDuration(item.Duration)</div>
                         <div class="thumbnail-overlay">
                             <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => DeleteVideo(item.Id)" title="Delete video">
-                                <i class="bi bi-trash"></i>
+                                <i class="icon-trash-2"></i>
                             </button>
                             <button class="btn btn-info btn-sm similar-btn" @onclick:stopPropagation="true" @onclick="() => ShowSimilar(item)" title="Find similar videos">
-                                <i class="bi bi-stars"></i>
+                                <i class="icon-sparkles"></i>
                             </button>
                             <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => DownloadVideo(item)" title="Download video">
-                                <i class="bi bi-download"></i>
+                                <i class="icon-download"></i>
                             </button>
                         </div>
                         <div class="like-btn-container">
@@ -266,10 +281,10 @@
                                     @onclick:stopPropagation="true"
                                     @onclick="() => ToggleLike(item)"
                                     title="@(item.Liked ? "Entfernen von Favoriten" : "Zu Favoriten hinzufügen")">
-                                <i class="bi bi-heart-fill"></i>
+                                <i class="icon-heart"></i>
                             </button>
                             <span class="play-count" title="Anzahl der Wiedergaben">
-                                <i class="bi bi-play-fill"></i>
+                                <i class="icon-play"></i>
                                 @item.PlayCount
                             </span>
                         </div>
@@ -278,7 +293,7 @@
                                     @onclick:stopPropagation="true"
                                     @onclick="() => ToggleWatchlist(item.Id)"
                                     title="@(IsInSelectedWatchlist(item.Id) ? "Aus Watchlist entfernen" : "Zur Watchlist hinzufügen")">
-                                <i class="bi @(IsInSelectedWatchlist(item.Id) ? "bi-bookmark-fill" : "bi-bookmark")"></i>
+                                <i class="icon-bookmark"></i>
                             </button>
                         </div>
                     </div>
@@ -289,7 +304,7 @@
                             @foreach (var starInfo in item.Stars)
                             {
                                 <button type="button" class="btn btn-primary star-pill" @onclick="() => AddStarFilter(starInfo.Name)">
-                                    <i class="bi bi-person-fill"></i> @starInfo.Name
+                                    <i class="icon-user"></i> @starInfo.Name
                                 </button>
                             }
                         </div>
@@ -315,6 +330,14 @@
 <VideoPlayer @ref="VideoPlayerComponent" OnClose="HandlePlayerClosed" />
 
 @code {
+
+    private bool _isLoading = true;
+
+    private int _minDurationMinutes = 0;
+    private int _maxDurationMinutes = 0;
+
+    public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); } }
+    public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); } }
 
     public List<string> _selectedTags = new List<string>();
     public IEnumerable<string> SelectedTagValues
@@ -366,6 +389,7 @@
                 _searchQuery = value;
                 CurrentPage = 1;
                 _cachedRandomItems = null;
+                SyncUrlState();
             }
         }
     }
@@ -386,8 +410,9 @@
             if (_showOnlyLiked != value)
             {
                 _showOnlyLiked = value;
-                CurrentPage = 1; // Reset page on filter change
-                _cachedRandomItems = null; // Clear cache on filter change
+                CurrentPage = 1;
+                _cachedRandomItems = null;
+                SyncUrlState();
             }
         }
     }
@@ -400,8 +425,9 @@
             if (_showOnlyUnwatched != value)
             {
                 _showOnlyUnwatched = value;
-                CurrentPage = 1; // Reset page on filter change
-                _cachedRandomItems = null; // Clear cache on filter change
+                CurrentPage = 1;
+                _cachedRandomItems = null;
+                SyncUrlState();
             }
         }
     }
@@ -414,8 +440,9 @@
             if (_showOnlyWithErrors != value)
             {
                 _showOnlyWithErrors = value;
-                CurrentPage = 1; // Reset page on filter change
-                _cachedRandomItems = null; // Clear cache on filter change
+                CurrentPage = 1;
+                _cachedRandomItems = null;
+                SyncUrlState();
             }
         }
     }
@@ -442,6 +469,7 @@
                     _lastRandomSeed = Guid.NewGuid().ToString();
                     _cachedRandomItems = null;
                 }
+                SyncUrlState();
             }
         }
     }
@@ -475,7 +503,9 @@
                         (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
                         (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) &&
                         (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
-                        (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))));
+                        (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))) &&
+                        (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
+                        (_maxDurationMinutes <= 0 || v.Duration.TotalMinutes <= _maxDurationMinutes));
 
             // Apply sorting
             List<DbVideoItem> sortedItems;
@@ -524,6 +554,7 @@
                         "rating" => v.SiteRating ?? 0,
                         "playtime" => v.PlayDurationEst.TotalSeconds,
                         "playcount" => v.PlayCount,
+                        "recentlywatched" => (double)(v.LastPlayedUtc?.Ticks ?? 0),
                         _ => (double)v.Id
                     })
                     .ToList();
@@ -568,7 +599,7 @@
     public IEnumerable<string> SelectedSitesValues
     {
         get => _selectedSites;
-        set { _selectedSites = value.ToList(); CurrentPage = 1; _cachedRandomItems = null; }
+        set { _selectedSites = value.ToList(); CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); }
     }
     private void ClearSites() { SelectedSitesValues = new List<string>(); }
 
@@ -654,7 +685,9 @@
         await LoadTags();
         await LoadActresses();
         WatchlistTabs = TabService.GetWatchlistTabs();
-        AvailableSites = ScraperRegistry.GetAllSiteNames().ToList();
+        AvailableSites = ScraperRegistry.GetEnabledSiteNames().ToList();
+        RestoreFiltersFromUrl();
+        _isLoading = false;
     }
 
     private async Task LoadVideos()
@@ -677,15 +710,17 @@
     private void OnTagsChanged(IEnumerable<string> e)
     {
         SelectedTags = e.ToHashSet();
-        CurrentPage = 1; // Reset page on filter change
-        _cachedRandomItems = null; // Clear cache on filter change
+        CurrentPage = 1;
+        _cachedRandomItems = null;
+        SyncUrlState();
     }
 
     private void OnActressesChanged(IEnumerable<string> e)
     {
         SelectedActresses = e.ToHashSet();
-        CurrentPage = 1; // Reset page on filter change
-        _cachedRandomItems = null; // Clear cache on filter change
+        CurrentPage = 1;
+        _cachedRandomItems = null;
+        SyncUrlState();
     }
 
     private void PageSizeChanged(int newSize)
@@ -772,6 +807,7 @@
         if (page >= 1 && page <= TotalPages)
         {
             CurrentPage = page;
+            SyncUrlState();
         }
     }
 
@@ -895,5 +931,60 @@
             // Circuit already disconnected, ignore
         }
         _dotNetRef?.Dispose();
+    }
+
+    // --- URL Sync ---
+    private bool _suppressUrlSync = false;
+
+    private void RestoreFiltersFromUrl()
+    {
+        _suppressUrlSync = true;
+        try
+        {
+            var uri = new Uri(NavigationManager.Uri);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+            if (query.TryGetValue("q", out var q)) _searchQuery = q.ToString();
+            if (query.TryGetValue("sort", out var sort)) _currentSortOption = sort.ToString();
+            if (query.TryGetValue("tags", out var tags) && !string.IsNullOrEmpty(tags))
+                _selectedTags = tags.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            if (query.TryGetValue("actresses", out var actresses) && !string.IsNullOrEmpty(actresses))
+                _selectedActresses = actresses.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            if (query.TryGetValue("sites", out var sites) && !string.IsNullOrEmpty(sites))
+                _selectedSites = sites.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+            if (query.TryGetValue("liked", out var liked)) _showOnlyLiked = liked == "1";
+            if (query.TryGetValue("unwatched", out var unwatched)) _showOnlyUnwatched = unwatched == "1";
+            if (query.TryGetValue("errors", out var errors)) _showOnlyWithErrors = errors == "1";
+            if (query.TryGetValue("page", out var page) && int.TryParse(page, out var p)) CurrentPage = p;
+            if (query.TryGetValue("pageSize", out var ps) && int.TryParse(ps, out var psi)) PageSize = psi;
+            if (query.TryGetValue("minDur", out var minD) && int.TryParse(minD, out var minDi)) _minDurationMinutes = minDi;
+            if (query.TryGetValue("maxDur", out var maxD) && int.TryParse(maxD, out var maxDi)) _maxDurationMinutes = maxDi;
+        }
+        finally
+        {
+            _suppressUrlSync = false;
+        }
+    }
+
+    private void SyncUrlState()
+    {
+        if (_suppressUrlSync) return;
+
+        var queryParams = new Dictionary<string, string?>();
+        if (!string.IsNullOrEmpty(_searchQuery)) queryParams["q"] = _searchQuery;
+        if (_currentSortOption != "latest") queryParams["sort"] = _currentSortOption;
+        if (_selectedTags.Any()) queryParams["tags"] = string.Join(",", _selectedTags);
+        if (_selectedActresses.Any()) queryParams["actresses"] = string.Join(",", _selectedActresses);
+        if (_selectedSites.Any()) queryParams["sites"] = string.Join(",", _selectedSites);
+        if (_showOnlyLiked) queryParams["liked"] = "1";
+        if (_showOnlyUnwatched) queryParams["unwatched"] = "1";
+        if (_showOnlyWithErrors) queryParams["errors"] = "1";
+        if (CurrentPage > 1) queryParams["page"] = CurrentPage.ToString();
+        if (PageSize != 30) queryParams["pageSize"] = PageSize.ToString();
+        if (_minDurationMinutes > 0) queryParams["minDur"] = _minDurationMinutes.ToString();
+        if (_maxDurationMinutes > 0) queryParams["maxDur"] = _maxDurationMinutes.ToString();
+
+        var url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/videos", queryParams);
+        NavigationManager.NavigateTo(url, replace: true, forceLoad: false);
     }
 }
