@@ -1,0 +1,95 @@
+@using System.Globalization
+
+<div class="pie-chart-wrapper">
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <h5 class="pie-chart-title">@Title</h5>
+    }
+
+    @if (Total > 0)
+    {
+        <svg viewBox="0 0 200 200" class="pie-chart-svg">
+            @if (Slices.Count == 1)
+            {
+                <circle cx="100" cy="100" r="70"
+                        fill="none"
+                        stroke="@Slices[0].Color"
+                        stroke-width="30" />
+            }
+            else
+            {
+                @foreach (var slice in Slices)
+                {
+                    <path d="@DescribeArc(100, 100, 70, slice.StartAngle, slice.EndAngle)"
+                          fill="none"
+                          stroke="@slice.Color"
+                          stroke-width="30"
+                          stroke-linecap="butt" />
+                }
+            }
+            <text x="100" y="96"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  class="pie-chart-center-value">@Total</text>
+            <text x="100" y="114"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  class="pie-chart-center-label">total</text>
+        </svg>
+
+        <div class="pie-chart-legend">
+            @foreach (var slice in Slices)
+            {
+                <div class="legend-item">
+                    <span class="legend-dot" style="background-color: @slice.Color;"></span>
+                    <span class="legend-label">@slice.Label</span>
+                    <span class="legend-value">@slice.Value</span>
+                    <span class="legend-percent">(@((100.0 * slice.Value / Total).ToString("F1", CultureInfo.InvariantCulture))%)</span>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="pie-chart-empty">No data available</div>
+    }
+</div>
+
+@code {
+    [Parameter] public Dictionary<string, int> Data { get; set; } = new();
+    [Parameter] public Dictionary<string, string> Colors { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "";
+
+    private int Total => Data.Values.Sum();
+
+    private List<SliceData> Slices => GetSlices().ToList();
+
+    private record SliceData(string Label, int Value, string Color, double StartAngle, double EndAngle);
+
+    private IEnumerable<SliceData> GetSlices()
+    {
+        double currentAngle = 0;
+        foreach (var kvp in Data.Where(d => d.Value > 0))
+        {
+            var fraction = (double)kvp.Value / Total;
+            var angle = fraction * 360;
+            var color = Colors.GetValueOrDefault(kvp.Key, "#94a3b8");
+            yield return new SliceData(kvp.Key, kvp.Value, color, currentAngle, currentAngle + angle);
+            currentAngle += angle;
+        }
+    }
+
+    private string DescribeArc(double cx, double cy, double r, double startAngle, double endAngle)
+    {
+        var start = PolarToCartesian(cx, cy, r, endAngle);
+        var end = PolarToCartesian(cx, cy, r, startAngle);
+        var largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+        return $"M {start.x.ToString(CultureInfo.InvariantCulture)} {start.y.ToString(CultureInfo.InvariantCulture)} A {r.ToString(CultureInfo.InvariantCulture)} {r.ToString(CultureInfo.InvariantCulture)} 0 {largeArcFlag} 0 {end.x.ToString(CultureInfo.InvariantCulture)} {end.y.ToString(CultureInfo.InvariantCulture)}";
+    }
+
+    private (double x, double y) PolarToCartesian(double cx, double cy, double r, double angleDeg)
+    {
+        var angleRad = (angleDeg - 90) * Math.PI / 180.0;
+        return (cx + r * Math.Cos(angleRad), cy + r * Math.Sin(angleRad));
+    }
+}

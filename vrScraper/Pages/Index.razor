@@ -3,8 +3,8 @@
 @using vrScraper.Components
 @using vrScraper.DB.Models
 @using vrScraper.Services
-@inject IEpornerScraper Scraper
 @inject IVideoService VideoService
+@inject IScrapeLogService ScrapeLogService
 
 <h3>Home</h3>
 
@@ -18,43 +18,134 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6">
-        <TagOverview />
-    </div>
-    <div class="col-md-6">
-        <ActorOverview />
-    </div>
-</div>
-
-<div class="stats-section mt-4">
-    <div class="stats-grid">
-        <div class="stat-card">
+<div class="dashboard-overview">
+    <div class="stats-col">
+        <div class="stat-item">
             <div class="stat-value">@TotalVideos</div>
             <div class="stat-label">Total Videos</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-item">
             <div class="stat-value">@WatchedVideos</div>
             <div class="stat-label">Watched</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-item">
             <div class="stat-value">@UnwatchedVideos</div>
             <div class="stat-label">Unwatched</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-item">
             <div class="stat-value">@TotalWatchTime</div>
-            <div class="stat-label">Total Watch Time</div>
+            <div class="stat-label">Watch Time</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-item">
             <div class="stat-value">@LikedVideos</div>
-            <div class="stat-label">Liked Videos</div>
+            <div class="stat-label">Liked</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-item">
             <div class="stat-value">@AverageRating</div>
             <div class="stat-label">Avg. Rating</div>
         </div>
     </div>
+    <div class="chart-col">
+        <PieChart Title="Videos by Source"
+                  Data="@_sourceDistribution"
+                  Colors="@_sourceColors" />
+    </div>
 </div>
+
+<div class="collapsible-section">
+    <h5 class="collapsible-header" @onclick="() => _tasteOpen = !_tasteOpen">
+        <i class="@(_tasteOpen ? "icon-chevron-down" : "icon-chevron-right")"></i>
+        Taste Profile
+    </h5>
+    @if (_tasteOpen)
+    {
+        <TasteProfile />
+    }
+</div>
+
+<div class="collapsible-section">
+    <h5 class="collapsible-header" @onclick="() => _leaderboardOpen = !_leaderboardOpen">
+        <i class="@(_leaderboardOpen ? "icon-chevron-down" : "icon-chevron-right")"></i>
+        Actress Leaderboard
+    </h5>
+    @if (_leaderboardOpen)
+    {
+        <ActressLeaderboard />
+    }
+</div>
+
+<div class="row mt-0 g-2">
+    <div class="col-md-6">
+        <div class="collapsible-section">
+            <h5 class="collapsible-header" @onclick="() => _tagsOpen = !_tagsOpen">
+                <i class="@(_tagsOpen ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                Tags
+            </h5>
+            @if (_tagsOpen)
+            {
+                <TagOverview />
+            }
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="collapsible-section">
+            <h5 class="collapsible-header" @onclick="() => _actorsOpen = !_actorsOpen">
+                <i class="@(_actorsOpen ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                Actresses
+            </h5>
+            @if (_actorsOpen)
+            {
+                <ActorOverview />
+            }
+        </div>
+    </div>
+</div>
+
+@if (_recentLogs.Count > 0)
+{
+    <div class="collapsible-section">
+        <h5 class="collapsible-header" @onclick="() => _scrapeLogOpen = !_scrapeLogOpen">
+            <i class="@(_scrapeLogOpen ? "icon-chevron-down" : "icon-chevron-right")"></i>
+            Recent Scraping Runs
+        </h5>
+        @if (_scrapeLogOpen)
+        {
+            <div class="table-responsive">
+                <table class="scrape-log-table">
+                    <thead>
+                        <tr>
+                            <th>Site</th>
+                            <th>Trigger</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Pages</th>
+                            <th>New</th>
+                            <th>Dupes</th>
+                            <th>Errors</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in _recentLogs)
+                        {
+                            <tr>
+                                <td>@log.Site</td>
+                                <td>@log.TriggerType</td>
+                                <td>@log.StartedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@FormatLogDuration(log)</td>
+                                <td>@log.PagesScraped</td>
+                                <td>@log.NewVideos</td>
+                                <td>@log.DuplicatesSkipped</td>
+                                <td>@log.Errors</td>
+                                <td><span class="log-status log-status-@log.Status.ToLowerInvariant()">@log.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
 
 @code {
     private int TotalVideos;
@@ -63,6 +154,21 @@
     private string TotalWatchTime = "0h 0m";
     private int LikedVideos;
     private string AverageRating = "N/A";
+
+    private List<DbScrapeLog> _recentLogs = new();
+    private bool _tasteOpen = false;
+    private bool _leaderboardOpen = false;
+    private bool _scrapeLogOpen = false;
+    private bool _tagsOpen = false;
+    private bool _actorsOpen = false;
+
+    private Dictionary<string, int> _sourceDistribution = new();
+    private Dictionary<string, string> _sourceColors = new()
+    {
+        { "eporner.com", "#d97706" },
+        { "xhamster.com", "#0284c7" },
+        { "spankbang.com", "#e11d48" }
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,11 +184,25 @@
         var totalMinutes = totalDuration.Minutes;
         TotalWatchTime = $"{totalHours}h {totalMinutes}m";
 
+        _sourceDistribution = videos.GroupBy(v => v.Site ?? "unknown")
+            .ToDictionary(g => g.Key, g => g.Count());
+
         var rated = videos.Where(v => v.SiteRating.HasValue && v.SiteRating.Value > 0).ToList();
         if (rated.Any())
         {
             var averageRating = rated.Average(v => v.SiteRating!.Value);
             AverageRating = $"{(averageRating * 5).ToString("F1")} / 5";
         }
+
+        _recentLogs = await ScrapeLogService.GetRecentLogs(10);
+    }
+
+    private static string FormatLogDuration(DbScrapeLog log)
+    {
+        if (!log.FinishedUtc.HasValue) return "...";
+        var d = log.FinishedUtc.Value - log.StartedUtc;
+        if (d.TotalHours >= 1) return $"{(int)d.TotalHours}h {d.Minutes}m";
+        if (d.TotalMinutes >= 1) return $"{(int)d.TotalMinutes}m {d.Seconds}s";
+        return $"{(int)d.TotalSeconds}s";
     }
 }
