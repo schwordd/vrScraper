@@ -1,0 +1,115 @@
+@using vrScraper.DB.Models
+@using vrScraper.Services
+@inject IVideoService VideoService
+
+<div class="leaderboard">
+    <h5 class="leaderboard-title">Actress Leaderboard</h5>
+    @if (_rows.Count == 0)
+    {
+        <p class="text-muted">No data yet</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th class="@SortClass("Name")" @onclick='() => ToggleSort("Name")'>Actress</th>
+                        <th class="@SortClass("Videos")" @onclick='() => ToggleSort("Videos")'>Videos</th>
+                        <th class="@SortClass("Watched")" @onclick='() => ToggleSort("Watched")'>Watched</th>
+                        <th class="@SortClass("Liked")" @onclick='() => ToggleSort("Liked")'>Liked</th>
+                        <th class="@SortClass("LikeRate")" @onclick='() => ToggleSort("LikeRate")'>Like %</th>
+                        <th class="@SortClass("AvgRating")" @onclick='() => ToggleSort("AvgRating")'>Avg Rating</th>
+                        <th class="@SortClass("WatchTime")" @onclick='() => ToggleSort("WatchTime")'>Watch Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in GetSortedRows())
+                    {
+                        <tr>
+                            <td class="fw-semibold">@row.Name</td>
+                            <td>@row.Videos</td>
+                            <td>@row.Watched</td>
+                            <td>@row.Liked</td>
+                            <td>@row.LikeRate.ToString("F0")%</td>
+                            <td>@(row.AvgRating > 0 ? row.AvgRating.ToString("F1") : "-")</td>
+                            <td>@FormatTime(row.WatchTime)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ActressRow> _rows = new();
+    private string _sortCol = "Videos";
+    private bool _sortAsc = false;
+
+    private record ActressRow(string Name, int Videos, int Watched, int Liked, double LikeRate, double AvgRating, TimeSpan WatchTime);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allVideos = await VideoService.GetVideoItems();
+
+        _rows = allVideos
+            .Where(v => v.Stars != null)
+            .SelectMany(v => v.Stars.Select(s => (Star: s.Name, Video: v)))
+            .GroupBy(x => x.Star)
+            .Select(g =>
+            {
+                var videos = g.Select(x => x.Video).ToList();
+                var watched = videos.Count(v => v.PlayCount > 0);
+                var liked = videos.Count(v => v.Liked);
+                var likeRate = videos.Count > 0 ? (double)liked / videos.Count * 100 : 0;
+                var rated = videos.Where(v => (v.LocalRating ?? v.SiteRating) > 0).ToList();
+                var avgRating = rated.Count > 0 ? rated.Average(v => (v.LocalRating ?? v.SiteRating ?? 0) * 5) : 0;
+                var watchTime = TimeSpan.FromTicks(videos.Sum(v => v.PlayDurationEst.Ticks));
+                return new ActressRow(g.Key, videos.Count, watched, liked, likeRate, avgRating, watchTime);
+            })
+            .ToList();
+    }
+
+    private void ToggleSort(string col)
+    {
+        if (_sortCol == col)
+            _sortAsc = !_sortAsc;
+        else
+        {
+            _sortCol = col;
+            _sortAsc = false;
+        }
+    }
+
+    private string SortClass(string col)
+    {
+        if (_sortCol != col) return "sortable";
+        return _sortAsc ? "sortable sort-asc" : "sortable sort-desc";
+    }
+
+    private List<ActressRow> GetSortedRows()
+    {
+        IEnumerable<ActressRow> sorted = _sortCol switch
+        {
+            "Name" => _sortAsc ? _rows.OrderBy(r => r.Name) : _rows.OrderByDescending(r => r.Name),
+            "Videos" => _sortAsc ? _rows.OrderBy(r => r.Videos) : _rows.OrderByDescending(r => r.Videos),
+            "Watched" => _sortAsc ? _rows.OrderBy(r => r.Watched) : _rows.OrderByDescending(r => r.Watched),
+            "Liked" => _sortAsc ? _rows.OrderBy(r => r.Liked) : _rows.OrderByDescending(r => r.Liked),
+            "LikeRate" => _sortAsc ? _rows.OrderBy(r => r.LikeRate) : _rows.OrderByDescending(r => r.LikeRate),
+            "AvgRating" => _sortAsc ? _rows.OrderBy(r => r.AvgRating) : _rows.OrderByDescending(r => r.AvgRating),
+            "WatchTime" => _sortAsc ? _rows.OrderBy(r => r.WatchTime) : _rows.OrderByDescending(r => r.WatchTime),
+            _ => _rows.OrderByDescending(r => r.Videos)
+        };
+        return sorted.Take(25).ToList();
+    }
+
+    private static string FormatTime(TimeSpan ts)
+    {
+        if (ts.TotalHours >= 1)
+            return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        if (ts.TotalMinutes >= 1)
+            return $"{(int)ts.TotalMinutes}m";
+        return "0m";
+    }
+}
