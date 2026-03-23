@@ -1,0 +1,108 @@
+@using vrScraper.DB.Models
+@using vrScraper.Services
+@inject IVideoService VideoService
+@inject IRecommendationService RecommendationService
+
+<div class="taste-columns">
+    <div class="taste-col">
+        <h6 class="taste-col-title">Top Tags</h6>
+        @if (_topTags.Count == 0)
+        {
+            <p class="text-muted">No data yet</p>
+        }
+        else
+        {
+            @foreach (var t in _topTags)
+            {
+                <div class="taste-bar-row">
+                    <span class="taste-label" title="@t.Name">@t.Name</span>
+                    <div class="taste-bar-track">
+                        <div class="taste-bar-fill taste-bar-tag" style="width: @(t.Pct.ToString("F0"))%"></div>
+                    </div>
+                    <div class="taste-stats">
+                        <span title="Videos">@t.Videos</span>
+                        <span title="Watched" class="stat-watched">@t.Watched</span>
+                        <span title="Liked" class="stat-liked">@t.Liked</span>
+                        <span title="Like Rate">@(t.LikeRate.ToString("F0"))%</span>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+    <div class="taste-col">
+        <h6 class="taste-col-title">Top Actresses</h6>
+        @if (_topStars.Count == 0)
+        {
+            <p class="text-muted">No data yet</p>
+        }
+        else
+        {
+            @foreach (var s in _topStars)
+            {
+                <div class="taste-bar-row">
+                    <span class="taste-label" title="@s.Name">@s.Name</span>
+                    <div class="taste-bar-track">
+                        <div class="taste-bar-fill taste-bar-star" style="width: @(s.Pct.ToString("F0"))%"></div>
+                    </div>
+                    <div class="taste-stats">
+                        <span title="Videos">@s.Videos</span>
+                        <span title="Watched" class="stat-watched">@s.Watched</span>
+                        <span title="Liked" class="stat-liked">@s.Liked</span>
+                        <span title="Watch Time">@FormatTime(s.WatchTime)</span>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private record TagRow(string Name, double Pct, int Videos, int Watched, int Liked, double LikeRate);
+    private record StarRow(string Name, double Pct, int Videos, int Watched, int Liked, TimeSpan WatchTime);
+
+    private List<TagRow> _topTags = new();
+    private List<StarRow> _topStars = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var videos = await VideoService.GetVideoItems();
+        var (tagAffinities, starAffinities) = RecommendationService.GetAffinities(videos);
+
+        // Build tag stats
+        var tagMax = tagAffinities.Values.Any() ? tagAffinities.Values.Max() : 1;
+        _topTags = tagAffinities
+            .OrderByDescending(kv => kv.Value)
+            .Take(10)
+            .Select(kv =>
+            {
+                var tagVideos = videos.Where(v => v.Tags.Any(t => t.Name == kv.Key)).ToList();
+                var watched = tagVideos.Count(v => v.PlayCount > 0);
+                var liked = tagVideos.Count(v => v.Liked);
+                var likeRate = tagVideos.Count > 0 ? (double)liked / tagVideos.Count * 100 : 0;
+                return new TagRow(kv.Key, kv.Value / tagMax * 100, tagVideos.Count, watched, liked, likeRate);
+            })
+            .ToList();
+
+        // Build star stats
+        var starMax = starAffinities.Values.Any() ? starAffinities.Values.Max() : 1;
+        _topStars = starAffinities
+            .OrderByDescending(kv => kv.Value)
+            .Take(10)
+            .Select(kv =>
+            {
+                var starVideos = videos.Where(v => v.Stars.Any(s => s.Name == kv.Key)).ToList();
+                var watched = starVideos.Count(v => v.PlayCount > 0);
+                var liked = starVideos.Count(v => v.Liked);
+                var watchTime = TimeSpan.FromTicks(starVideos.Sum(v => v.PlayDurationEst.Ticks));
+                return new StarRow(kv.Key, kv.Value / starMax * 100, starVideos.Count, watched, liked, watchTime);
+            })
+            .ToList();
+    }
+
+    private static string FormatTime(TimeSpan t)
+    {
+        if (t.TotalHours >= 1) return $"{(int)t.TotalHours}h";
+        if (t.TotalMinutes >= 1) return $"{(int)t.TotalMinutes}m";
+        return "0m";
+    }
+}

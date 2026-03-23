@@ -11,25 +11,22 @@ namespace vrScraper.Services
       _logger = logger;
     }
 
-    public List<DbVideoItem> GetRecommendedVideos(List<DbVideoItem> allItems, int limit = 500)
+    public (Dictionary<string, double> TagAffinities, Dictionary<string, double> StarAffinities) GetAffinities(List<DbVideoItem> allItems)
     {
       // Step 1: Find signal videos
       var signalVideos = allItems
         .Where(v => v.Liked || v.PlayCount >= 2 || v.PlayDurationEst > TimeSpan.FromMinutes(2))
         .ToList();
 
-      if (signalVideos.Count == 0)
-      {
-        _logger.LogDebug("No signal videos found, returning empty recommendations");
-        return new List<DbVideoItem>();
-      }
-
-      _logger.LogDebug("Found {Count} signal videos for recommendation", signalVideos.Count);
-
-      // Step 2: Build tag affinity
       var tagAffinity = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
       var starAffinity = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
 
+      if (signalVideos.Count == 0)
+      {
+        return (tagAffinity, starAffinity);
+      }
+
+      // Step 2: Build tag/star affinity
       foreach (var video in signalVideos)
       {
         double weight = video.Liked ? 2.0 : 1.0;
@@ -92,6 +89,22 @@ namespace vrScraper.Services
         if (starCounts.TryGetValue(key, out int count) && count > 0)
           starAffinity[key] *= Math.Log(totalVideos / count);
       }
+
+      return (tagAffinity, starAffinity);
+    }
+
+    public List<DbVideoItem> GetRecommendedVideos(List<DbVideoItem> allItems, int limit = 500)
+    {
+      var (tagAffinity, starAffinity) = GetAffinities(allItems);
+
+      if (tagAffinity.Count == 0 && starAffinity.Count == 0)
+      {
+        _logger.LogDebug("No signal videos found, returning empty recommendations");
+        return new List<DbVideoItem>();
+      }
+
+      _logger.LogDebug("Computing recommendations from {TagCount} tag affinities, {StarCount} star affinities",
+        tagAffinity.Count, starAffinity.Count);
 
       // Step 3: Score each candidate video (exclude disliked)
       var scored = new List<(DbVideoItem Video, double Score)>();

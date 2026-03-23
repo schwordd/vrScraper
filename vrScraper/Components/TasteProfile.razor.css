@@ -1,0 +1,80 @@
+.taste-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.taste-col-title {
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.taste-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+
+.taste-label {
+    flex: 0 0 90px;
+    font-size: var(--text-xs, 0.75rem);
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.taste-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--color-surface-sunken);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    min-width: 40px;
+}
+
+.taste-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width var(--transition-slow);
+}
+
+.taste-bar-tag {
+    background: var(--color-primary);
+}
+
+.taste-bar-star {
+    background: var(--color-info);
+}
+
+.taste-stats {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+}
+
+.taste-stats span {
+    min-width: 20px;
+    text-align: right;
+}
+
+.stat-watched {
+    color: var(--color-info);
+}
+
+.stat-liked {
+    color: var(--color-liked);
+}
+
+@media (max-width: 768px) {
+    .taste-columns {
+        grid-template-columns: 1fr;
+    }
+}
