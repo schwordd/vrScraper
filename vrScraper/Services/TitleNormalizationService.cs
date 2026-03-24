@@ -895,7 +895,7 @@ namespace vrScraper.Services
         .ToList();
     }
 
-    public async Task<int> NormalizeAllTitles(bool forceReprocess = false, NormalizationProgress? progress = null)
+    public async Task<int> NormalizeAllTitles(bool forceReprocess = false, bool normalizeTitles = true, bool detectStars = true, bool detectTags = true, NormalizationProgress? progress = null)
     {
       var allVideos = await videoService.GetVideoItems();
 
@@ -904,14 +904,19 @@ namespace vrScraper.Services
         .Where(v => IsObfuscated(v.Title) && (forceReprocess || string.IsNullOrEmpty(v.NormalizedTitle)))
         .ToList();
 
-      // Phase 2: All non-obfuscated videos — try star/tag detection from original title
-      var nonObfuscatedIds = new HashSet<long>(obfuscated.Select(v => v.Id));
-      var withoutStarsOrTags = allVideos
-        .Where(v => !nonObfuscatedIds.Contains(v.Id)
-          && ((v.Stars == null || v.Stars.Count == 0) || (v.Tags == null || v.Tags.Count == 0)))
-        .ToList();
+      // Phase 2: Non-obfuscated videos without stars/tags (only if detection is enabled)
+      var withoutStarsOrTags = new List<DbVideoItem>();
+      if (detectStars || detectTags)
+      {
+        var nonObfuscatedIds = new HashSet<long>(obfuscated.Select(v => v.Id));
+        withoutStarsOrTags = allVideos
+          .Where(v => !nonObfuscatedIds.Contains(v.Id)
+            && ((detectStars && (v.Stars == null || v.Stars.Count == 0))
+             || (detectTags && (v.Tags == null || v.Tags.Count == 0))))
+          .ToList();
+      }
 
-      var toProcess = obfuscated.Concat(withoutStarsOrTags).ToList();
+      var toProcess = normalizeTitles ? obfuscated.Concat(withoutStarsOrTags).ToList() : withoutStarsOrTags;
 
       if (toProcess.Count == 0)
       {
@@ -931,8 +936,8 @@ namespace vrScraper.Services
 
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-      var allStars = await context.Stars.Include(s => s.Videos).ToListAsync();
-      var allTags = await context.Tags.Include(t => t.Videos).ToListAsync();
+      var allStars = detectStars ? await context.Stars.Include(s => s.Videos).ToListAsync() : [];
+      var allTags = detectTags ? await context.Tags.Include(t => t.Videos).ToListAsync() : [];
 
       int processed = 0;
       int starsDetected = 0;
@@ -961,7 +966,7 @@ namespace vrScraper.Services
           string? normalizedTitle = null;
           string titleForDetection;
 
-          if (isObf)
+          if (isObf && normalizeTitles)
           {
             normalizedTitle = NormalizeTitle(video.Title);
             titleForDetection = normalizedTitle;
@@ -971,14 +976,18 @@ namespace vrScraper.Services
             titleForDetection = video.Title;
           }
 
-          var detectedStars = DetectStars(titleForDetection, starList)
-            .Where(d => d.Confidence >= 0.7)
-            .Select(d => (d.Star.Id, d.Confidence))
-            .ToList();
+          var detectedStars = detectStars
+            ? DetectStars(titleForDetection, starList)
+                .Where(d => d.Confidence >= 0.7)
+                .Select(d => (d.Star.Id, d.Confidence))
+                .ToList()
+            : [];
 
-          var detectedTagIds = DetectTags(titleForDetection, tagList)
-            .Select(t => t.Id)
-            .ToList();
+          var detectedTagIds = detectTags
+            ? DetectTags(titleForDetection, tagList)
+                .Select(t => t.Id)
+                .ToList()
+            : new List<long>();
 
           results.Add((video.Id, isObf, normalizedTitle, titleForDetection, detectedStars, detectedTagIds));
 

@@ -56,10 +56,22 @@
                 </div>
                 <div class="action-controls">
                     <label class="form-check">
+                        <input type="checkbox" class="form-check-input" @bind="_normTitles" />
+                        <span class="form-check-label">Titles</span>
+                    </label>
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check-input" @bind="_normStars" />
+                        <span class="form-check-label">Stars</span>
+                    </label>
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check-input" @bind="_normTags" />
+                        <span class="form-check-label">Tags</span>
+                    </label>
+                    <label class="form-check">
                         <input type="checkbox" class="form-check-input" @bind="_forceReprocess" />
                         <span class="form-check-label">Force reprocess</span>
                     </label>
-                    <button class="btn btn-primary" @onclick="RunNormalization" disabled="@_normRunning">
+                    <button class="btn btn-primary" @onclick="RunNormalization" disabled="@(_normRunning || (!_normTitles && !_normStars && !_normTags))">
                         @if (_normRunning)
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
@@ -175,6 +187,9 @@
 
 @code {
     private bool _forceReprocess;
+    private bool _normTitles = true;
+    private bool _normStars;
+    private bool _normTags;
 
     // Normalization state
     private bool _normRunning;
@@ -247,7 +262,7 @@
 
         try
         {
-            var count = await TitleNormService.NormalizeAllTitles(_forceReprocess, _normProgress);
+            var count = await TitleNormService.NormalizeAllTitles(_forceReprocess, _normTitles, _normStars, _normTags, _normProgress);
             _normResult = $"Done! Processed {count} videos. " +
                 $"Decoded {_normProgress.TitlesNormalized} titles, " +
                 $"detected {_normProgress.StarsDetected} stars, " +

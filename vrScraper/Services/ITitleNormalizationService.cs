@@ -18,6 +18,6 @@ namespace vrScraper.Services
     bool IsObfuscated(string title);
     List<(DbStar Star, double Confidence)> DetectStars(string normalizedTitle, List<DbStar> knownStars);
     List<DbTag> DetectTags(string normalizedTitle, List<DbTag> knownTags);
-    Task<int> NormalizeAllTitles(bool forceReprocess = false, NormalizationProgress? progress = null);
+    Task<int> NormalizeAllTitles(bool forceReprocess = false, bool normalizeTitles = true, bool detectStars = true, bool detectTags = true, NormalizationProgress? progress = null);
   }
 }
