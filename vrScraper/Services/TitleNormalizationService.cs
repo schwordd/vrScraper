@@ -227,13 +227,13 @@ namespace vrScraper.Services
       // More CJK from DB
       map['\u30E2'] = 'E'; // モ→? not quite
 
-      // Upside-down characters
+      // Upside-down characters (individual char mapping — reversal handled in NormalizeUnicode)
       map['\u01DD'] = 'e'; // ǝ
       map['\u0279'] = 'r'; // ɹ
       map['\u0131'] = 'i'; // ı (dotless i)
       map['\u0250'] = 'a'; // ɐ
       map['\u0254'] = 'c'; // ɔ (open o, used as c)
-      map['\u025F'] = 'j'; // ɟ
+      map['\u025F'] = 'f'; // ɟ (looks like f upside down, used as f)
       map['\u0265'] = 'h'; // ɥ
       map['\u026F'] = 'm'; // ɯ
       map['\u0270'] = 'w'; // ɰ
@@ -241,7 +241,160 @@ namespace vrScraper.Services
       map['\u028C'] = 'v'; // ʌ
       map['\u028D'] = 'w'; // ʍ
       map['\u028E'] = 'y'; // ʎ
-      // U+0070 is ASCII 'p' — no mapping needed
+      map['\u0285'] = 'l'; // ʅ (squat reversed esh, used as l)
+      map['\u029E'] = 'k'; // ʞ
+      map['\u0253'] = 'b'; // ɓ (used as b upside down)
+      map['\u1D09'] = 'i'; // ᴉ (turned i)
+      map['\u0183'] = 'b'; // ƃ
+      map['\uA72D'] = 'd'; // ꜭ (turned D variant)
+      map['\uA4F7'] = 'd'; // ꓷ (turned D — actual codepoint in DB data)
+      map['\uA7B0'] = 'K'; // Ꝁ
+      map['\uA4D8'] = 'K'; // ꓘ (turned K)
+      map['\uA4E9'] = 'Z'; // ꓩ (turned Z)
+      map['\u0222'] = 'S'; // Ȣ→S? (Շ is Armenian)
+      map['\u0547'] = '2'; // Շ (Armenian Sha, used as flipped 2)
+
+      // Currency/Stroke letter confusables (from actual DB data)
+      map['\u20B3'] = 'A'; // ₳
+      map['\u0244'] = 'U'; // Ʉ
+      map['\u20B4'] = 'S'; // ₴
+      map['\u20AE'] = 'T'; // ₮
+      map['\u20B1'] = 'P'; // ₱
+      map['\u20B5'] = 'C'; // ₵
+      map['\u20A3'] = 'F'; // ₣
+      map['\u20A5'] = 'M'; // ₥
+      map['\u2C67'] = 'H'; // Ⱨ
+      map['\u2C68'] = 'h'; // ⱨ
+      map['\u024E'] = 'Y'; // Ɏ
+      map['\u2C60'] = 'L'; // Ⱡ
+      map['\u2C61'] = 'l'; // ⱡ
+      map['\u0110'] = 'D'; // Đ
+      map['\u0111'] = 'd'; // đ
+      map['\u0246'] = 'E'; // Ɇ
+      map['\u0247'] = 'e'; // ɇ
+      map['\u024C'] = 'R'; // Ɽ
+      map['\u024D'] = 'r'; // ɽ
+      map['\u2C64'] = 'R'; // Ɽ (alternate)
+      map['\u019E'] = 'n'; // ƞ
+      map['\u2C66'] = 't'; // ⱦ
+      map['\u0142'] = 'l'; // ł
+      map['\u0141'] = 'L'; // Ł
+      map['\u00D8'] = 'O'; // Ø
+      map['\u00F8'] = 'o'; // ø
+      map['\u0E3F'] = 'B'; // ฿ (Thai Baht, used as B)
+      map['\u20B2'] = 'G'; // ₲
+      map['\u20A0'] = 'E'; // ₠→CE? just E
+      map['\u20A7'] = 'P'; // ₧ (Peseta)
+
+      // Latin Extended-B confusables
+      map['\u0189'] = 'D'; // Ɖ (African D)
+      map['\u018E'] = 'E'; // Ǝ (reversed E)
+      map['\u018F'] = 'E'; // Ə (Schwa, used as E)
+      map['\u0186'] = 'C'; // Ɔ (Open O, used as C)
+      map['\u0190'] = 'E'; // Ɛ (Open E)
+      map['\u0191'] = 'F'; // Ƒ
+      map['\u0193'] = 'G'; // Ɠ
+      map['\u0197'] = 'I'; // Ɨ
+      map['\u019C'] = 'M'; // Ɯ (turned M)
+      map['\u019D'] = 'N'; // Ɲ
+      map['\u01A4'] = 'P'; // Ƥ
+      map['\u01AC'] = 'T'; // Ƭ
+      map['\u01B2'] = 'V'; // Ʋ
+      map['\u0224'] = 'Z'; // Ȥ
+      map['\u0187'] = 'C'; // Ƈ
+      map['\u0198'] = 'K'; // Ƙ
+      map['\u01A0'] = 'O'; // Ơ
+      map['\u01AF'] = 'U'; // Ư
+      map['\u018C'] = 'd'; // ƌ (d with topbar)
+      map['\u0192'] = 'f'; // ƒ (f with hook)
+      map['\u025D'] = 'e'; // ɝ (reversed open e)
+      map['\u0277'] = 'w'; // ɷ (closed omega, used as w)
+
+      // Hebrew used as Latin look-alikes
+      map['\u05E0'] = 'j'; // נ (nun → visually used as j in obfuscated text)
+      map['\u05D5'] = 'u'; // ו (vav)
+
+      // More Greek/Coptic confusables
+      map['\u03C9'] = 'w'; // ω (omega)
+      map['\u03B6'] = 'z'; // ζ (zeta)
+      map['\u03C4'] = 't'; // τ (tau)
+      map['\u03BD'] = 'v'; // ν (nu → v)
+      map['\u03BA'] = 'k'; // κ (kappa)
+      map['\u03C1'] = 'p'; // ρ (rho → p)
+      map['\u03B7'] = 'n'; // η (eta → n)
+      map['\u03C6'] = 'f'; // φ (phi → f)
+
+      // Latin Extended Additional
+      map['\u0219'] = 's'; // ș (s with comma below)
+      map['\u021B'] = 't'; // ț (t with comma below)
+      map['\u1E63'] = 's'; // ṣ
+      map['\u1E6D'] = 't'; // ṭ
+
+      // CJK used as Latin look-alikes (more from DB)
+      map['\u3007'] = 'O'; // 〇 (ideographic zero → O)
+      map['\u5200'] = 'D'; // 刀 (knife → D)
+      map['\u4E39'] = 'A'; // 丹 → A
+      map['\uAAB6'] = 'l'; // ꪶ (Tai Viet → l)
+
+      // Combining/modifier letters that should just be stripped
+      // (handled by the "strip unknown" logic)
+
+      // Armenian additional
+      map['\u054A'] = 'P'; // Պ → P
+
+      // More Cyrillic confusables (used in mixed-script obfuscation)
+      map['\u0454'] = 'e'; // є (Cyrillic ie)
+      map['\u0455'] = 's'; // ѕ (Cyrillic dze)
+      map['\u0432'] = 'b'; // в (Cyrillic ve → used as b visually)
+      map['\u0456'] = 'i'; // і (Cyrillic i)
+      map['\u0457'] = 'i'; // ї (Cyrillic yi)
+      map['\u0442'] = 't'; // т (Cyrillic te)
+      map['\u043D'] = 'n'; // н (Cyrillic en)
+      map['\u0448'] = 'w'; // ш (Cyrillic sha → w)
+      map['\u043C'] = 'm'; // м (Cyrillic em)
+      map['\u043A'] = 'k'; // к (Cyrillic ka)
+      map['\u0440'] = 'r'; // р (Cyrillic er → was mapped to p, but visually used as r too)
+
+      // Cent/currency signs used as letters
+      map['\u00A2'] = 'c'; // ¢ → c
+
+      // Latin Extended-A common diacritics (FormKD fails under InvariantGlobalization)
+      map['\u010E'] = 'D'; // Ď
+      map['\u010F'] = 'd'; // ď
+      map['\u0164'] = 'T'; // Ť
+      map['\u0165'] = 't'; // ť
+      map['\u0174'] = 'W'; // Ŵ
+      map['\u0175'] = 'w'; // ŵ
+      map['\u0159'] = 'r'; // ř
+      map['\u0158'] = 'R'; // Ř
+      map['\u0155'] = 'r'; // ŕ
+      map['\u0154'] = 'R'; // Ŕ
+      map['\u0117'] = 'e'; // ė
+      map['\u0116'] = 'E'; // Ė
+      map['\u015F'] = 's'; // ş
+      map['\u015E'] = 'S'; // Ş
+      map['\u011F'] = 'g'; // ğ
+      map['\u011E'] = 'G'; // Ğ
+      map['\u0148'] = 'n'; // ň
+      map['\u0147'] = 'N'; // Ň
+      map['\u013E'] = 'l'; // ľ
+      map['\u013D'] = 'L'; // Ľ
+      map['\u017E'] = 'z'; // ž
+      map['\u017D'] = 'Z'; // Ž
+      map['\u0161'] = 's'; // š
+      map['\u0160'] = 'S'; // Š
+      map['\u010D'] = 'c'; // č
+      map['\u010C'] = 'C'; // Č
+      map['\u0144'] = 'n'; // ń
+      map['\u0143'] = 'N'; // Ń
+      map['\u024E'] = 'Y'; // Ɏ
+      map['\u024F'] = 'y'; // ɏ
+      map['\u0186'] = 'C'; // Ɔ (Open O → used as C)
+      map['\u01B2'] = 'V'; // Ʋ
+      map['\u0166'] = 'T'; // Ŧ
+      map['\u0167'] = 't'; // ŧ
+      map['\u0126'] = 'H'; // Ħ
+      map['\u20A6'] = 'N'; // ₦ (Naira → N)
 
       // Greek confusables
       map['\u0391'] = 'A'; // Α
@@ -424,6 +577,20 @@ namespace vrScraper.Services
       // Old Italic 𐌵 U+10335 → u (seen in DB for "pussy")
       map[0x10335] = 'u';
 
+      // Enclosed Alphanumeric Supplement (emoji-style letters)
+      // Squared Latin Capital Letters: 🄰-🅉 U+1F130-1F149
+      for (int i = 0; i < 26; i++)
+        map[0x1F130 + i] = (char)('A' + i);
+      // Negative Circled Latin Capital Letters: 🅐-🅩 U+1F150-1F169
+      for (int i = 0; i < 26; i++)
+        map[0x1F150 + i] = (char)('A' + i);
+      // Negative Squared Latin Capital Letters: 🅰-🆉 U+1F170-1F189
+      for (int i = 0; i < 26; i++)
+        map[0x1F170 + i] = (char)('A' + i);
+      // Regional Indicator Symbols: 🇦-🇿 U+1F1E6-1F1FF (used in flag emoji but also as letters)
+      for (int i = 0; i < 26; i++)
+        map[0x1F1E6 + i] = (char)('A' + i);
+
       return map;
     }
 
@@ -442,6 +609,30 @@ namespace vrScraper.Services
       ['!'] = 'i',
       ['9'] = 'g',
     };
+
+    // Characters that are upside-down versions of Latin letters — words made of these need reversing
+    private static readonly HashSet<char> UpsideDownChars =
+    [
+      '\u0250', // ɐ→a
+      '\u01DD', // ǝ→e
+      '\u0279', // ɹ→r
+      '\u0265', // ɥ→h
+      '\u026F', // ɯ→m
+      '\u0287', // ʇ→t
+      '\u028E', // ʎ→y
+      '\u028C', // ʌ→v
+      '\u028D', // ʍ→w
+      '\u0254', // ɔ→c
+      '\u025F', // ɟ→f
+      '\u029E', // ʞ→k
+      '\u0253', // ɓ→b
+      '\u0285', // ʅ→l
+      '\u1D09', // ᴉ→i
+      '\uA72D', // ꜭ→D variant
+      '\uA4F7', // ꓷ→d
+      '\uA4D8', // ꓘ→K
+      '\uA4E9', // ꓩ→Z
+    ];
 
     // ── Public API ─────────────────────────────────────────────────────
 
@@ -496,14 +687,17 @@ namespace vrScraper.Services
 
       foreach (var star in knownStars)
       {
-        if (star.Name.Length < 4) continue;
+        if (star.Name.Length < 6) continue; // Minimum 6 chars total
 
         var starWords = star.Name.ToLowerInvariant()
           .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         if (starWords.Length >= 2)
         {
-          // Two-word name: both words must appear in title
+          // Two-word name: each word must be at least 3 chars
+          if (starWords.Any(w => w.Length < 3)) continue;
+
+          // Both words must appear in title
           var matchConfidences = new List<double>();
           foreach (var starWord in starWords)
           {
@@ -512,8 +706,8 @@ namespace vrScraper.Services
             {
               var dist = LevenshteinDistance(starWord, titleWord);
               if (dist == 0) bestConf = Math.Max(bestConf, 1.0);
-              else if (dist == 1) bestConf = Math.Max(bestConf, 0.8);
-              else if (dist == 2 && starWord.Length >= 4) bestConf = Math.Max(bestConf, 0.6);
+              else if (dist == 1 && starWord.Length >= 4) bestConf = Math.Max(bestConf, 0.8);
+              else if (dist == 2 && starWord.Length >= 5) bestConf = Math.Max(bestConf, 0.6);
             }
             matchConfidences.Add(bestConf);
           }
@@ -526,9 +720,9 @@ namespace vrScraper.Services
         }
         else if (starWords.Length == 1)
         {
-          // Single-word name: stricter matching
+          // Single-word name: very strict
           var starWord = starWords[0];
-          if (starWord.Length < 4) continue;
+          if (starWord.Length < 6) continue;
 
           foreach (var titleWord in titleWords)
           {
@@ -737,6 +931,11 @@ namespace vrScraper.Services
 
     private static string NormalizeUnicode(string input)
     {
+      // Pre-process: detect upside-down text — returns fully normalized ASCII if detected
+      var upsideDown = HandleUpsideDown(input);
+      if (upsideDown != null)
+        return upsideDown;
+
       var sb = new StringBuilder(input.Length);
 
       for (int i = 0; i < input.Length; i++)
@@ -770,12 +969,22 @@ namespace vrScraper.Services
           continue;
         }
 
-        // Keep common Latin-1 accented chars (à-ÿ)
-        if (c >= 0x00C0 && c <= 0x00FF)
+        // Latin Extended with diacritics — try to extract base letter
+        // U+00C0-024F covers Latin-1 Supplement, Latin Extended-A, Latin Extended-B
+        if (c >= 0x00C0 && c <= 0x024F)
         {
-          sb.Append(c);
+          // Try to decompose to base letter (e.g. Ť → T, ė → e, ŕ → r)
+          var decomposed = c.ToString().Normalize(System.Text.NormalizationForm.FormKD);
+          if (decomposed.Length > 0 && decomposed[0] <= 0x007F)
+            sb.Append(decomposed[0]);
+          else
+            sb.Append(c);
           continue;
         }
+
+        // Combining characters (U+0300-036F) — skip (diacritics on previous char)
+        if (c >= 0x0300 && c <= 0x036F)
+          continue;
 
         // Strip everything else (emoji, decorators, unknown Unicode)
         // But keep spaces
@@ -784,6 +993,63 @@ namespace vrScraper.Services
       }
 
       return sb.ToString();
+    }
+
+    /// <summary>
+    /// Detects upside-down text (ɐuɐʅ → anal) and reverses each word's characters.
+    /// Only activates when >40% of non-space chars are upside-down characters.
+    /// </summary>
+    // ASCII chars that flip to different letters when rotated 180°
+    private static readonly Dictionary<char, char> UpsideDownAsciiFlip = new()
+    {
+      ['d'] = 'p', ['p'] = 'd',
+      ['b'] = 'q', ['q'] = 'b',
+      ['n'] = 'u', ['u'] = 'n',
+      ['D'] = 'P', ['P'] = 'D',
+      ['B'] = 'Q', ['Q'] = 'B',
+      ['N'] = 'U', ['U'] = 'N',
+    };
+
+    /// <summary>Returns normalized+reversed string if upside-down text detected, null otherwise.</summary>
+    private static string? HandleUpsideDown(string input)
+    {
+      int upsideDownCount = 0;
+      int totalChars = 0;
+      foreach (var c in input)
+      {
+        if (c == ' ') continue;
+        totalChars++;
+        if (UpsideDownChars.Contains(c)) upsideDownCount++;
+      }
+
+      if (totalChars == 0 || (double)upsideDownCount / totalChars < 0.3)
+        return null; // Not upside-down text
+
+      // Map each char to ASCII; only flip original ASCII chars (not mapped ones)
+      var sb = new StringBuilder(input.Length);
+      foreach (var c in input)
+      {
+        if (c == ' ') { sb.Append(' '); continue; }
+        if (Confusables.TryGetValue(c, out var mapped))
+        {
+          // Already correctly mapped by Confusables — don't flip
+          sb.Append(mapped);
+        }
+        else if (c <= 0x007F)
+        {
+          // Original ASCII char in upside-down context — flip p↔d, b↔q, n↔u
+          sb.Append(UpsideDownAsciiFlip.TryGetValue(c, out var flipped) ? flipped : c);
+        }
+        // skip unmapped non-ASCII
+      }
+
+      var words = sb.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+      var reversed = words
+        .Select(w => new string(w.Reverse().ToArray()))
+        .Reverse()
+        .ToArray();
+
+      return string.Join(' ', reversed);
     }
 
     private static bool IsLetterOrLeet(char c) => char.IsLetter(c) || LeetMap.ContainsKey(c);
@@ -808,7 +1074,18 @@ namespace vrScraper.Services
           // Decode if at least one neighbor is a letter or another leet char
           if (prevValid || nextValid)
           {
-            sb.Append(leetChar);
+            // Special case: '1' is ambiguous (l or i)
+            // At word start (after space/punctuation or string start) → 'l' (like "1ittle")
+            // Otherwise → 'i' (like "L1sa", "N1cole", "P1nelli")
+            if (c == '1')
+            {
+              bool atWordStart = i == 0 || result[i - 1] == ' ' || result[i - 1] == '-';
+              sb.Append(atWordStart ? 'l' : 'i');
+            }
+            else
+            {
+              sb.Append(leetChar);
+            }
           }
           else
           {

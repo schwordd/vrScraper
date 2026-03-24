@@ -96,6 +96,48 @@ namespace vrScraper.Controllers
       });
     }
 
+    /// <summary>Dry-run normalization on all obfuscated titles (read-only, no DB changes)</summary>
+    [HttpGet("test-normalization")]
+    public async Task<IActionResult> TestNormalization([FromQuery] int limit = 100)
+    {
+      var allVideos = await videoService.GetVideoItems();
+
+      var obfuscated = allVideos
+        .Where(v => v.LastScrapedUtc != null && titleNormService.IsObfuscated(v.Title))
+        .OrderByDescending(v => v.Id)
+        .Take(limit)
+        .ToList();
+
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+      var allStars = await context.Stars.ToListAsync();
+      var allTags = await context.Tags.ToListAsync();
+
+      var results = obfuscated.Select(v =>
+      {
+        var normalized = titleNormService.NormalizeTitle(v.Title);
+        var stars = titleNormService.DetectStars(normalized, allStars)
+          .Where(s => s.Confidence >= 0.7)
+          .Select(s => new { s.Star.Name, s.Confidence })
+          .ToList();
+        var tags = titleNormService.DetectTags(normalized, allTags)
+          .Select(t => t.Name)
+          .ToList();
+
+        return new
+        {
+          v.Id,
+          original = v.Title,
+          normalized,
+          stars,
+          tags,
+          scrapedStars = v.Stars?.Select(s => s.Name).ToList() ?? []
+        };
+      });
+
+      return Ok(new { count = obfuscated.Count, results });
+    }
+
     /// <summary>Rescrape a single video by ID (clean slate + fresh from source)</summary>
     [HttpPost("rescrape/{id}")]
     public async Task<IActionResult> RescrapeVideo(long id)
