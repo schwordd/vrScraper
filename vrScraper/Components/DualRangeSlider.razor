@@ -26,7 +26,6 @@
 
     private string _id = $"dr-{Guid.NewGuid():N}";
     private DotNetObjectReference<DualRangeSlider>? _dotNetRef;
-    private bool _initialized;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -34,7 +33,6 @@
         {
             _dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("dualRange.init", _id, _dotNetRef, Min, Max, Step, MinValue, MaxValue);
-            _initialized = true;
         }
     }
 

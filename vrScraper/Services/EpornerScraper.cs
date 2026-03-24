@@ -391,6 +391,9 @@ namespace vrScraper.Services
     public async Task<(VideoPlayerSettings PlayerSettings, List<string> Tags, List<string> Stars, AdditionalVideoDetails VideoDetails)> GetDetails(DbVideoItem item)
     {
       var web = new HtmlWeb();
+      if (string.IsNullOrEmpty(item.Link))
+        return (new VideoPlayerSettings(), [], [], new AdditionalVideoDetails());
+
       var doc = await web.LoadFromWebAsync(item.Link);
 
       var lines = doc.ParsedText.Split(separator, StringSplitOptions.None).ToList(); ;
