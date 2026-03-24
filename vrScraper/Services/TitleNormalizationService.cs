@@ -826,63 +826,29 @@ namespace vrScraper.Services
 
       foreach (var star in knownStars)
       {
-        if (star.Name.Length < 6) continue; // Minimum 6 chars total
+        if (star.Name.Length < 6) continue;
 
         var starWords = star.Name.ToLowerInvariant()
           .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         if (starWords.Length >= 2)
         {
-          // Two-word name: each word must be at least 3 chars
+          // Two-word name: each word must be at least 3 chars, exact match only
           if (starWords.Any(w => w.Length < 3)) continue;
 
-          // Both words must appear in title
-          var matchConfidences = new List<double>();
-          foreach (var starWord in starWords)
-          {
-            double bestConf = 0;
-            foreach (var titleWord in titleWords)
-            {
-              var dist = LevenshteinDistance(starWord, titleWord);
-              if (dist == 0) bestConf = Math.Max(bestConf, 1.0);
-              else if (dist == 1 && starWord.Length >= 4) bestConf = Math.Max(bestConf, 0.8);
-              else if (dist == 2 && starWord.Length >= 5) bestConf = Math.Max(bestConf, 0.6);
-            }
-            matchConfidences.Add(bestConf);
-          }
-
-          if (matchConfidences.All(c => c > 0))
-          {
-            var avgConf = matchConfidences.Average();
-            results.Add((star, avgConf));
-          }
+          bool allMatch = starWords.All(sw => titleWords.Any(tw => tw == sw));
+          if (allMatch)
+            results.Add((star, 1.0));
         }
-        else if (starWords.Length == 1)
+        else if (starWords.Length == 1 && starWords[0].Length >= 6)
         {
-          // Single-word name: very strict
-          var starWord = starWords[0];
-          if (starWord.Length < 6) continue;
-
-          foreach (var titleWord in titleWords)
-          {
-            var dist = LevenshteinDistance(starWord, titleWord);
-            if (dist == 0)
-            {
-              results.Add((star, 1.0));
-              break;
-            }
-            else if (dist == 1 && starWord.Length >= 5)
-            {
-              results.Add((star, 0.8));
-              break;
-            }
-          }
+          // Single-word name: exact match only, min 6 chars
+          if (titleWords.Contains(starWords[0]))
+            results.Add((star, 1.0));
         }
       }
 
-      return results
-        .OrderByDescending(r => r.Confidence)
-        .ToList();
+      return results;
     }
 
     public List<DbTag> DetectTags(string normalizedTitle, List<DbTag> knownTags)
