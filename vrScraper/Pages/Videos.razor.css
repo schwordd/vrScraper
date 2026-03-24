@@ -136,7 +136,8 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 10px;
-    min-height: 0;  /* Verhindert Overflow */
+    min-height: 0;
+    align-items: start;
 }
 
 .video-item {
