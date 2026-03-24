@@ -16,6 +16,7 @@ namespace vrScraper.DB.Models
     public string Name { get; set; }
 
     public virtual List<DbVideoItem> Videos { get; set; }
+    public virtual List<DbVideoStar> VideoStars { get; set; }
 
   }
 

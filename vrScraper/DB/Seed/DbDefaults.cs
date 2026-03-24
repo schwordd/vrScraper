@@ -82,6 +82,11 @@ namespace vrScraper.DB.Seed
         db.Settings.Add(new Models.DbSetting() { Key = "TagSynonymMap", Type = "System.String", Value = "{}" });
       }
 
+      if (defaultSettings.Exists(a => a.Key == "ThePornDbApiToken") == false)
+      {
+        db.Settings.Add(new Models.DbSetting() { Key = "ThePornDbApiToken", Type = "System.String", Value = "" });
+      }
+
       if (defaultSettings.Exists(a => a.Key == "AuthPasswordHash") == false)
       {
         db.Settings.Add(new Models.DbSetting() { Key = "AuthPasswordHash", Type = "System.String", Value = "" });

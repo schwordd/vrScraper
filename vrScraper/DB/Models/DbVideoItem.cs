@@ -34,8 +34,10 @@ namespace vrScraper.DB.Models
     public DateTime? AddedUTC { get; set; }
 
     public virtual List<DbTag> Tags { get; set; }
-
     public virtual List<DbStar> Stars { get; set; }
+
+    public virtual List<DbVideoTag> VideoTags { get; set; }
+    public virtual List<DbVideoStar> VideoStars { get; set; }
 
     public bool ParsedDetails { get; set; }
 
@@ -49,6 +51,10 @@ namespace vrScraper.DB.Models
     public int? ErrorCount { get; set; }
 
     public DateTime? LastPlayedUtc { get; set; }
+
+    public DateTime? LastScrapedUtc { get; set; }
+
+    public string? NormalizedTitle { get; set; }
 
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public bool IsThumbnailNotAvailable { get; set; }
