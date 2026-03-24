@@ -305,6 +305,7 @@
     position: relative;
     overflow: hidden;
     cursor: pointer;
+    aspect-ratio: 16/9;
 }
 
 .thumbnail-overlay {
