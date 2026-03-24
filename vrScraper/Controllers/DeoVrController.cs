@@ -76,7 +76,7 @@ namespace vrScraper.Controllers
       {
         id = foundVideo.Id,
         is3d = true,
-        title = foundVideo.Title,
+        title = foundVideo.NormalizedTitle ?? foundVideo.Title,
         thumbnailUrl = $"{foundVideo.Thumbnail}",
         authorized = 1,
         videoLength = (int)foundVideo.Duration.TotalSeconds,

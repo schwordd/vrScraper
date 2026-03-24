@@ -130,12 +130,9 @@
 
             <span class="filter-item">
                 <label>Duration:</label>
-                <div class="d-flex align-items-center gap-1">
-                    <input type="number" class="form-control form-control-sm filter-duration" min="0" placeholder="Min" @bind="MinDurationMinutes" />
-                    <span>-</span>
-                    <input type="number" class="form-control form-control-sm filter-duration" min="0" placeholder="Max" @bind="MaxDurationMinutes" />
-                    <span class="text-muted" style="font-size:12px">min</span>
-                </div>
+                <DualRangeSlider Min="0" Max="120" Step="5"
+                                 @bind-MinValue="MinDurationMinutes"
+                                 @bind-MaxValue="MaxDurationMinutes" />
             </span>
         </div>
     </div>
@@ -207,13 +204,19 @@
                                 </button>
                             </div>
                         </div>
-                        <h3>@item.Title</h3>
+                        <h3>@(item.NormalizedTitle ?? item.Title)</h3>
+                        @if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title)
+                        {
+                            <div class="original-title">@item.Title</div>
+                        }
                         @if (item.Stars != null && item.Stars.Any())
                         {
                             <div class="star-container">
                                 @foreach (var starInfo in item.Stars)
                                 {
-                                    <button type="button" class="btn btn-primary star-pill" @onclick="() => AddStarFilter(starInfo.Name)">
+                                    var isAutoStar = IsAutoDetectedStar(item, starInfo.Id);
+                                    <button type="button" class="btn btn-primary star-pill @(isAutoStar ? "auto-detected" : "")" @onclick="() => AddStarFilter(starInfo.Name)">
+                                        @if (isAutoStar) { <i class="icon-sparkles"></i> }
                                         <i class="icon-user"></i> @starInfo.Name
                                     </button>
                                 }
@@ -224,7 +227,8 @@
                             {
                                 @foreach (var tagInfo in item.Tags)
                                 {
-                                    <button type="button" class="btn btn-primary tag-pill" @onclick="() => AddTagFilter(tagInfo.Name)">
+                                    var isAutoTag = IsAutoDetectedTag(item, tagInfo.Id);
+                                    <button type="button" class="btn btn-primary tag-pill @(isAutoTag ? "auto-detected" : "")" @onclick="() => AddTagFilter(tagInfo.Name)">
                                         @tagInfo.Name
                                     </button>
                                 }
@@ -297,13 +301,19 @@
                             </button>
                         </div>
                     </div>
-                    <h3>@item.Title</h3>
+                    <h3>@(item.NormalizedTitle ?? item.Title)</h3>
+                    @if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title)
+                    {
+                        <div class="original-title">@item.Title</div>
+                    }
                     @if (item.Stars != null && item.Stars.Any())
                     {
                         <div class="star-container">
                             @foreach (var starInfo in item.Stars)
                             {
-                                <button type="button" class="btn btn-primary star-pill" @onclick="() => AddStarFilter(starInfo.Name)">
+                                var isAutoStar = IsAutoDetectedStar(item, starInfo.Id);
+                                <button type="button" class="btn btn-primary star-pill @(isAutoStar ? "auto-detected" : "")" @onclick="() => AddStarFilter(starInfo.Name)">
+                                    @if (isAutoStar) { <i class="icon-sparkles"></i> }
                                     <i class="icon-user"></i> @starInfo.Name
                                 </button>
                             }
@@ -314,7 +324,8 @@
                         {
                             @foreach (var tagInfo in item.Tags)
                             {
-                                <button type="button" class="btn btn-primary tag-pill" @onclick="() => AddTagFilter(tagInfo.Name)">
+                                var isAutoTag = IsAutoDetectedTag(item, tagInfo.Id);
+                                <button type="button" class="btn btn-primary tag-pill @(isAutoTag ? "auto-detected" : "")" @onclick="() => AddTagFilter(tagInfo.Name)">
                                     @tagInfo.Name
                                 </button>
                             }
@@ -334,7 +345,8 @@
     private bool _isLoading = true;
 
     private int _minDurationMinutes = 0;
-    private int _maxDurationMinutes = 0;
+    private int _maxDurationMinutes = 120;
+    private const int DurationSliderMax = 120;
 
     public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); } }
     public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); } }
@@ -501,11 +513,11 @@
                         (!_showOnlyUnwatched || v.PlayCount == 0) &&
                         (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
                         (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
-                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) &&
+                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || (v.NormalizedTitle != null && v.NormalizedTitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
                         (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
                         (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))) &&
                         (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
-                        (_maxDurationMinutes <= 0 || v.Duration.TotalMinutes <= _maxDurationMinutes));
+                        (_maxDurationMinutes >= DurationSliderMax || v.Duration.TotalMinutes <= _maxDurationMinutes));
 
             // Apply sorting
             List<DbVideoItem> sortedItems;
@@ -599,9 +611,9 @@
                         (!_showOnlyUnwatched || v.PlayCount == 0) &&
                         (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
                         (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
-                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) &&
+                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || (v.NormalizedTitle != null && v.NormalizedTitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
                         (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
-                        (_maxDurationMinutes <= 0 || v.Duration.TotalMinutes <= _maxDurationMinutes))
+                        (_maxDurationMinutes >= DurationSliderMax || v.Duration.TotalMinutes <= _maxDurationMinutes))
                 .ToList();
         }
     }
@@ -793,6 +805,16 @@
             currentTags.Add(tagName);
             SelectedTagValues = currentTags;
         }
+    }
+
+    private static bool IsAutoDetectedStar(DbVideoItem video, long starId)
+    {
+        return video.VideoStars?.Any(vs => vs.StarId == starId && vs.IsAutoDetected) ?? false;
+    }
+
+    private static bool IsAutoDetectedTag(DbVideoItem video, long tagId)
+    {
+        return video.VideoTags?.Any(vt => vt.TagId == tagId && vt.IsAutoDetected) ?? false;
     }
 
     private void AddStarFilter(string starName)
@@ -1039,7 +1061,7 @@
         if (CurrentPage > 1) queryParams["page"] = CurrentPage.ToString();
         if (PageSize != 30) queryParams["pageSize"] = PageSize.ToString();
         if (_minDurationMinutes > 0) queryParams["minDur"] = _minDurationMinutes.ToString();
-        if (_maxDurationMinutes > 0) queryParams["maxDur"] = _maxDurationMinutes.ToString();
+        if (_maxDurationMinutes > 0 && _maxDurationMinutes < DurationSliderMax) queryParams["maxDur"] = _maxDurationMinutes.ToString();
 
         var url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/videos", queryParams);
         NavigationManager.NavigateTo(url, replace: true, forceLoad: false);

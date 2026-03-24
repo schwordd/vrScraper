@@ -139,7 +139,7 @@ namespace vrScraper.Controllers
       return new
       {
         access = 1,
-        title = foundVideo.Title,
+        title = foundVideo.NormalizedTitle ?? foundVideo.Title,
         description = "",
         thumbnailImage = $"{foundVideo.Thumbnail}",
         dateReleased = dateStr,
