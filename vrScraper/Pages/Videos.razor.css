@@ -143,13 +143,7 @@
     text-align: center;
 }
 
-.video-item img {
-    width: 100%;
-    aspect-ratio: 16/9;
-    object-fit: cover;
-    display: block;
-    margin: 0 auto;
-}
+/* img sizing handled by .thumbnail-container img */
 
 .video-item h3 {
     font-size: 14px;
