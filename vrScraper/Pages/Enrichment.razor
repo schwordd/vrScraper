@@ -1,0 +1,325 @@
+@page "/enrichment"
+
+@using vrScraper.Services
+@using vrScraper.DB
+@using Microsoft.EntityFrameworkCore
+
+@inject ITitleNormalizationService TitleNormService
+@inject IThePornDbService ThePornDbService
+@inject ISettingService SettingService
+@inject IServiceProvider ServiceProvider
+@inject IVideoService VideoService
+
+<h3>Data Enrichment</h3>
+
+<div class="enrichment-container">
+
+    <!-- Reset Section -->
+    <div class="enrichment-section">
+        <h5 class="section-title">
+            <i class="icon-trash-2 me-2"></i>
+            Reset Enrichment Data
+        </h5>
+        <p class="section-desc">
+            Removes all auto-detected data (NormalizedTitle, auto-detected stars/tags) so you can re-run enrichment from scratch.
+        </p>
+        <div class="action-controls">
+            <button class="btn btn-danger" @onclick="ResetEnrichmentData" disabled="@_resetRunning">
+                @if (_resetRunning)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                }
+                <i class="icon-rotate-ccw me-1"></i> Reset All Enrichment Data
+            </button>
+            @if (_resetResult != null)
+            {
+                <span class="text-success ms-2">@_resetResult</span>
+            }
+        </div>
+    </div>
+
+    <!-- Title Normalization Section -->
+    <div class="enrichment-section">
+        <h5 class="section-title">
+            <i class="icon-languages me-2"></i>
+            Title Normalization
+        </h5>
+        <p class="section-desc">
+            Decodes obfuscated video titles (Unicode tricks, leet-speak) and detects stars/tags from all titles.
+        </p>
+
+        <div class="action-row">
+            <div class="action-card">
+                <div class="action-header">
+                    <h6>Normalize &amp; Detect</h6>
+                    <small class="text-muted">Normalizes obfuscated titles + detects stars/tags from all video titles</small>
+                </div>
+                <div class="action-controls">
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check-input" @bind="_forceReprocess" />
+                        <span class="form-check-label">Force reprocess</span>
+                    </label>
+                    <button class="btn btn-primary" @onclick="RunNormalization" disabled="@_normRunning">
+                        @if (_normRunning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        <i class="icon-wand-sparkles me-1"></i> Run Normalization
+                    </button>
+                </div>
+                @if (_normRunning || _normResult != null)
+                {
+                    <div class="progress-section">
+                        @if (_normRunning && _normProgress != null)
+                        {
+                            <div class="progress mb-2">
+                                <div class="progress-bar" role="progressbar"
+                                     style="width: @(_normProgress.Total > 0 ? (int)(_normProgress.Current * 100.0 / _normProgress.Total) : 0)%">
+                                    @_normProgress.Current / @_normProgress.Total
+                                </div>
+                            </div>
+                            <div class="stats-row">
+                                <span class="stat-badge"><i class="icon-activity me-1"></i>@_normProgress.Phase</span>
+                                <span class="stat-badge"><i class="icon-type me-1"></i>@_normProgress.TitlesNormalized titles decoded</span>
+                                <span class="stat-badge"><i class="icon-user me-1"></i>@_normProgress.StarsDetected stars detected</span>
+                                <span class="stat-badge"><i class="icon-tag me-1"></i>@_normProgress.TagsDetected tags detected</span>
+                            </div>
+                        }
+                        @if (_normResult != null)
+                        {
+                            <div class="alert @(_normSuccess ? "alert-success" : "alert-danger") mt-2 mb-0">
+                                @_normResult
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- ThePornDB Enrichment Section -->
+    <div class="enrichment-section">
+        <h5 class="section-title">
+            <i class="icon-database me-2"></i>
+            ThePornDB Enrichment
+        </h5>
+        <p class="section-desc">
+            Looks up known stars in ThePornDB to find additional aliases and genre tags.
+        </p>
+
+        <div class="action-row">
+            <div class="action-card">
+                <div class="action-header">
+                    <h6>API Configuration</h6>
+                    <small class="text-muted">Free API token from <a href="https://theporndb.net/register" target="_blank">theporndb.net</a></small>
+                </div>
+                <div class="input-group mb-3">
+                    <input type="@(_showToken ? "text" : "password")" class="form-control"
+                           placeholder="Bearer token..."
+                           @bind="_apiToken" @bind:event="oninput" />
+                    <button class="btn btn-outline-secondary" type="button" @onclick="() => _showToken = !_showToken">
+                        <i class="@(_showToken ? "icon-eye-off" : "icon-eye")"></i>
+                    </button>
+                    <button class="btn btn-primary" @onclick="SaveApiToken">
+                        <i class="icon-save me-1"></i> Save
+                    </button>
+                </div>
+                @if (_tokenSaved)
+                {
+                    <div class="alert alert-success py-1 mb-2">Token saved.</div>
+                }
+            </div>
+
+            <div class="action-card">
+                <div class="action-header">
+                    <h6>Enrich Stars via API</h6>
+                    <small class="text-muted">Searches all known stars in ThePornDB and adds discovered tags to their videos</small>
+                </div>
+                <div class="action-controls">
+                    <button class="btn btn-primary" @onclick="RunEnrichment" disabled="@(_enrichRunning || string.IsNullOrWhiteSpace(_apiToken))">
+                        @if (_enrichRunning)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        <i class="icon-cloud-download me-1"></i> Enrich Stars
+                    </button>
+                </div>
+                @if (_enrichRunning || _enrichResult != null)
+                {
+                    <div class="progress-section">
+                        @if (_enrichRunning)
+                        {
+                            <div class="progress mb-2">
+                                <div class="progress-bar" role="progressbar"
+                                     style="width: @(_enrichTotal > 0 ? (int)(_enrichCurrent * 100.0 / _enrichTotal) : 0)%">
+                                    @_enrichCurrent / @_enrichTotal
+                                </div>
+                            </div>
+                            <small class="text-muted">Querying ThePornDB API... (~500ms per star)</small>
+                        }
+                        @if (_enrichResult != null)
+                        {
+                            <div class="alert @(_enrichSuccess ? "alert-success" : "alert-danger") mt-2 mb-0">
+                                @_enrichResult
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private bool _forceReprocess;
+
+    // Normalization state
+    private bool _normRunning;
+    private NormalizationProgress? _normProgress;
+    private string? _normResult;
+    private bool _normSuccess;
+
+    // Enrichment state
+    private bool _enrichRunning;
+    private int _enrichCurrent;
+    private int _enrichTotal;
+    private string? _enrichResult;
+    private bool _enrichSuccess;
+
+    // Reset state
+    private bool _resetRunning;
+    private string? _resetResult;
+
+    // API token
+    private string _apiToken = "";
+    private bool _showToken;
+    private bool _tokenSaved;
+
+    protected override void OnInitialized()
+    {
+        _apiToken = SettingService.GetSettingValue("ThePornDbApiToken") ?? "";
+    }
+
+    private async Task ResetEnrichmentData()
+    {
+        _resetRunning = true;
+        _resetResult = null;
+        StateHasChanged();
+
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+            await context.Database.ExecuteSqlRawAsync(
+                "DELETE FROM VideoStars WHERE IsAutoDetected = 1");
+            await context.Database.ExecuteSqlRawAsync(
+                "DELETE FROM VideoTags WHERE IsAutoDetected = 1");
+            int count = await context.Database.ExecuteSqlRawAsync(
+                "UPDATE VideoItems SET NormalizedTitle = NULL WHERE NormalizedTitle IS NOT NULL");
+
+            await VideoService.ReloadVideos();
+            _resetResult = $"Reset {count} videos.";
+        }
+        catch (Exception ex)
+        {
+            _resetResult = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _resetRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunNormalization()
+    {
+        _normRunning = true;
+        _normResult = null;
+        _normProgress = new NormalizationProgress();
+        StateHasChanged();
+
+        using var cts = new CancellationTokenSource();
+        _ = RefreshUiPeriodically(cts.Token);
+
+        try
+        {
+            var count = await TitleNormService.NormalizeAllTitles(_forceReprocess, _normProgress);
+            _normResult = $"Done! Processed {count} videos. " +
+                $"Decoded {_normProgress.TitlesNormalized} titles, " +
+                $"detected {_normProgress.StarsDetected} stars, " +
+                $"{_normProgress.TagsDetected} tags.";
+            _normSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            _normResult = $"Error: {ex.Message}";
+            _normSuccess = false;
+        }
+        finally
+        {
+            _normRunning = false;
+            cts.Cancel();
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveApiToken()
+    {
+        await SettingService.SaveSetting("ThePornDbApiToken", _apiToken);
+        _tokenSaved = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        _tokenSaved = false;
+        StateHasChanged();
+    }
+
+    private async Task RunEnrichment()
+    {
+        _enrichRunning = true;
+        _enrichResult = null;
+        _enrichCurrent = 0;
+        _enrichTotal = 0;
+        StateHasChanged();
+
+        using var cts = new CancellationTokenSource();
+        _ = RefreshUiPeriodically(cts.Token);
+
+        try
+        {
+            var count = await ThePornDbService.EnrichAllStars((current, total) =>
+            {
+                _enrichCurrent = current;
+                _enrichTotal = total;
+            });
+            _enrichResult = $"Done! Enriched {count} stars with additional tags.";
+            _enrichSuccess = true;
+        }
+        catch (Exception ex)
+        {
+            _enrichResult = $"Error: {ex.Message}";
+            _enrichSuccess = false;
+        }
+        finally
+        {
+            _enrichRunning = false;
+            cts.Cancel();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshUiPeriodically(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(500, ct);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+    }
+}
