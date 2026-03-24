@@ -397,7 +397,6 @@ namespace vrScraper.Services
       var videoInfos = lines.Where(a => a.StartsWith("EP.video.player.")).ToList();
       var settings = ParseVideoPlayerSettings(videoInfos);
 
-      var pStars = doc.DocumentNode.SelectNodes("//li[contains(@class, 'vit-pornstar')]");
       var categories = doc.DocumentNode.SelectNodes("//li[contains(@class, 'vit-category')]");
       var vitTag = doc.DocumentNode.SelectNodes("//li[contains(@class, 'vit-tag')]");
       var jsonNodes = doc.DocumentNode.SelectNodes("//script[@type='application/ld+json']");
@@ -435,6 +434,34 @@ namespace vrScraper.Services
 
               if (uploadDateCandidate.GetString() != null)
                 videoDetails.UploadDate = DateTime.ParseExact(uploadDateCandidate.GetString()!, "yyyy-MM-ddTHH:mm:ssK", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal);
+
+              // Extract views from interactionStatistic
+              if (jsonObject.RootElement.TryGetProperty("interactionStatistic", out var interactionProp)
+                  && interactionProp.TryGetProperty("userInteractionCount", out var viewCount))
+              {
+                if (long.TryParse(viewCount.ToString(), out var views))
+                  videoDetails.Views = views;
+              }
+
+              // Extract rating from aggregateRating
+              if (jsonObject.RootElement.TryGetProperty("aggregateRating", out var ratingProp)
+                  && ratingProp.TryGetProperty("ratingValue", out var ratingVal))
+              {
+                if (double.TryParse(ratingVal.ToString(), out var rating))
+                  videoDetails.Rating = rating;
+              }
+
+              // Extract actors from JSON-LD (most reliable source for stars)
+              if (jsonObject.RootElement.TryGetProperty("actor", out var actorProp) && actorProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+              {
+                foreach (var actor in actorProp.EnumerateArray())
+                {
+                  if (actor.TryGetProperty("name", out var actorName) && actorName.GetString() is string name && !string.IsNullOrWhiteSpace(name))
+                  {
+                    videoDetails.Actors.Add(name);
+                  }
+                }
+              }
             }
           }
           catch (System.Text.Json.JsonException ex)
@@ -448,11 +475,39 @@ namespace vrScraper.Services
       var stars = new List<string>();
       var tags = new List<string>();
 
-      if (pStars != null)
+      // Stars: prefer JSON-LD actor array, fallback to /pornstar/ links in HTML
+      if (videoDetails.Actors.Count > 0)
       {
-        foreach (var t in pStars)
+        stars.AddRange(videoDetails.Actors);
+      }
+      else
+      {
+        // Fallback: /pornstar/ links inside video info area only
+        var pornstarLinks = doc.DocumentNode.SelectNodes(
+          "//a[starts-with(@href, '/pornstar/') and not(starts-with(@href, '/pornstar-list'))]");
+        if (pornstarLinks != null)
         {
-          stars.Add(t.InnerText);
+          foreach (var link in pornstarLinks)
+          {
+            var name = link.InnerText?.Trim();
+            if (string.IsNullOrWhiteSpace(name) || name.Length <= 2) continue;
+
+            // Skip nav menu entries: they are inside #listcatsmallstars or are generic labels
+            var parent = link.ParentNode;
+            var isNavMenu = false;
+            while (parent != null)
+            {
+              var id = parent.GetAttributeValue("id", "");
+              if (id.Contains("listcat") || id.Contains("nav") || id == "header" || id == "footer")
+              {
+                isNavMenu = true;
+                break;
+              }
+              parent = parent.ParentNode;
+            }
+            if (!isNavMenu)
+              stars.Add(name);
+          }
         }
       }
 
@@ -537,6 +592,17 @@ namespace vrScraper.Services
     {
       var (PlayerSettings, Tags, Stars, VideoDetails) = await this.GetDetails(video);
 
+      // Clean slate: remove all existing star/tag links for this video
+      var existingStarLinks = await context.VideoStars.Where(vs => vs.VideoId == video.Id).ToListAsync();
+      context.VideoStars.RemoveRange(existingStarLinks);
+      var existingTagLinks = await context.VideoTags.Where(vt => vt.VideoId == video.Id).ToListAsync();
+      context.VideoTags.RemoveRange(existingTagLinks);
+      video.NormalizedTitle = null;
+
+      // Save the deletes first so new junction entries don't conflict
+      await context.SaveChangesAsync();
+
+      // Re-add stars from source (use navigation property to avoid extra saves for new stars)
       foreach (var starParsed in Stars.Distinct().ToList())
       {
         var star = await context.Stars.Where(s => s.Name == starParsed).FirstOrDefaultAsync();
@@ -544,22 +610,13 @@ namespace vrScraper.Services
         {
           star = new DbStar() { Name = starParsed };
           context.Stars.Add(star);
-          star.Videos = [];
         }
 
-        star.Videos ??= [];
-
-        if (star.Videos.Any(s => s.Id == video.Id))
-        {
-          //logger.LogInformation("Star {s} already exists for video {v}", star.Name, video.Id);
-        }
-        else
-        {
-          star.Videos.Add(video);
-          logger.LogInformation("Star {s} added for video {v}", star.Name, video.Id);
-        }
+        context.VideoStars.Add(new DbVideoStar { Video = video, Star = star, IsAutoDetected = false });
+        logger.LogInformation("Star {s} added for video {v}", star.Name, video.Id);
       }
 
+      // Re-add tags from source
       foreach (var tagRaw in Tags.Distinct().ToList())
       {
         var tagParsed = tagNorm.NormalizeTag(tagRaw);
@@ -570,19 +627,17 @@ namespace vrScraper.Services
           context.Tags.Add(tag);
         }
 
-        tag.Videos ??= [];
-
-        if (tag.Videos.Any(s => s.Id == video.Id))
-        {
-          //logger.LogInformation("Tag {t} already exists for video {v}", tag.Name, video.Id);
-        }
-        else
-        {
-          tag.Videos.Add(video);
-          logger.LogInformation("Tag {s} added for video {v}", tag.Name, video.Id);
-        }
+        context.VideoTags.Add(new DbVideoTag { Video = video, Tag = tag, IsAutoDetected = false });
+        logger.LogInformation("Tag {s} added for video {v}", tag.Name, video.Id);
       }
 
+      // Update views and rating from structured data
+      if (VideoDetails.Views.HasValue)
+        video.Views = VideoDetails.Views.Value;
+      if (VideoDetails.Rating.HasValue)
+        video.SiteRating = VideoDetails.Rating.Value;
+
+      // Update title from structured data
       if (string.IsNullOrWhiteSpace(VideoDetails.Name) == false && VideoDetails.Name != video.Title)
       {
         var old = video.Title;
@@ -592,6 +647,7 @@ namespace vrScraper.Services
       }
 
       video.ParsedDetails = true;
+      video.LastScrapedUtc = DateTime.UtcNow;
       await context.SaveChangesAsync();
     }
 
@@ -619,78 +675,73 @@ namespace vrScraper.Services
 
     public async Task ReparseInformations(CancellationToken cancellationToken = default)
     {
-      logger.LogInformation("ReparseInformations started");
+      // Load only IDs (lightweight, no navigation properties)
+      List<long> videoIds;
+      using (var scope = serviceProvider.CreateScope())
+      {
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        videoIds = await context.VideoItems
+            .Where(a => a.Site == SiteName)
+            .OrderByDescending(a => a.Id)
+            .Select(a => a.Id)
+            .ToListAsync(cancellationToken);
+      }
 
-      using var scope = serviceProvider.CreateScope();
-      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-
-      logger.LogInformation("Loading video items from database");
-      var items = await context.VideoItems
-          .Include(a => a.Stars)
-          .Include(a => a.Tags)
-          .ToListAsync(cancellationToken);
-
-      // Sortiere nach dem Laden in Memory - vom ältesten zum neuesten für Rescraping
-      items = items
-          .OrderBy(a => Convert.ToInt32(a.SiteVideoId))
-          .ToList();
-
-      logger.LogInformation("Loaded {Count} items for reparse", items.Count);
+      var estimatedTime = TimeSpan.FromSeconds(videoIds.Count * 2.5);
+      logger.LogInformation("Rescrape started for {Site}: {Count} videos, estimated ~{Est}",
+        SiteName, videoIds.Count, estimatedTime.ToString(@"hh\:mm\:ss"));
 
       var startTime = DateTime.UtcNow;
       var errorCount = 0;
       var successCount = 0;
       var consecutiveErrors = 0;
 
-      for (var i = 0; i < items.Count && !cancellationToken.IsCancellationRequested; i++)
+      for (var i = 0; i < videoIds.Count && !cancellationToken.IsCancellationRequested; i++)
       {
-        var videoItem = items[i];
-        var progress = (double)(i + 1) / items.Count * 100;
-
-        // Calculate ETA
+        var progress = (double)(i + 1) / videoIds.Count * 100;
         var elapsed = DateTime.UtcNow - startTime;
         var avgTimePerItem = elapsed.TotalSeconds / (i + 1);
-        var remainingItems = items.Count - (i + 1);
-        var etaSeconds = remainingItems * avgTimePerItem;
+        var etaSeconds = (videoIds.Count - (i + 1)) * avgTimePerItem;
         var eta = TimeSpan.FromSeconds(etaSeconds);
 
-        // Set current video info for UI feedback
-        this._currentVideoThumbnail = videoItem.Thumbnail;
-        this._currentVideoTitle = videoItem.Title;
+        this._scrapingStatus = $"Reparse details: {i + 1} / {videoIds.Count} ({progress:F1}%) - ETA: {eta:hh\\:mm\\:ss} | Errors: {errorCount}, Success: {successCount}";
 
-        this._scrapingStatus = $"Reparse details: {i + 1} / {items.Count} ({progress:F1}%) - ETA: {eta:hh\\:mm\\:ss} | Errors: {errorCount}, Success: {successCount}";
-        logger.LogInformation(this._scrapingStatus);
-
-        var requestStartTime = DateTime.UtcNow;
         var success = false;
 
         try
         {
-          await ParseDetails(items[i], context);
-          success = true;
-          successCount++;
-          consecutiveErrors = 0;
+          // Fresh scope per video — prevents Change Tracker bloat
+          using var itemScope = serviceProvider.CreateScope();
+          var itemContext = itemScope.ServiceProvider.GetRequiredService<VrScraperContext>();
+          var video = await itemContext.VideoItems.FindAsync([videoIds[i]], cancellationToken);
+
+          if (video != null)
+          {
+            this._currentVideoThumbnail = video.Thumbnail;
+            this._currentVideoTitle = video.Title;
+            logger.LogInformation("[{Current}/{Total}] Reparsing {Id} '{Title}'", i + 1, videoIds.Count, video.Id, video.Title);
+
+            await ParseDetails(video, itemContext);
+            success = true;
+            successCount++;
+            consecutiveErrors = 0;
+          }
         }
         catch (Exception ex)
         {
-          logger.LogError(ex, "Error reparsing VideoItem {Id}: {Title}", videoItem.Id, videoItem.Title);
+          logger.LogError(ex, "[{Current}/{Total}] ERROR reparsing video {Id}", i + 1, videoIds.Count, videoIds[i]);
           errorCount++;
           consecutiveErrors++;
-
-          // Increase error count for this video in DB and memory
-          await vs.UpdateVideoErrorCount(videoItem.Id);
+          await vs.UpdateVideoErrorCount(videoIds[i]);
         }
 
-        // Defensive rate limiting with adaptive delays
         var delay = CalculateAdaptiveDelay(i, consecutiveErrors, success, DateTime.UtcNow.Hour);
-        logger.LogDebug("Using delay: {Delay}ms for item {Item}", delay, i + 1);
-
         await Task.Delay(delay, cancellationToken);
       }
 
-      cancellationToken.ThrowIfCancellationRequested();
-      logger.LogInformation("ReparseInformations completed. Total: {Total}, Success: {Success}, Errors: {Errors}",
-        items.Count, successCount, errorCount);
+      var totalDuration = DateTime.UtcNow - startTime;
+      logger.LogInformation("Rescrape finished for {Site}: {Success}/{Total} success, {Errors} errors, duration {Duration}",
+        SiteName, successCount, videoIds.Count, errorCount, totalDuration.ToString(@"hh\:mm\:ss"));
     }
 
     /// <summary>
@@ -699,41 +750,33 @@ namespace vrScraper.Services
     private int CalculateAdaptiveDelay(int itemIndex, int consecutiveErrors, bool lastSuccess, int currentHour)
     {
       // Base delay: 3-7 seconds (much more defensive than 100ms)
-      var baseDelay = 1000;
-
-      // Night time (22:00 - 06:00): Can be more aggressive
-      if (currentHour >= 22 || currentHour <= 6)
-      {
-        baseDelay = 1000; // 2-4 seconds at night
-      }
-      // Peak hours (09:00 - 17:00): Be more defensive  
+      // Time-based base delay to avoid rate limiting
+      int baseDelay;
+      if (currentHour >= 22 || currentHour < 6)
+        baseDelay = 2000;   // Night: 2s — less site traffic
       else if (currentHour >= 9 && currentHour <= 17)
-      {
-        baseDelay = 1000; // 5-10 seconds during day
-      }
+        baseDelay = 5000;   // Peak: 5s — most defensive
+      else
+        baseDelay = 3000;   // Transition: 3s
 
-      // Exponential backoff on consecutive errors (VERY defensive)
+      // Exponential backoff on consecutive errors (rate-limit detection)
       if (consecutiveErrors > 0)
       {
-        var errorMultiplier = Math.Pow(2, Math.Min(consecutiveErrors, 6)); // Max 64x multiplier
+        var errorMultiplier = Math.Pow(2, Math.Min(consecutiveErrors, 6));
         baseDelay = (int)(baseDelay * errorMultiplier);
-        logger.LogWarning("Consecutive errors detected: {Count}. Increasing delay to {Delay}ms",
-          consecutiveErrors, baseDelay);
+        logger.LogWarning("Consecutive errors: {Count}, delay increased to {Delay}ms", consecutiveErrors, baseDelay);
       }
 
-      // Progressive slowdown every 100 items (prevent sustained high load)
-      var progressiveMultiplier = 1 + (itemIndex / 100) * 0.1; // +10% every 100 items
+      // Progressive slowdown every 200 items (+5%)
+      var progressiveMultiplier = 1.0 + (itemIndex / 200) * 0.05;
       baseDelay = (int)(baseDelay * progressiveMultiplier);
 
-      // Add random jitter (±25%) for human-like behavior
-      var random = new Random();
-      var jitter = random.Next(-25, 26) / 100.0; // -25% to +25%
+      // Random jitter ±25% for human-like behavior
+      var jitter = Random.Shared.Next(-25, 26) / 100.0;
       var finalDelay = (int)(baseDelay * (1 + jitter));
 
-      // Safety bounds: minimum 1 second, maximum 5 minutes
-      finalDelay = Math.Max(1000, Math.Min(finalDelay, 300000));
-
-      return finalDelay;
+      // Bounds: min 1.5s, max 5min
+      return Math.Max(1500, Math.Min(finalDelay, 300000));
     }
 
     public async Task RemoveDeadByPicture(CancellationToken cancellationToken = default)

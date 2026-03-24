@@ -412,9 +412,18 @@ namespace vrScraper.Services
       if (doc?.DocumentNode == null)
       {
         video.ParsedDetails = true;
+      video.LastScrapedUtc = DateTime.UtcNow;
         await context.SaveChangesAsync(ct);
         return;
       }
+
+      // Clean slate: remove all existing star/tag links for this video
+      var existingStarLinks = await context.VideoStars.Where(vs => vs.VideoId == video.Id).ToListAsync(ct);
+      context.VideoStars.RemoveRange(existingStarLinks);
+      var existingTagLinks = await context.VideoTags.Where(vt => vt.VideoId == video.Id).ToListAsync(ct);
+      context.VideoTags.RemoveRange(existingTagLinks);
+      video.NormalizedTitle = null;
+      await context.SaveChangesAsync(ct);
 
       // SpankBang tags have data-testid="tag" or are links to /s/tagname/
       var tagNodes = doc.DocumentNode.SelectNodes("//*[@data-testid='tag']")
@@ -443,11 +452,8 @@ namespace vrScraper.Services
         logger.LogInformation("Parsed {Count} tags for video {Id}", tagNodes.Count, video.Id);
       }
 
-      // SpankBang doesn't have video-specific pornstar links on detail pages
-      // (the /pornstar/ links are from the navigation menu, not the video info)
-      // Stars would need to be extracted from tags if they match known performer names
-
       video.ParsedDetails = true;
+      video.LastScrapedUtc = DateTime.UtcNow;
       await context.SaveChangesAsync(ct);
     }
 

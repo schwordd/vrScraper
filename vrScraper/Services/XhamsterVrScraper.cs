@@ -458,11 +458,20 @@ namespace vrScraper.Services
       {
         logger.LogWarning("Failed to load detail page for video {Id}", video.Id);
         video.ParsedDetails = true;
+      video.LastScrapedUtc = DateTime.UtcNow;
         await context.SaveChangesAsync(cancellationToken);
         return;
       }
 
       var html = doc.DocumentNode.InnerHtml;
+
+      // Clean slate: remove all existing star/tag links for this video
+      var existingStarLinks = await context.VideoStars.Where(vs => vs.VideoId == video.Id).ToListAsync(cancellationToken);
+      context.VideoStars.RemoveRange(existingStarLinks);
+      var existingTagLinks = await context.VideoTags.Where(vt => vt.VideoId == video.Id).ToListAsync(cancellationToken);
+      context.VideoTags.RemoveRange(existingTagLinks);
+      video.NormalizedTitle = null;
+      await context.SaveChangesAsync(cancellationToken);
 
       // Parse categories from URL params embedded in GTM/analytics data
       // Pattern: videoCategory=BBW%2CBabe%2CBig+Natural+Tits%2C...
@@ -531,6 +540,7 @@ namespace vrScraper.Services
       }
 
       video.ParsedDetails = true;
+      video.LastScrapedUtc = DateTime.UtcNow;
       await context.SaveChangesAsync(cancellationToken);
     }
 

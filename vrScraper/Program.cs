@@ -115,6 +115,9 @@ namespace vrScraper
       builder.Services.AddSingleton<IRecommendationService, RecommendationService>();
       builder.Services.AddSingleton<IScrapeLogService, ScrapeLogService>();
       builder.Services.AddSingleton<ITagNormalizationService, TagNormalizationService>();
+      builder.Services.AddSingleton<ITitleNormalizationService, TitleNormalizationService>();
+      builder.Services.AddSingleton<IThePornDbService, ThePornDbService>();
+      builder.Services.AddHttpClient();
       // Add scheduled scraping background service
       builder.Services.AddHostedService<ScheduledScrapingService>();
 
@@ -147,7 +150,19 @@ namespace vrScraper
       using (var scope = app.Services.CreateScope())
       {
         var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var pending = context.Database.GetPendingMigrations().ToList();
+        if (pending.Count > 0)
+        {
+          Console.WriteLine($"Applying {pending.Count} pending migration(s): {string.Join(", ", pending)}");
+          Console.WriteLine("This may take a few minutes for large data migrations...");
+          // Disable FK checks before migration so bulk INSERT...SELECT is fast
+          context.Database.ExecuteSqlRaw("PRAGMA foreign_keys = OFF;");
+        }
         context.Database.Migrate();
+        // Always ensure FK checks are on after migration
+        context.Database.ExecuteSqlRaw("PRAGMA foreign_keys = ON;");
+        if (pending.Count > 0)
+          Console.WriteLine("Database migrations complete.");
 
         //seeding
         DbDefaults.SeedDefaultSettings(context);
@@ -190,9 +205,12 @@ namespace vrScraper
       var tabService = app.Services.GetRequiredService<ITabService>();
       await tabService.Initialize();
 
-      // Open the browser asynchronously
+      // Open the browser unless --headless flag is set
       var url = $"http://127.0.0.1:{builder.Configuration.GetValue<int>("Port")}";
-      _ = Task.Run(() => OpenBrowser(url));
+      if (!args.Contains("--headless"))
+        _ = Task.Run(() => OpenBrowser(url));
+      else
+        Console.WriteLine($"Headless mode — listening on {url}");
 
       app.Run();
     }

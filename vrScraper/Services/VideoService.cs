@@ -44,7 +44,10 @@ namespace vrScraper.Services
       logger.LogInformation("reloading all video meta data");
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-      var items = await context.VideoItems.Include(a => a.Tags).Include(a => a.Stars).AsNoTracking().AsSplitQuery().ToListAsync();
+      var items = await context.VideoItems
+        .Include(a => a.Tags).Include(a => a.Stars)
+        .Include(a => a.VideoStars).Include(a => a.VideoTags)
+        .AsNoTracking().AsSplitQuery().ToListAsync();
       lock (_videoLock)
       {
         this.videoItems = items;
