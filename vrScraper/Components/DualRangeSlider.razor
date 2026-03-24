@@ -1,0 +1,54 @@
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="dual-range" id="@_id">
+    <div class="dual-range-labels">
+        <span class="dual-range-value dual-range-label-min">@(MinValue > 0 ? $"{MinValue}m" : "0")</span>
+        <span class="dual-range-value dual-range-label-max">@(MaxValue < Max ? $"{MaxValue}m" : "Max")</span>
+    </div>
+    <div class="dual-range-track">
+        <div class="dual-range-fill"></div>
+        <input type="range" class="dual-range-input dual-range-min" min="@Min" max="@Max" step="@Step" value="@MinValue" />
+        <input type="range" class="dual-range-input dual-range-max" min="@Min" max="@Max" step="@Step" value="@MaxValue" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Min { get; set; } = 0;
+    [Parameter] public int Max { get; set; } = 120;
+    [Parameter] public int Step { get; set; } = 5;
+
+    [Parameter] public int MinValue { get; set; } = 0;
+    [Parameter] public EventCallback<int> MinValueChanged { get; set; }
+
+    [Parameter] public int MaxValue { get; set; } = 120;
+    [Parameter] public EventCallback<int> MaxValueChanged { get; set; }
+
+    private string _id = $"dr-{Guid.NewGuid():N}";
+    private DotNetObjectReference<DualRangeSlider>? _dotNetRef;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("dualRange.init", _id, _dotNetRef, Min, Max, Step, MinValue, MaxValue);
+            _initialized = true;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnSliderCommit(int minVal, int maxVal)
+    {
+        MinValue = minVal;
+        MaxValue = maxVal;
+        await MinValueChanged.InvokeAsync(minVal);
+        await MaxValueChanged.InvokeAsync(maxVal);
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+    }
+}
