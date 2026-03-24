@@ -243,7 +243,7 @@ namespace vrScraper.Services
       map['\u028E'] = 'y'; // ʎ
       map['\u0285'] = 'l'; // ʅ (squat reversed esh, used as l)
       map['\u029E'] = 'k'; // ʞ
-      map['\u0253'] = 'b'; // ɓ (used as b upside down)
+      map['\u0253'] = 'g'; // ɓ (upside-down g — visually looks like rotated g)
       map['\u1D09'] = 'i'; // ᴉ (turned i)
       map['\u0183'] = 'b'; // ƃ
       map['\uA72D'] = 'd'; // ꜭ (turned D variant)
@@ -610,6 +610,142 @@ namespace vrScraper.Services
       ['9'] = 'g',
     };
 
+    // ── Ambiguous character pairs for dictionary-based post-correction ──
+    private static readonly (char from, char to)[] AmbiguousPairs =
+    [
+      ('l', 'i'), ('i', 'l'),  // l ↔ i
+      ('I', 'l'), ('v', 'u'),  // I → l, v → u
+      ('u', 'v'),              // u → v
+      ('b', 'g'), ('g', 'b'),  // b ↔ g (upside-down ambiguity)
+    ];
+
+    // ── Dictionary for post-processing correction ──
+    private static readonly HashSet<string> WordDictionary = BuildDictionary();
+    private readonly HashSet<string> _dynamicDictionary = new(StringComparer.OrdinalIgnoreCase);
+    private bool _dynamicDictionaryLoaded;
+
+    private static HashSet<string> BuildDictionary()
+    {
+      var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+      // Common English words (500+)
+      foreach (var w in "a an the and or but in on at to for of with by from is it its not no yes be am are was were been has have had do does did will would shall should can could may might must get got let set put run say see go come give take make like love know want need find look feel think back good bad big small hot cold new old first last long short hard easy best more most very much just only even still also too than then when where how who what which this that here there now up down out over off into about between through again another both each other such being having going coming making taking getting doing saying looking feeling thinking after before during while because never always every some any really around under inside outside above below near next still away right left sure thing way much many well just already quite really".Split(' '))
+        words.Add(w);
+
+      // Pronouns, prepositions, conjunctions
+      foreach (var w in "her his she he him they them their your my our its me us you we who whom whose what which that these those i my mine myself we our ours ourselves you your yours yourself yourselves he him his himself she her hers herself it its itself they them their theirs themselves".Split(' '))
+        words.Add(w);
+
+      // Common adjectives/adverbs used in titles
+      foreach (var w in "little pretty beautiful gorgeous stunning amazing perfect special private secret exclusive premium young teen mature old new blonde brunette redhead ebony latina asian japanese black white pink blue red wild crazy dirty nasty naughty horny wet tight slim thick curvy busty petite tall skinny tiny huge giant massive enormous giant small large big great super ultra mega extra intense extreme deep full open close free easy real hard soft long quick slow fast rough gentle sweet lovely cute adorable innocent guilty lucky happy ready willing eager forbidden taboo unexpected surprised caught cheating lazy sleepy drunk sober naked nude topless dressed undressed covered oiled tattooed pierced shaved smooth hairy natural fake enhanced silicone athletic fit toned muscular skinny chubby plump bbw thicc juicy perky round flat firm bouncy floppy saggy swollen puffy".Split(' '))
+        words.Add(w);
+
+      // Verbs common in titles
+      foreach (var w in "fuck fucked fucking fucks suck sucked sucking sucks lick licked licking licks kiss kissed kissing ride riding rode rides bang banged banging blow blew blowing cum came coming cums swallow swallowed swallowing squirt squirted squirting gape gaped gaping choke choked choking spank spanked spanking tie tied tying bind bound flash flashed flashing strip stripped stripping tease teased teasing seduce seduced seducing surprise surprised surprising catch caught catching cheat cheated cheating share shared sharing swap swapped swapping watch watched watching film filmed filming record recorded recording help helped helping teach taught teaching learn learned learning train trained training punish punished punishing reward rewarded rewarding serve served serving clean cleaned cleaning cook cooked cooking deliver delivered delivering fix fixed fixing massage massaged massaging shower showered showering bathe bathed bathing swim swimming exercise exercised exercising stretch stretched stretching bend bending spread spreading squeeze squeezed squeezing thrust thrusting pound pounding hammer hammered hammering drill drilled drilling slam slammed slamming smash smashed smashing wreck wrecked wrecking destroy destroyed destroying dominate dominated dominating submit submitted submitting obey obeyed obeying beg begged begging plead pleaded please pleased pleasing satisfy satisfied satisfying crave craved craving desire desired desiring worship worshipped worshipping adore adored".Split(' '))
+        words.Add(w);
+
+      // Nouns — people, places, things in titles
+      foreach (var w in "girl girls boy boys woman women man men lady ladies guy guys babe babes chick doll model actress pornstar performer star queen princess goddess angel devil demon slut whore bitch mistress master slave maid butler driver pilot captain soldier officer guard warden inmate prisoner cop police detective agent spy thief robber burglar pirate ninja samurai knight prince king emperor gladiator warrior fighter boxer wrestler athlete coach trainer instructor professor tutor mentor boss manager director ceo secretary assistant intern employee worker colleague coworker client customer patient landlord tenant neighbor stranger guest visitor tourist traveler hiker camper swimmer diver surfer skater dancer singer actress musician artist painter photographer reporter journalist writer author poet".Split(' '))
+        words.Add(w);
+
+      foreach (var w in "mom mommy mother mama dad daddy father papa son daughter sister brother aunt uncle cousin nephew niece grandmother grandfather grandma grandpa granny wife husband bride groom fiancee boyfriend girlfriend lover partner friend bestfriend roommate classmate teammate babysitter nanny tutor stepmother stepfather stepmom stepdad stepsister stepbrother stepdaughter stepson".Split(' '))
+        words.Add(w);
+
+      foreach (var w in "house home room bedroom bathroom kitchen living dining garage attic basement closet office studio apartment penthouse mansion villa cottage cabin lodge hotel motel resort spa gym pool jacuzzi sauna shower bath tub couch sofa bed mattress desk table chair floor wall door window balcony patio garden yard backyard rooftop beach island forest mountain lake river ocean park street alley parking car bus train plane boat yacht helicopter elevator staircase hallway lobby reception waiting dressing locker changing fitting prison cell dungeon castle tower church temple shrine library museum gallery theater cinema stadium arena ring cage bar club pub restaurant cafe diner shop store mall market salon barbershop tattoo parlor massage".Split(' '))
+        words.Add(w);
+
+      // Adult content vocabulary
+      foreach (var w in "milf gilf dilf cougar pawg bbc bwc bbw ssbbw pov vr virtual reality threesome foursome fivesome gangbang bukkake orgy creampie facial cumshot blowjob handjob footjob rimjob titjob assjob throatpie internal external anal oral vaginal double triple penetration dp dvp dap airtight deepthroat gagging choking edging orgasm climax finish compilation montage pmv hmv converted remaster remastered fisting pegging strapon dildo vibrator toy toys fleshlight onahole insertion gaping prolapse enema squirting pissing watersports golden bondage bdsm shibari rope chain handcuff blindfold gag ball collar leash whip flogger paddle crop candle wax clamp clothespin cage chastity femdom maledom switch dominant submissive slave pet play cosplay roleplay fantasy scenario uniform costume outfit dress suit armor bikini lingerie underwear panties bra thong stockings fishnets heels boots gloves mask wig".Split(' '))
+        words.Add(w);
+
+      // Body parts and descriptors
+      foreach (var w in "ass butt booty pussy cunt vagina cock dick penis tits boobs breasts chest nipples clit clitoris lips mouth tongue throat neck shoulders arms hands fingers nails feet toes legs thighs hips waist belly stomach abs core back spine ribs pelvis groin hole holes balls testicles shaft tip head skin hair bush landing strip tattoo tattoos piercing piercings scar birthmark freckle mole dimple muscle muscles bone bones joint joints vein veins nerve nerves".Split(' '))
+        words.Add(w);
+
+      // Common title structure words
+      foreach (var w in "part episode scene chapter vol volume season series number special edition version extended full complete total uncut uncensored raw director cut behind scenes making exclusive debut premiere release return encore final ultimate best greatest collection compilation mix set bundle pack remastered remaster converted ai upscale enhanced improved restored".Split(' '))
+        words.Add(w);
+
+      // Common misspellings and variations
+      foreach (var w in "luv cum cumming orgasming pleasuring servicing worshiping".Split(' '))
+        words.Add(w);
+
+      // Additional common English words that frequently appear in titles
+      foreach (var w in "service services surprise surprised surprising birthday christmas halloween valentine valentines easter morning afternoon evening night midnight weekend holiday honeymoon anniversary wedding engagement date dinner lunch breakfast coffee drinks party club meeting appointment business trip travel adventure mission quest challenge game games play playing player luck lucky fortune golden silver diamond crystal angel devil fire flame ice snow rain storm thunder lightning dream dreams nightmare sleep sleeping awake waking morning routine daily weekly monthly annual professional amateur beginner expert master class lesson tutorial guide show performance stage concert live stream recording session practice rehearsal preparation celebration ceremony ritual tradition culture history story stories tale legend myth adventure journey road path trail expedition discovery exploration hunt treasure search rescue escape prison break breakout freedom liberation revenge justice truth dare bet wager challenge competition contest race fight battle war peace".Split(' '))
+        words.Add(w);
+
+      // More occupation/role words
+      foreach (var w in "service servant waitress waiter bartender chef baker florist gardener cleaner janitor mechanic electrician plumber carpenter painter decorator designer architect engineer scientist researcher professor librarian accountant lawyer judge attorney prosecutor detective investigator analyst consultant advisor counselor therapist psychiatrist psychologist surgeon specialist technician assistant receptionist operator dispatcher coordinator supervisor inspector examiner auditor pharmacist veterinarian dentist orthodontist optometrist chiropractor physiotherapist acupuncturist masseuse masseur barber hairdresser stylist makeup artist photographer videographer cinematographer director producer editor writer journalist blogger influencer streamer gamer programmer developer hacker".Split(' '))
+        words.Add(w);
+
+      // Clothing and appearance
+      foreach (var w in "clothing clothes dress dressed dressing shirt blouse top skirt pants jeans shorts leggings tights pantyhose underwear panties bra thong gstring corset bustier bodysuit jumpsuit romper robe bathrobe towel apron mask glasses sunglasses hat cap helmet crown tiara veil scarf gloves mittens belt buckle zipper button lace silk satin leather latex rubber vinyl mesh sheer transparent opaque tight loose fitted baggy torn ripped vintage retro modern classy elegant casual formal professional sporty athletic military".Split(' '))
+        words.Add(w);
+
+      // Actions and descriptors commonly in titles
+      foreach (var w in "caught cheating secretly hidden camera spy voyeur peeping watching observing discovered exposed revealed confessed admitted betrayed forgiven punished rewarded testing tested trying tried failing failed passing passed winning losing playing pretending faking lying telling truth truth dare daring challenged accepted declined rejected refused invited welcomed received greeted approached introduced presented offered given taken stolen borrowed returned exchanged traded sold bought paid hired fired promoted demoted transferred assigned".Split(' '))
+        words.Add(w);
+
+      return words;
+    }
+
+    private void EnsureDynamicDictionary()
+    {
+      if (_dynamicDictionaryLoaded) return;
+      _dynamicDictionaryLoaded = true;
+
+      try
+      {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+        // Add all star name parts
+        foreach (var star in context.Stars.Select(s => s.Name).ToList())
+        {
+          foreach (var part in star.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            _dynamicDictionary.Add(part.ToLowerInvariant());
+        }
+
+        // Add all tag names
+        foreach (var tag in context.Tags.Select(t => t.Name).ToList())
+        {
+          _dynamicDictionary.Add(tag.ToLowerInvariant());
+          foreach (var part in tag.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            _dynamicDictionary.Add(part.ToLowerInvariant());
+        }
+
+        // Extract vocabulary from non-obfuscated titles (best domain-specific word source)
+        var cleanTitles = context.VideoItems
+          .Select(v => v.Title)
+          .ToList()
+          .Where(t => !IsObfuscated(t))
+          .ToList();
+
+        foreach (var title in cleanTitles)
+        {
+          foreach (var word in title.Split([' ', '-', ',', '.', '(', ')', ':', '\'', '"', '!', '?'], StringSplitOptions.RemoveEmptyEntries))
+          {
+            var clean = word.Trim().ToLowerInvariant();
+            if (clean.Length >= 3 && clean.All(char.IsLetter))
+              _dynamicDictionary.Add(clean);
+          }
+        }
+
+        logger.LogInformation("Dynamic dictionary loaded: {Count} words (from stars, tags, and {Titles} clean titles)",
+          _dynamicDictionary.Count, cleanTitles.Count);
+      }
+      catch (Exception ex)
+      {
+        logger.LogWarning(ex, "Failed to load dynamic dictionary");
+      }
+    }
+
+    private bool IsInDictionary(string word)
+    {
+      var lower = word.ToLowerInvariant();
+      return WordDictionary.Contains(lower) || _dynamicDictionary.Contains(lower);
+    }
+
     // Characters that are upside-down versions of Latin letters — words made of these need reversing
     private static readonly HashSet<char> UpsideDownChars =
     [
@@ -669,8 +805,11 @@ namespace vrScraper.Services
     {
       if (string.IsNullOrWhiteSpace(title)) return title;
 
+      EnsureDynamicDictionary();
+
       var result = NormalizeUnicode(title);
       result = DecodeLeetSpeak(result);
+      result = PostProcessWithDictionary(result);
       result = CollapseSpaces(result);
       result = ToTitleCase(result);
 
@@ -1134,6 +1273,91 @@ namespace vrScraper.Services
         }
       }
       return string.Join(' ', words);
+    }
+
+    /// <summary>
+    /// Post-processes decoded text using dictionary lookup to resolve ambiguous characters.
+    /// E.g. "Biake" → try I→l → "Blake" (in dictionary) → use "Blake"
+    /// </summary>
+    private string PostProcessWithDictionary(string input)
+    {
+      var words = input.Split(' ');
+      var result = new string[words.Length];
+
+      for (int w = 0; w < words.Length; w++)
+      {
+        var word = words[w];
+
+        // Handle hyphenated words (e.g. "step-dad")
+        if (word.Contains('-'))
+        {
+          var parts = word.Split('-');
+          var corrected = parts.Select(p => CorrectWord(p)).ToArray();
+          result[w] = string.Join('-', corrected);
+        }
+        else
+        {
+          result[w] = CorrectWord(word);
+        }
+      }
+
+      return string.Join(' ', result);
+    }
+
+    private string CorrectWord(string word)
+    {
+      if (word.Length < 2) return word;
+      if (IsInDictionary(word)) return word;
+
+      // Find positions with ambiguous characters
+      var ambiguousPositions = new List<(int pos, char from, char to)>();
+      var lower = word.ToLowerInvariant();
+
+      for (int i = 0; i < lower.Length; i++)
+      {
+        foreach (var (from, to) in AmbiguousPairs)
+        {
+          if (lower[i] == from)
+            ambiguousPositions.Add((i, from, to));
+        }
+      }
+
+      if (ambiguousPositions.Count == 0) return word;
+
+      // Generate candidates (limit to max 4 ambiguous positions to avoid explosion)
+      var positions = ambiguousPositions.Take(4).ToList();
+      int combCount = 1 << positions.Count; // 2^n combinations
+
+      for (int combo = 1; combo < combCount; combo++)
+      {
+        var chars = lower.ToCharArray();
+        for (int bit = 0; bit < positions.Count; bit++)
+        {
+          if ((combo & (1 << bit)) != 0)
+          {
+            chars[positions[bit].pos] = positions[bit].to;
+          }
+        }
+
+        var candidate = new string(chars);
+        if (IsInDictionary(candidate))
+        {
+          // Preserve original casing pattern
+          var corrected = word.ToCharArray();
+          for (int bit = 0; bit < positions.Count; bit++)
+          {
+            if ((combo & (1 << bit)) != 0)
+            {
+              var pos = positions[bit].pos;
+              var newChar = positions[bit].to;
+              corrected[pos] = char.IsUpper(word[pos]) ? char.ToUpperInvariant(newChar) : newChar;
+            }
+          }
+          return new string(corrected);
+        }
+      }
+
+      return word; // No dictionary match found, keep original
     }
 
     private static int LevenshteinDistance(string s, string t)
