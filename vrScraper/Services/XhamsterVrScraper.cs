@@ -10,6 +10,7 @@ namespace vrScraper.Services
   {
     public string SiteName => "xhamster.com";
     public string DisplayName => "xHamster VR";
+    public bool IsExperimental => true;
 
     public Dictionary<string, string> GetProxyHeaders() => new()
     {

@@ -28,6 +28,8 @@ namespace vrScraper.Services
 
     private bool IsSiteEnabled(string siteName)
     {
+      if (_scrapers.TryGetValue(siteName, out var scraper) && scraper.IsExperimental)
+        return false;
       var defaultValue = siteName.Equals("eporner.com", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
       var value = _settingService.GetSettingValue($"Site:{siteName}:Enabled") ?? defaultValue;
       return value.Equals("true", StringComparison.OrdinalIgnoreCase);

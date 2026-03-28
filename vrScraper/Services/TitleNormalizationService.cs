@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using vrScraper.DB;
 using vrScraper.DB.Models;
@@ -478,6 +479,7 @@ namespace vrScraper.Services
       map['\u0289'] = 'u'; // ʉ→u
       map['\u1E9E'] = 'S'; // ẞ→S
       map['\uA7B5'] = 'r'; // ꞵ→? ꞅ
+      map['\uA784'] = 'R'; // Ꞅ→R (Latin capital letter insular R)
       map['\uA785'] = 'r'; // ꞅ→r (Latin small letter insular r)
 
       // Letterlike symbols (includes BMP chars for Script/Fraktur/DoubleStruck gaps)
@@ -517,6 +519,70 @@ namespace vrScraper.Services
       map['\u03F2'] = 'c'; // ϲ (Greek lunate sigma)
       map['\u03F9'] = 'C'; // Ϲ
       map['\u03FB'] = 'M'; // ϻ→M (seen in DB)
+
+      // ── Lisu Script (U+A4D0-A4FF) ────────────────────────────────
+      map['\uA4D0'] = 'A'; // ꓐ
+      map['\uA4D1'] = 'N'; // ꓑ
+      map['\uA4D5'] = 'T'; // ꓕ
+      map['\uA4D6'] = 'G'; // ꓖ
+      map['\uA4DA'] = 'C'; // ꓚ
+      map['\uA4DB'] = 'C'; // ꓛ
+      map['\uA4DD'] = 'F'; // ꓝ
+      map['\uA4DE'] = 'Y'; // ꓞ
+      map['\uA4E0'] = 'N'; // ꓠ
+      map['\uA4E2'] = 'S'; // ꓢ
+      map['\uA4E3'] = 'N'; // ꓣ
+      map['\uA4E4'] = 'U'; // ꓤ
+      map['\uA4E6'] = 'V'; // ꓦ
+      map['\uA4E7'] = 'H'; // ꓧ
+      map['\uA4E8'] = 'Y'; // ꓨ
+      map['\uA4EC'] = 'X'; // ꓬ
+      map['\uA4ED'] = 'G'; // ꓭ
+      map['\uA4EE'] = 'E'; // ꓮ
+      map['\uA4F0'] = 'A'; // ꓰ
+      map['\uA4F2'] = 'I'; // ꓲ
+      map['\uA4F5'] = 'F'; // ꓵ
+      map['\uA4F6'] = 'F'; // ꓶ
+
+      // ── Cherokee (U+13A0-13FF) ───────────────────────────────────
+      map['\u13A5'] = 'I'; // Ꭵ
+      map['\u13A6'] = 'T'; // Ꮦ (approximation)
+      map['\u13A7'] = 'A'; // Ꮧ (approximation)
+      map['\u13AA'] = 'L'; // Ꮮ
+      map['\u13AB'] = 'E'; // Ꮛ (approximation)
+      map['\u13AD'] = 'L'; // Ꮭ
+      map['\u13B1'] = 'N'; // Ꮑ
+      map['\u13B2'] = 'H'; // Ꮒ
+      map['\u13BE'] = 'P'; // Ꭾ
+      map['\u13C6'] = 'G'; // Ꮆ
+      map['\u13C7'] = 'M'; // Ꮇ
+      map['\u13D2'] = 'S'; // Ꮪ
+      map['\u13DC'] = 'U'; // Ꮜ
+      map['\u13E2'] = 'R'; // Ꮢ
+      map['\u13F9'] = 'W'; // Ꮹ
+
+      // ── Additional IPA/Latin/CJK ─────────────────────────────────
+      map['\u0258'] = 'e'; // ɘ (reversed e)
+      map['\u0252'] = 'a'; // ɒ (turned alpha)
+      map['\u027F'] = 'r'; // ɿ (reversed r with fishhook)
+      map['\u01A8'] = 's'; // ƨ (tone two)
+      map['\u157C'] = 'H'; // ᕼ (Canadian Syllabics H)
+      map['\u2C6F'] = 'A'; // Ɐ (turned A)
+      map['\u5344'] = 'A'; // 卄→A (CJK)
+      map['\u3116'] = 'O'; // ㄖ (Bopomofo)
+      map['\u3125'] = 'L'; // ㄥ (Bopomofo)
+      map['\u5343'] = 'F'; // 千 (CJK)
+      map['\u4E59'] = 'Z'; // 乙 (CJK)
+      map['\u4E05'] = 'T'; // 丅 (CJK)
+      map['\u3129'] = 'U'; // ㄩ (Bopomofo)
+      map['\u5C71'] = 'W'; // 山 (CJK)
+
+      // ── Circled Digits ①-⑳ ──────────────────────────────────────
+      for (int i = 0; i < 20; i++)
+        map[(char)(0x2460 + i)] = i < 9 ? (char)('1' + i) : ' '; // ①-⑨ → 1-9, rest → space
+      // Negative circled ❶-❿
+      for (int i = 0; i < 10; i++)
+        map[(char)(0x2776 + i)] = (char)('1' + i);
 
       return map;
     }
@@ -594,6 +660,27 @@ namespace vrScraper.Services
       return map;
     }
 
+    // ── Accent Map for direct diacritic stripping ──────────────────────
+    private static readonly Dictionary<char, char> AccentMap = BuildAccentMap();
+    private static Dictionary<char, char> BuildAccentMap()
+    {
+      var map = new Dictionary<char, char>();
+      void Add(char baseChar, string accented)
+      {
+        foreach (var c in accented)
+        {
+          map[c] = baseChar;
+          map[char.ToUpperInvariant(c)] = char.ToUpperInvariant(baseChar);
+        }
+      }
+      Add('a', "àáâãäåăạǎǟ"); Add('e', "èéêëěẽęệėẻ"); Add('i', "ìíîïĩịĭǐ");
+      Add('o', "òóôõöőọǒȍ"); Add('u', "ùúûüůũụǔ"); Add('y', "ýÿŷ"); Add('n', "ñňń");
+      Add('c', "çčć"); Add('s', "šśşŝ"); Add('z', "žźżẑ"); Add('r', "řŕ");
+      Add('d', "ďđ"); Add('t', "ťŧ"); Add('l', "ľłĺ"); Add('g', "ğǧ");
+      Add('h', "ħȟ"); Add('b', "ƀ"); Add('w', "ŵ");
+      return map;
+    }
+
     // ── Leet-Speak Mappings ────────────────────────────────────────────
     private static readonly Dictionary<char, char> LeetMap = new()
     {
@@ -628,65 +715,58 @@ namespace vrScraper.Services
     {
       var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-      // Common English words (500+)
-      foreach (var w in "a an the and or but in on at to for of with by from is it its not no yes be am are was were been has have had do does did will would shall should can could may might must get got let set put run say see go come give take make like love know want need find look feel think back good bad big small hot cold new old first last long short hard easy best more most very much just only even still also too than then when where how who what which this that here there now up down out over off into about between through again another both each other such being having going coming making taking getting doing saying looking feeling thinking after before during while because never always every some any really around under inside outside above below near next still away right left sure thing way much many well just already quite really".Split(' '))
-        words.Add(w);
+      // Load embedded english_words.txt (234k NLTK words)
+      var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+      using var stream = assembly.GetManifestResourceStream("vrScraper.Resources.english_words.txt");
+      if (stream != null)
+      {
+        using var reader = new StreamReader(stream);
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+        {
+          line = line.Trim();
+          if (line.Length >= 3)
+            words.Add(line);
+        }
+      }
 
-      // Pronouns, prepositions, conjunctions
-      foreach (var w in "her his she he him they them their your my our its me us you we who whom whose what which that these those i my mine myself we our ours ourselves you your yours yourself yourselves he him his himself she her hers herself it its itself they them their theirs themselves".Split(' '))
-        words.Add(w);
-
-      // Common adjectives/adverbs used in titles
-      foreach (var w in "little pretty beautiful gorgeous stunning amazing perfect special private secret exclusive premium young teen mature old new blonde brunette redhead ebony latina asian japanese black white pink blue red wild crazy dirty nasty naughty horny wet tight slim thick curvy busty petite tall skinny tiny huge giant massive enormous giant small large big great super ultra mega extra intense extreme deep full open close free easy real hard soft long quick slow fast rough gentle sweet lovely cute adorable innocent guilty lucky happy ready willing eager forbidden taboo unexpected surprised caught cheating lazy sleepy drunk sober naked nude topless dressed undressed covered oiled tattooed pierced shaved smooth hairy natural fake enhanced silicone athletic fit toned muscular skinny chubby plump bbw thicc juicy perky round flat firm bouncy floppy saggy swollen puffy".Split(' '))
-        words.Add(w);
-
-      // Verbs common in titles
-      foreach (var w in "fuck fucked fucking fucks suck sucked sucking sucks lick licked licking licks kiss kissed kissing ride riding rode rides bang banged banging blow blew blowing cum came coming cums swallow swallowed swallowing squirt squirted squirting gape gaped gaping choke choked choking spank spanked spanking tie tied tying bind bound flash flashed flashing strip stripped stripping tease teased teasing seduce seduced seducing surprise surprised surprising catch caught catching cheat cheated cheating share shared sharing swap swapped swapping watch watched watching film filmed filming record recorded recording help helped helping teach taught teaching learn learned learning train trained training punish punished punishing reward rewarded rewarding serve served serving clean cleaned cleaning cook cooked cooking deliver delivered delivering fix fixed fixing massage massaged massaging shower showered showering bathe bathed bathing swim swimming exercise exercised exercising stretch stretched stretching bend bending spread spreading squeeze squeezed squeezing thrust thrusting pound pounding hammer hammered hammering drill drilled drilling slam slammed slamming smash smashed smashing wreck wrecked wrecking destroy destroyed destroying dominate dominated dominating submit submitted submitting obey obeyed obeying beg begged begging plead pleaded please pleased pleasing satisfy satisfied satisfying crave craved craving desire desired desiring worship worshipped worshipping adore adored".Split(' '))
-        words.Add(w);
-
-      // Nouns — people, places, things in titles
-      foreach (var w in "girl girls boy boys woman women man men lady ladies guy guys babe babes chick doll model actress pornstar performer star queen princess goddess angel devil demon slut whore bitch mistress master slave maid butler driver pilot captain soldier officer guard warden inmate prisoner cop police detective agent spy thief robber burglar pirate ninja samurai knight prince king emperor gladiator warrior fighter boxer wrestler athlete coach trainer instructor professor tutor mentor boss manager director ceo secretary assistant intern employee worker colleague coworker client customer patient landlord tenant neighbor stranger guest visitor tourist traveler hiker camper swimmer diver surfer skater dancer singer actress musician artist painter photographer reporter journalist writer author poet".Split(' '))
-        words.Add(w);
-
-      foreach (var w in "mom mommy mother mama dad daddy father papa son daughter sister brother aunt uncle cousin nephew niece grandmother grandfather grandma grandpa granny wife husband bride groom fiancee boyfriend girlfriend lover partner friend bestfriend roommate classmate teammate babysitter nanny tutor stepmother stepfather stepmom stepdad stepsister stepbrother stepdaughter stepson".Split(' '))
-        words.Add(w);
-
-      foreach (var w in "house home room bedroom bathroom kitchen living dining garage attic basement closet office studio apartment penthouse mansion villa cottage cabin lodge hotel motel resort spa gym pool jacuzzi sauna shower bath tub couch sofa bed mattress desk table chair floor wall door window balcony patio garden yard backyard rooftop beach island forest mountain lake river ocean park street alley parking car bus train plane boat yacht helicopter elevator staircase hallway lobby reception waiting dressing locker changing fitting prison cell dungeon castle tower church temple shrine library museum gallery theater cinema stadium arena ring cage bar club pub restaurant cafe diner shop store mall market salon barbershop tattoo parlor massage".Split(' '))
-        words.Add(w);
-
-      // Adult content vocabulary
-      foreach (var w in "milf gilf dilf cougar pawg bbc bwc bbw ssbbw pov vr virtual reality threesome foursome fivesome gangbang bukkake orgy creampie facial cumshot blowjob handjob footjob rimjob titjob assjob throatpie internal external anal oral vaginal double triple penetration dp dvp dap airtight deepthroat gagging choking edging orgasm climax finish compilation montage pmv hmv converted remaster remastered fisting pegging strapon dildo vibrator toy toys fleshlight onahole insertion gaping prolapse enema squirting pissing watersports golden bondage bdsm shibari rope chain handcuff blindfold gag ball collar leash whip flogger paddle crop candle wax clamp clothespin cage chastity femdom maledom switch dominant submissive slave pet play cosplay roleplay fantasy scenario uniform costume outfit dress suit armor bikini lingerie underwear panties bra thong stockings fishnets heels boots gloves mask wig".Split(' '))
-        words.Add(w);
-
-      // Body parts and descriptors
-      foreach (var w in "ass butt booty pussy cunt vagina cock dick penis tits boobs breasts chest nipples clit clitoris lips mouth tongue throat neck shoulders arms hands fingers nails feet toes legs thighs hips waist belly stomach abs core back spine ribs pelvis groin hole holes balls testicles shaft tip head skin hair bush landing strip tattoo tattoos piercing piercings scar birthmark freckle mole dimple muscle muscles bone bones joint joints vein veins nerve nerves".Split(' '))
-        words.Add(w);
-
-      // Common title structure words
-      foreach (var w in "part episode scene chapter vol volume season series number special edition version extended full complete total uncut uncensored raw director cut behind scenes making exclusive debut premiere release return encore final ultimate best greatest collection compilation mix set bundle pack remastered remaster converted ai upscale enhanced improved restored".Split(' '))
-        words.Add(w);
-
-      // Common misspellings and variations
-      foreach (var w in "luv cum cumming orgasming pleasuring servicing worshiping".Split(' '))
-        words.Add(w);
-
-      // Additional common English words that frequently appear in titles
-      foreach (var w in "service services surprise surprised surprising birthday christmas halloween valentine valentines easter morning afternoon evening night midnight weekend holiday honeymoon anniversary wedding engagement date dinner lunch breakfast coffee drinks party club meeting appointment business trip travel adventure mission quest challenge game games play playing player luck lucky fortune golden silver diamond crystal angel devil fire flame ice snow rain storm thunder lightning dream dreams nightmare sleep sleeping awake waking morning routine daily weekly monthly annual professional amateur beginner expert master class lesson tutorial guide show performance stage concert live stream recording session practice rehearsal preparation celebration ceremony ritual tradition culture history story stories tale legend myth adventure journey road path trail expedition discovery exploration hunt treasure search rescue escape prison break breakout freedom liberation revenge justice truth dare bet wager challenge competition contest race fight battle war peace".Split(' '))
-        words.Add(w);
-
-      // More occupation/role words
-      foreach (var w in "service servant waitress waiter bartender chef baker florist gardener cleaner janitor mechanic electrician plumber carpenter painter decorator designer architect engineer scientist researcher professor librarian accountant lawyer judge attorney prosecutor detective investigator analyst consultant advisor counselor therapist psychiatrist psychologist surgeon specialist technician assistant receptionist operator dispatcher coordinator supervisor inspector examiner auditor pharmacist veterinarian dentist orthodontist optometrist chiropractor physiotherapist acupuncturist masseuse masseur barber hairdresser stylist makeup artist photographer videographer cinematographer director producer editor writer journalist blogger influencer streamer gamer programmer developer hacker".Split(' '))
-        words.Add(w);
-
-      // Clothing and appearance
-      foreach (var w in "clothing clothes dress dressed dressing shirt blouse top skirt pants jeans shorts leggings tights pantyhose underwear panties bra thong gstring corset bustier bodysuit jumpsuit romper robe bathrobe towel apron mask glasses sunglasses hat cap helmet crown tiara veil scarf gloves mittens belt buckle zipper button lace silk satin leather latex rubber vinyl mesh sheer transparent opaque tight loose fitted baggy torn ripped vintage retro modern classy elegant casual formal professional sporty athletic military".Split(' '))
-        words.Add(w);
-
-      // Actions and descriptors commonly in titles
-      foreach (var w in "caught cheating secretly hidden camera spy voyeur peeping watching observing discovered exposed revealed confessed admitted betrayed forgiven punished rewarded testing tested trying tried failing failed passing passed winning losing playing pretending faking lying telling truth truth dare daring challenged accepted declined rejected refused invited welcomed received greeted approached introduced presented offered given taken stolen borrowed returned exchanged traded sold bought paid hired fired promoted demoted transferred assigned".Split(' '))
+      // Add domain-specific words not in NLTK
+      foreach (var w in "milf gilf dilf cougar pawg bbc bwc bbw ssbbw pov vr threesome foursome fivesome gangbang bukkake orgy creampie facial cumshot blowjob handjob footjob rimjob titjob assjob throatpie deepthroat gagging edging orgasm squirting fisting pegging strapon dildo vibrator fleshlight gaping prolapse bondage bdsm shibari femdom maledom cosplay roleplay lingerie stockings fishnets pantyhose bodysuit corset bikini stepmom stepdad stepsister stepbrother stepdaughter stepson babysitter nanny roommate coworker landlord pornstar webcam livestream onlyfans chaturbate brazzers naughtyamerica realitykings bangbros mofos tushy vixen blacked wankz virtualreal darkroom slr vrbangers vrhush vrallure vrlatina hentai ahegao waifu senpai ecchi harem softcore hardcore interracial cuckold hotwife bdsm gangbanged creampied deepthroated squirted fisted pegged rimmed cuckolded dominated submitted".Split(' '))
         words.Add(w);
 
       return words;
+    }
+
+    // ── Canonical index for O(1) ambiguity resolution (i↔l, v↔u, b↔g) ──
+    private static readonly Dictionary<string, List<string>> CanonicalIndex = BuildCanonicalIndex();
+
+    private static Dictionary<string, List<string>> BuildCanonicalIndex()
+    {
+      var index = new Dictionary<string, List<string>>();
+      foreach (var word in WordDictionary)
+      {
+        var canon = Canonicalize(word);
+        if (!index.ContainsKey(canon))
+          index[canon] = [];
+        index[canon].Add(word);
+      }
+      return index;
+    }
+
+    private static string Canonicalize(string word)
+    {
+      var sb = new StringBuilder(word.Length);
+      foreach (var c in word.ToLowerInvariant())
+      {
+        sb.Append(c switch
+        {
+          'i' or 'l' => '*',
+          'v' or 'u' => '#',
+          'b' or 'g' => '@',
+          _ => c
+        });
+      }
+      return sb.ToString();
     }
 
     private void EnsureDynamicDictionary()
@@ -714,20 +794,30 @@ namespace vrScraper.Services
             _dynamicDictionary.Add(part.ToLowerInvariant());
         }
 
-        // Extract vocabulary from non-obfuscated titles (best domain-specific word source)
+        // Extract vocabulary from non-obfuscated titles
+        // Only add words that are ALREADY in the main dictionary (prevents pollution from
+        // obfuscated titles that IsObfuscated() missed, like i/l swaps: "Mldnlght")
         var cleanTitles = context.VideoItems
           .Select(v => v.Title)
           .ToList()
           .Where(t => !IsObfuscated(t))
           .ToList();
 
+        int cleanWordsAdded = 0;
         foreach (var title in cleanTitles)
         {
           foreach (var word in title.Split([' ', '-', ',', '.', '(', ')', ':', '\'', '"', '!', '?'], StringSplitOptions.RemoveEmptyEntries))
           {
             var clean = word.Trim().ToLowerInvariant();
             if (clean.Length >= 3 && clean.All(char.IsLetter))
-              _dynamicDictionary.Add(clean);
+            {
+              // Only add if it's a known English word (prevents "mldnlght" etc.)
+              if (WordDictionary.Contains(clean))
+              {
+                _dynamicDictionary.Add(clean);
+                cleanWordsAdded++;
+              }
+            }
           }
         }
 
@@ -743,7 +833,20 @@ namespace vrScraper.Services
     private bool IsInDictionary(string word)
     {
       var lower = word.ToLowerInvariant();
-      return WordDictionary.Contains(lower) || _dynamicDictionary.Contains(lower);
+      if (WordDictionary.Contains(lower) || _dynamicDictionary.Contains(lower))
+        return true;
+      // Check common inflections: strip trailing s/es/ed/ing/er
+      if (lower.EndsWith("s") && WordDictionary.Contains(lower[..^1]))
+        return true;
+      if (lower.EndsWith("es") && WordDictionary.Contains(lower[..^2]))
+        return true;
+      if (lower.EndsWith("ed") && WordDictionary.Contains(lower[..^2]))
+        return true;
+      if (lower.EndsWith("ing") && lower.Length > 5 && WordDictionary.Contains(lower[..^3]))
+        return true;
+      if (lower.EndsWith("ers") && WordDictionary.Contains(lower[..^1])) // honeymooners → honeymooner
+        return true;
+      return false;
     }
 
     // Characters that are upside-down versions of Latin letters — words made of these need reversing
@@ -772,9 +875,29 @@ namespace vrScraper.Services
 
     // ── Public API ─────────────────────────────────────────────────────
 
+    /// <summary>File extensions that indicate the title is a filename, not obfuscated text.</summary>
+    private static readonly string[] FileExtensions = [".mp4", ".avi", ".mkv", ".wmv", ".mov", ".flv", ".webm", ".m4v"];
+
     public bool IsObfuscated(string title)
     {
       if (string.IsNullOrWhiteSpace(title)) return false;
+
+      // Filenames are not obfuscated — they just happen to contain metadata
+      // Check original, confusable-decoded, and Cyrillic-lookalike variants
+      // Cyrillic р(U+0440) looks like p, so .mр4 = .mp4
+      var titleForExtCheck = title
+        .Replace('\u0440', 'p')  // Cyrillic р → p
+        .Replace('\u0435', 'e')  // Cyrillic е → e
+        .Replace('\u043E', 'o')  // Cyrillic о → o
+        .Replace('\u0430', 'a'); // Cyrillic а → a
+      if (FileExtensions.Any(ext => titleForExtCheck.Contains(ext, StringComparison.OrdinalIgnoreCase)))
+        return false;
+
+      // Titles with significant CJK/Japanese/Korean content are not leet-obfuscated
+      // (they may contain catalog codes like "Test339B天月あず" which should not be decoded)
+      int cjkChars = title.Count(c => c >= 0x3000 && c <= 0x9FFF || c >= 0xAC00 && c <= 0xD7AF || c >= 0x3040 && c <= 0x30FF);
+      if (cjkChars >= 3)
+        return false;
 
       int suspiciousChars = 0;
       int leetTransitions = 0;
@@ -801,15 +924,28 @@ namespace vrScraper.Services
       return suspiciousChars > 2 || leetTransitions > 4;
     }
 
-    public string NormalizeTitle(string title)
+    public string? NormalizeTitle(string title)
+    {
+      if (string.IsNullOrWhiteSpace(title)) return null;
+      var decoded = NormalizeTitleLegacy(title);
+      return decoded != title ? decoded : null;
+    }
+
+    public string NormalizeTitleLegacy(string title)
     {
       if (string.IsNullOrWhiteSpace(title)) return title;
+
+      // Decode HTML entities
+      title = title.Replace("&#039;", "'").Replace("&amp;", "&")
+                   .Replace("&lt;", "<").Replace("&gt;", ">").Replace("&quot;", "\"");
 
       EnsureDynamicDictionary();
 
       var result = NormalizeUnicode(title);
+      result = HandleReversedAscii(result);
       result = DecodeLeetSpeak(result);
       result = PostProcessWithDictionary(result);
+      result = TryAltLeetFallback(result, title);
       result = CollapseSpaces(result);
       result = ToTitleCase(result);
 
@@ -861,7 +997,7 @@ namespace vrScraper.Services
         .ToList();
     }
 
-    public async Task<int> NormalizeAllTitles(bool forceReprocess = false, bool normalizeTitles = true, bool detectStars = true, bool detectTags = true, NormalizationProgress? progress = null)
+    public async Task<int> NormalizeAllTitles(bool forceReprocess = false, bool normalizeTitles = true, bool detectStars = true, bool detectTags = true, NormalizationProgress? progress = null, Action<string, string?, string>? onTitleProcessed = null, CancellationToken ct = default)
     {
       var allVideos = await videoService.GetVideoItems();
 
@@ -893,17 +1029,16 @@ namespace vrScraper.Services
       logger.LogInformation("Processing {Count} titles ({Obfuscated} obfuscated + {Normal} normal without stars/tags)",
         toProcess.Count, obfuscated.Count, withoutStarsOrTags.Count);
 
-      // Report total immediately so UI can show progress bar
       if (progress != null)
       {
         progress.Total = toProcess.Count;
-        progress.Phase = "Analyzing titles";
+        progress.Phase = "Initialisiere...";
       }
 
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-      var allStars = detectStars ? await context.Stars.Include(s => s.Videos).ToListAsync() : [];
-      var allTags = detectTags ? await context.Tags.Include(t => t.Videos).ToListAsync() : [];
+      var allStars = detectStars ? await context.Stars.Include(s => s.Videos).ToListAsync(ct) : [];
+      var allTags = detectTags ? await context.Tags.Include(t => t.Videos).ToListAsync(ct) : [];
 
       int processed = 0;
       int starsDetected = 0;
@@ -912,124 +1047,115 @@ namespace vrScraper.Services
 
       var obfuscatedIds = new HashSet<long>(obfuscated.Select(v => v.Id));
 
-      // Phase A: CPU-intensive work in parallel (normalize + detect — no DB writes)
-      var results = new System.Collections.Concurrent.ConcurrentBag<(
-        long VideoId, bool IsObfuscated, string? NormalizedTitle, string TitleForDetection,
-        List<(long StarId, double Confidence)> DetectedStarIds,
-        List<long> DetectedTagIds)>();
+      // Split into obfuscated and non-obfuscated (just star/tag detection)
+      var obfuscatedToProcess = toProcess.Where(v => obfuscatedIds.Contains(v.Id)).ToList();
+      var nonObfuscatedToProcess = toProcess.Where(v => !obfuscatedIds.Contains(v.Id)).ToList();
 
-      var starList = allStars.ToList(); // snapshot for thread-safe read
-      var tagList = allTags.ToList();
-
-      var totalCount = toProcess.Count;
-
-      // Run parallel analysis with periodic progress reporting
-      var parallelTask = Task.Run(() =>
+      // Process obfuscated titles: decoder only
+      if (normalizeTitles && obfuscatedToProcess.Count > 0)
       {
-        Parallel.ForEach(toProcess, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, video =>
-        {
-          bool isObf = obfuscatedIds.Contains(video.Id);
-          string? normalizedTitle = null;
-          string titleForDetection;
+        int unsicher = 0;
 
-          if (isObf && normalizeTitles)
+        for (int i = 0; i < obfuscatedToProcess.Count; i++)
+        {
+          ct.ThrowIfCancellationRequested();
+          var video = obfuscatedToProcess[i];
+
+          var decoded = NormalizeTitleLegacy(video.Title);
+          if (decoded != video.Title && IsPlausible(decoded))
           {
-            normalizedTitle = NormalizeTitle(video.Title);
-            titleForDetection = normalizedTitle;
+            // Decoder succeeded with plausible result
+            { var (s, t) = await SaveNormalization(context, video, decoded, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
+            onTitleProcessed?.Invoke(video.Title, decoded, "decoder");
+            titlesNormalized++;
+          }
+          else if (decoded != video.Title)
+          {
+            // Decoder changed the title but result is not plausible — save as "decoder-unsicher"
+            { var (s, t) = await SaveNormalization(context, video, decoded, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
+            onTitleProcessed?.Invoke(video.Title, decoded, "decoder-unsicher");
+            titlesNormalized++;
+            unsicher++;
           }
           else
           {
-            titleForDetection = video.Title;
+            // Decoder didn't change anything
+            onTitleProcessed?.Invoke(video.Title, null, "skip");
           }
 
-          var detectedStars = detectStars
-            ? DetectStars(titleForDetection, starList)
-                .Where(d => d.Confidence >= 0.7)
-                .Select(d => (d.Star.Id, d.Confidence))
-                .ToList()
-            : [];
-
-          var detectedTagIds = detectTags
-            ? DetectTags(titleForDetection, tagList)
-                .Select(t => t.Id)
-                .ToList()
-            : new List<long>();
-
-          results.Add((video.Id, isObf, normalizedTitle, titleForDetection, detectedStars, detectedTagIds));
-
-          var p = Interlocked.Increment(ref processed);
+          processed++;
           if (progress != null)
-            progress.Current = p;
-        });
-      });
+          {
+            progress.Current = processed;
+            progress.StarsDetected = starsDetected;
+            progress.TagsDetected = tagsDetected;
+            progress.TitlesNormalized = titlesNormalized;
+            progress.Phase = $"Decoder ({unsicher} unsicher)";
+          }
 
-      await parallelTask;
+          if (processed % 100 == 0)
+            await context.SaveChangesAsync(ct);
+        }
 
-      logger.LogInformation("Parallel analysis done for {Count} titles, now persisting to DB...", results.Count);
-      if (progress != null)
-      {
-        progress.Phase = "Saving to database";
-        progress.Current = 0;
-        progress.Total = results.Count;
+        await context.SaveChangesAsync(ct);
+
+        logger.LogInformation("Decoder handled {Total} obfuscated titles ({Unsicher} unsicher)",
+          obfuscatedToProcess.Count, unsicher);
       }
 
-      // Phase B: Sequential DB writes (EF Core is not thread-safe)
-      int dbProcessed = 0;
-      foreach (var result in results)
+      // Process non-obfuscated titles (star/tag detection only, no LLM)
+      if (progress != null && nonObfuscatedToProcess.Count > 0)
+        progress.Phase = $"Star/Tag Erkennung ({nonObfuscatedToProcess.Count} Titel)";
+
+      foreach (var video in nonObfuscatedToProcess)
       {
-        var dbVideo = await context.VideoItems.FindAsync(result.VideoId);
-        if (dbVideo == null) continue;
+        ct.ThrowIfCancellationRequested();
 
-        if (result.IsObfuscated && result.NormalizedTitle != null)
-          dbVideo.NormalizedTitle = result.NormalizedTitle;
+        var detectedStarList = detectStars
+          ? DetectStars(video.Title, allStars).Where(d => d.Confidence >= 0.7).ToList()
+          : new List<(DbStar Star, double Confidence)>();
+        var detectedTagList = detectTags ? DetectTags(video.Title, allTags) : new List<DbTag>();
 
-        // Link detected stars
-        foreach (var (starId, confidence) in result.DetectedStarIds)
+        var dbVideo = await context.VideoItems.FindAsync([video.Id], ct);
+        if (dbVideo != null)
         {
-          var star = allStars.FirstOrDefault(s => s.Id == starId);
-          if (star == null) continue;
-          if (!await context.VideoStars.AnyAsync(vs => vs.VideoId == dbVideo.Id && vs.StarId == starId))
+          foreach (var (star, _) in detectedStarList)
           {
-            context.VideoStars.Add(new DbVideoStar { VideoId = dbVideo.Id, StarId = starId, IsAutoDetected = true });
-            starsDetected++;
+            if (!await context.VideoStars.AnyAsync(vs => vs.VideoId == dbVideo.Id && vs.StarId == star.Id, ct))
+            {
+              context.VideoStars.Add(new DbVideoStar { VideoId = dbVideo.Id, StarId = star.Id, IsAutoDetected = true });
+              starsDetected++;
+            }
+          }
+
+          foreach (var tag in detectedTagList)
+          {
+            if (!await context.VideoTags.AnyAsync(vt => vt.VideoId == dbVideo.Id && vt.TagId == tag.Id, ct))
+            {
+              context.VideoTags.Add(new DbVideoTag { VideoId = dbVideo.Id, TagId = tag.Id, IsAutoDetected = true });
+              tagsDetected++;
+            }
           }
         }
 
-        // Link detected tags
-        foreach (var tagId in result.DetectedTagIds)
-        {
-          var tag = allTags.FirstOrDefault(t => t.Id == tagId);
-          if (tag == null) continue;
-          if (!await context.VideoTags.AnyAsync(vt => vt.VideoId == dbVideo.Id && vt.TagId == tagId))
-          {
-            context.VideoTags.Add(new DbVideoTag { VideoId = dbVideo.Id, TagId = tagId, IsAutoDetected = true });
-            tagsDetected++;
-          }
-        }
-
-        if (result.IsObfuscated && result.NormalizedTitle != null)
-          titlesNormalized++;
-
-        dbProcessed++;
+        processed++;
         if (progress != null)
         {
-          progress.Current = dbProcessed;
+          progress.Current = processed;
           progress.StarsDetected = starsDetected;
           progress.TagsDetected = tagsDetected;
-          progress.TitlesNormalized = titlesNormalized;
         }
-        if (dbProcessed % 100 == 0)
-        {
-          await context.SaveChangesAsync();
-        }
+
+        if (processed % 100 == 0)
+          await context.SaveChangesAsync(ct);
       }
 
-      await context.SaveChangesAsync();
+      await context.SaveChangesAsync(ct);
 
       if (progress != null)
       {
-        progress.Phase = "Done";
-        progress.Current = results.Count;
+        progress.Phase = "Fertig";
+        progress.Current = processed;
       }
 
       logger.LogInformation(
@@ -1039,6 +1165,57 @@ namespace vrScraper.Services
       await videoService.ReloadVideos();
 
       return processed;
+    }
+
+    private async Task<(int Stars, int Tags)> SaveNormalization(VrScraperContext context, DbVideoItem video,
+      string normalizedTitle, List<DbStar> allStars, List<DbTag> allTags, bool detectStars, bool detectTags,
+      CancellationToken ct)
+    {
+      int stars = 0, tags = 0;
+      var detectedStarList = detectStars
+        ? DetectStars(normalizedTitle, allStars).Where(d => d.Confidence >= 0.7).ToList()
+        : new List<(DbStar Star, double Confidence)>();
+      var detectedTagList = detectTags ? DetectTags(normalizedTitle, allTags) : new List<DbTag>();
+
+      var dbVideo = await context.VideoItems.FindAsync([video.Id], ct);
+      if (dbVideo == null) return (0, 0);
+
+      dbVideo.NormalizedTitle = normalizedTitle;
+
+      foreach (var (star, _) in detectedStarList)
+      {
+        if (!await context.VideoStars.AnyAsync(vs => vs.VideoId == dbVideo.Id && vs.StarId == star.Id, ct))
+        {
+          context.VideoStars.Add(new DbVideoStar { VideoId = dbVideo.Id, StarId = star.Id, IsAutoDetected = true });
+          stars++;
+        }
+      }
+
+      foreach (var tag in detectedTagList)
+      {
+        if (!await context.VideoTags.AnyAsync(vt => vt.VideoId == dbVideo.Id && vt.TagId == tag.Id, ct))
+        {
+          context.VideoTags.Add(new DbVideoTag { VideoId = dbVideo.Id, TagId = tag.Id, IsAutoDetected = true });
+          tags++;
+        }
+      }
+
+      return (stars, tags);
+    }
+
+    /// <summary>
+    /// Checks if a decoded title looks plausible (contains real words).
+    /// Used to decide whether to trust the decoder or fall back to LLM.
+    /// </summary>
+    private bool IsPlausible(string decoded)
+    {
+      EnsureDynamicDictionary();
+      var words = decoded.Split([' ', '-', ',', '.'], StringSplitOptions.RemoveEmptyEntries)
+        .Where(w => w.Length >= 3 && w.All(char.IsLetter))
+        .ToList();
+      if (words.Count == 0) return true; // no testable words, trust decoder
+      int dictHits = words.Count(w => IsInDictionary(w));
+      return (double)dictHits / words.Count > 0.5;
     }
 
     // ── Internal Methods ───────────────────────────────────────────────
@@ -1087,6 +1264,13 @@ namespace vrScraper.Services
         // U+00C0-024F covers Latin-1 Supplement, Latin Extended-A, Latin Extended-B
         if (c >= 0x00C0 && c <= 0x024F)
         {
+          // Direct accent map lookup first (more reliable than FormKD under InvariantGlobalization)
+          if (AccentMap.TryGetValue(c, out var accentMapped))
+          {
+            sb.Append(accentMapped);
+            continue;
+          }
+
           // Try to decompose to base letter (e.g. Ť → T, ė → e, ŕ → r)
           var decomposed = c.ToString().Normalize(System.Text.NormalizationForm.FormKD);
           if (decomposed.Length > 0 && decomposed[0] <= 0x007F)
@@ -1101,12 +1285,36 @@ namespace vrScraper.Services
           continue;
 
         // Strip everything else (emoji, decorators, unknown Unicode)
-        // But keep spaces
-        if (c == ' ')
-          sb.Append(c);
+        // But keep spaces (including fullwidth space U+3000)
+        if (c == ' ' || c == '\u3000')
+          sb.Append(' ');
       }
 
-      return sb.ToString();
+      // Spaced-out text detection: if >60% of "words" are single characters, collapse spaces
+      var normalized = sb.ToString();
+      var spacedWords = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+      if (spacedWords.Length > 3)
+      {
+        // Only count single LETTERS (not digits) — "D S 1 5 2 8 2" is a catalog code, not spaced text
+        int singleLetterCount = spacedWords.Count(w => w.Length == 1 && char.IsLetter(w[0]));
+        if ((double)singleLetterCount / spacedWords.Length > 0.6)
+        {
+          // Collapse: join single-char runs, keep multi-char words separated
+          var collapsed = new StringBuilder(normalized.Length);
+          bool prevWasSingle = false;
+          foreach (var sw in spacedWords)
+          {
+            bool isSingle = sw.Length == 1 && char.IsLetterOrDigit(sw[0]);
+            if (collapsed.Length > 0 && !(prevWasSingle && isSingle))
+              collapsed.Append(' ');
+            collapsed.Append(sw);
+            prevWasSingle = isSingle;
+          }
+          return collapsed.ToString();
+        }
+      }
+
+      return normalized;
     }
 
     /// <summary>
@@ -1119,9 +1327,11 @@ namespace vrScraper.Services
       ['d'] = 'p', ['p'] = 'd',
       ['b'] = 'q', ['q'] = 'b',
       ['n'] = 'u', ['u'] = 'n',
+      ['m'] = 'w', ['w'] = 'm',
       ['D'] = 'P', ['P'] = 'D',
       ['B'] = 'Q', ['Q'] = 'B',
       ['N'] = 'U', ['U'] = 'N',
+      ['M'] = 'W', ['W'] = 'M',
     };
 
     /// <summary>Returns normalized+reversed string if upside-down text detected, null otherwise.</summary>
@@ -1166,12 +1376,89 @@ namespace vrScraper.Services
       return string.Join(' ', reversed);
     }
 
+    /// <summary>
+    /// Detects reversed ASCII text by checking if reversing words yields more dictionary hits.
+    /// E.g. "yssup" → "pussy", "kcid" → "dick"
+    /// Must be called after NormalizeUnicode() and before DecodeLeetSpeak().
+    /// </summary>
+    private string HandleReversedAscii(string input)
+    {
+      var words = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+      if (words.Length == 0) return input;
+
+      // Only consider ASCII-letter words for reversal check
+      int forwardHits = 0;
+      int reverseHits = 0;
+      int testableWords = 0;
+
+      foreach (var word in words)
+      {
+        if (word.Length < 3 || !word.All(c => char.IsLetter(c) && c <= 0x007F))
+          continue;
+
+        testableWords++;
+        var lower = word.ToLowerInvariant();
+        if (IsInDictionary(lower)) forwardHits++;
+
+        var reversed = new string(lower.Reverse().ToArray());
+        if (IsInDictionary(reversed)) reverseHits++;
+      }
+
+      // Only reverse if reverse hits are significantly better
+      if (testableWords < 2 || reverseHits <= forwardHits)
+        return input;
+
+      // Reverse all words and their order
+      var reversedWords = words
+        .Select(w =>
+        {
+          if (w.Length < 2 || !w.All(c => char.IsLetter(c) && c <= 0x007F))
+            return w;
+          var chars = w.ToCharArray();
+          // Preserve case pattern: if first char was upper, make first char of reversed upper
+          bool firstWasUpper = char.IsUpper(chars[0]);
+          Array.Reverse(chars);
+          var rev = new string(chars).ToLowerInvariant();
+          if (firstWasUpper && rev.Length > 0)
+            rev = char.ToUpperInvariant(rev[0]) + rev[1..];
+          return rev;
+        })
+        .Reverse()
+        .ToArray();
+
+      return string.Join(' ', reversedWords);
+    }
+
+    /// <summary>Regex to detect date patterns that should not be leet-decoded.</summary>
+    private static readonly Regex DatePattern = new(@"\d{1,4}[.\-/]\d{1,2}[.\-/]\d{1,4}", RegexOptions.Compiled);
+
+    /// <summary>Regex for ordinals (1st, 2nd, 3rd, etc.) and digit-abbreviations (4some, 3way).</summary>
+    private static readonly Regex ProtectedPattern = new(@"\d+(st|nd|rd|th|some|way)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex PureNumberToken = new(@"(?<=^|\s)\d+(?=\s|$|-)", RegexOptions.Compiled);
+
     private static bool IsLetterOrLeet(char c) => char.IsLetter(c) || LeetMap.ContainsKey(c);
 
     private static string DecodeLeetSpeak(string input)
     {
+      // Protect date patterns, ordinals, and digit-abbreviations from leet-decoding
+      var protectedInput = input;
+      var placeholders = new List<(string placeholder, string original)>();
+      int placeholderIdx = 0;
+
+      foreach (var pattern in new[] { DatePattern, ProtectedPattern, PureNumberToken })
+      {
+        var matches = pattern.Matches(protectedInput);
+        for (int d = matches.Count - 1; d >= 0; d--)
+        {
+          var match = matches[d];
+          var placeholder = $"\x01P{placeholderIdx++}\x01";
+          placeholders.Add((placeholder, match.Value));
+          protectedInput = protectedInput[..match.Index] + placeholder + protectedInput[(match.Index + match.Length)..];
+        }
+      }
+
       // Multi-char replacements first
-      var result = input.Replace("vv", "w", StringComparison.OrdinalIgnoreCase);
+      var result = protectedInput.Replace("vv", "w", StringComparison.OrdinalIgnoreCase);
 
       // Single-char leet decode — treat other leet chars as valid neighbors
       // so consecutive leet like "61@k3" decodes fully to "blake"
@@ -1180,10 +1467,28 @@ namespace vrScraper.Services
       {
         char c = result[i];
 
+        // Skip entire placeholder sequences (\x01...\x01)
+        if (c == '\x01')
+        {
+          sb.Append(c);
+          i++;
+          while (i < result.Length && result[i] != '\x01') { sb.Append(result[i]); i++; }
+          if (i < result.Length) sb.Append(result[i]); // closing \x01
+          continue;
+        }
+
         if (LeetMap.TryGetValue(c, out var leetChar))
         {
           bool prevValid = i > 0 && IsLetterOrLeet(result[i - 1]);
           bool nextValid = i + 1 < result.Length && IsLetterOrLeet(result[i + 1]);
+
+          // '!' is only leet when BOTH neighbors are actual letters (not other leet/punctuation)
+          // "h!llo" → decode, "hello!" → punctuation, "!!!" → punctuation
+          if (c == '!' && !(i > 0 && char.IsLetter(result[i - 1]) && i + 1 < result.Length && char.IsLetter(result[i + 1])))
+          {
+            sb.Append(c);
+            continue;
+          }
 
           // Decode if at least one neighbor is a letter or another leet char
           if (prevValid || nextValid)
@@ -1212,7 +1517,14 @@ namespace vrScraper.Services
         }
       }
 
-      return sb.ToString();
+      // Restore protected patterns
+      var decoded = sb.ToString();
+      foreach (var (placeholder, original) in placeholders)
+      {
+        decoded = decoded.Replace(placeholder, original);
+      }
+
+      return decoded;
     }
 
     private static string CollapseSpaces(string input)
@@ -1279,83 +1591,185 @@ namespace vrScraper.Services
       return string.Join(' ', result);
     }
 
-    private string CorrectWord(string word)
+    /// <summary>
+    /// Alt-Leet fallback: for words still not in dictionary after standard leet decoding,
+    /// try alternate leet mappings (e.g. 4→e instead of 4→a) and check the dictionary.
+    /// </summary>
+    private static readonly Dictionary<char, char[]> AltLeetMap = new()
     {
-      if (word.Length < 2) return word;
-      if (IsInDictionary(word)) return word;
+      ['4'] = ['e'],       // 4→a is default, try 4→e (e.g. "h4r" → "her" instead of "har")
+      ['0'] = ['u'],       // 0→o is default, try 0→u
+      ['3'] = ['a'],       // 3→e is default, try 3→a
+      ['1'] = ['i', 'l'],  // 1→l/i context-dependent, try the other
+      ['5'] = ['z'],       // 5→s is default, try 5→z
+      ['6'] = ['g'],       // 6→b is default, try 6→g
+      ['9'] = ['p'],       // 9→g is default, try 9→p
+    };
 
-      // Find positions with ambiguous characters
-      var ambiguousPositions = new List<(int pos, char from, char to)>();
-      var lower = word.ToLowerInvariant();
+    private static readonly Regex WordSplitPattern = new(@"([\s\-/,;:!?().&'""]+)", RegexOptions.Compiled);
 
-      for (int i = 0; i < lower.Length; i++)
+    private string TryAltLeetFallback(string processed, string originalTitle)
+    {
+      var processedParts = WordSplitPattern.Split(processed);
+      var originalParts = WordSplitPattern.Split(originalTitle);
+
+      // Build a quick lookup of original words by approximate position
+      var result = new string[processedParts.Length];
+
+      for (int w = 0; w < processedParts.Length; w++)
       {
-        foreach (var (from, to) in AmbiguousPairs)
+        var pWord = processedParts[w];
+        result[w] = pWord;
+
+        // Skip separators, short words, already-correct words
+        if (pWord.Length < 3 || !pWord.Any(char.IsLetter) || !pWord.All(char.IsLetter) || IsInDictionary(pWord))
+          continue;
+
+        // Try to find the corresponding original word (by position, approximately)
+        string? origWord = w < originalParts.Length ? originalParts[w] : null;
+        if (origWord == null) continue;
+
+        // Check if original had leet chars that could have alternate mappings
+        var hasAltLeet = origWord.Any(c => AltLeetMap.ContainsKey(c));
+        if (!hasAltLeet) continue;
+
+        // Try alternate leet mappings
+        var bestCandidate = TryAltLeetCombinations(origWord);
+        if (bestCandidate != null)
+          result[w] = bestCandidate;
+      }
+
+      return string.Concat(result);
+    }
+
+    /// <summary>
+    /// Tries alternate leet decode combinations for a single word and returns
+    /// the first dictionary hit, or null if none found.
+    /// </summary>
+    private string? TryAltLeetCombinations(string word)
+    {
+      // Find positions with alt-leet chars
+      var altPositions = new List<(int pos, char orig, char[] alts)>();
+      for (int i = 0; i < word.Length; i++)
+      {
+        if (AltLeetMap.TryGetValue(word[i], out var alts))
+          altPositions.Add((i, word[i], alts));
+      }
+
+      if (altPositions.Count == 0 || altPositions.Count > 5)
+        return null;
+
+      // For each alt-leet position, also include the standard leet decode as an option
+      var options = new List<(int pos, char[] choices)>();
+      foreach (var (pos, orig, alts) in altPositions)
+      {
+        var choices = new List<char>();
+        if (LeetMap.TryGetValue(orig, out var standard))
+          choices.Add(standard);
+        choices.AddRange(alts);
+        options.Add((pos, choices.Distinct().ToArray()));
+      }
+
+      // Also decode non-alt leet chars normally
+      var baseChars = word.ToCharArray();
+      for (int i = 0; i < baseChars.Length; i++)
+      {
+        if (!altPositions.Any(ap => ap.pos == i) && LeetMap.TryGetValue(baseChars[i], out var lc))
         {
-          if (lower[i] == from)
-            ambiguousPositions.Add((i, from, to));
+          bool prevValid = i > 0 && IsLetterOrLeet(baseChars[i - 1]);
+          bool nextValid = i + 1 < baseChars.Length && IsLetterOrLeet(baseChars[i + 1]);
+          if (prevValid || nextValid)
+            baseChars[i] = lc;
         }
       }
 
-      if (ambiguousPositions.Count == 0) return word;
+      // Try all combinations of alt positions (limit explosion)
+      int totalCombos = 1;
+      foreach (var (_, choices) in options)
+        totalCombos *= choices.Length;
+      if (totalCombos > 64) return null;
 
-      // Generate candidates (limit to max 4 ambiguous positions to avoid explosion)
-      var positions = ambiguousPositions.Take(4).ToList();
-      int combCount = 1 << positions.Count; // 2^n combinations
-
-      for (int combo = 1; combo < combCount; combo++)
+      for (int combo = 0; combo < totalCombos; combo++)
       {
-        var chars = lower.ToCharArray();
-        for (int bit = 0; bit < positions.Count; bit++)
+        var attempt = (char[])baseChars.Clone();
+        int divisor = 1;
+        for (int o = 0; o < options.Count; o++)
         {
-          if ((combo & (1 << bit)) != 0)
-          {
-            chars[positions[bit].pos] = positions[bit].to;
-          }
+          var (pos, choices) = options[o];
+          int choiceIdx = (combo / divisor) % choices.Length;
+          attempt[pos] = choices[choiceIdx];
+          divisor *= choices.Length;
         }
 
-        var candidate = new string(chars);
+        var candidate = new string(attempt).ToLowerInvariant();
+
+        // Direct dictionary check
         if (IsInDictionary(candidate))
         {
-          // Preserve original casing pattern
-          var corrected = word.ToCharArray();
-          for (int bit = 0; bit < positions.Count; bit++)
+          var result = attempt;
+          for (int i = 0; i < result.Length; i++)
           {
-            if ((combo & (1 << bit)) != 0)
-            {
-              var pos = positions[bit].pos;
-              var newChar = positions[bit].to;
-              corrected[pos] = char.IsUpper(word[pos]) ? char.ToUpperInvariant(newChar) : newChar;
-            }
+            if (char.IsLetter(word[i]) && char.IsUpper(word[i]))
+              result[i] = char.ToUpperInvariant(result[i]);
           }
-          return new string(corrected);
+          return new string(result);
         }
-      }
 
-      return word; // No dictionary match found, keep original
-    }
-
-    private static int LevenshteinDistance(string s, string t)
-    {
-      int n = s.Length, m = t.Length;
-      if (n == 0) return m;
-      if (m == 0) return n;
-
-      var d = new int[n + 1, m + 1];
-      for (int i = 0; i <= n; i++) d[i, 0] = i;
-      for (int j = 0; j <= m; j++) d[0, j] = j;
-
-      for (int i = 1; i <= n; i++)
-      {
-        for (int j = 1; j <= m; j++)
+        // Also try canonical index (resolves i/l, v/u, b/g on top of alt-leet)
+        var canon = Canonicalize(candidate);
+        if (CanonicalIndex.TryGetValue(canon, out var canonCandidates))
         {
-          int cost = s[i - 1] == t[j - 1] ? 0 : 1;
-          d[i, j] = Math.Min(
-            Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
-            d[i - 1, j - 1] + cost);
+          var best = canonCandidates.FirstOrDefault(c => c.Length == candidate.Length) ?? canonCandidates[0];
+          var result = best.ToCharArray();
+          for (int i = 0; i < Math.Min(result.Length, word.Length); i++)
+          {
+            if (char.IsUpper(word[i]))
+              result[i] = char.ToUpperInvariant(result[i]);
+          }
+          return new string(result);
         }
       }
-      return d[n, m];
+
+      return null;
     }
+
+    private string CorrectWord(string word)
+    {
+      if (word.Length < 3) return word; // too short for reliable dictionary correction
+      var lower = word.ToLowerInvariant();
+      if (IsInDictionary(lower)) return word;
+
+      var canon = Canonicalize(lower);
+      if (CanonicalIndex.TryGetValue(canon, out var candidates))
+      {
+        // Prefer same-length match
+        var best = candidates.FirstOrDefault(c => c.Length == lower.Length) ?? candidates[0];
+        // Preserve original case pattern
+        var result = word.ToCharArray();
+        for (int i = 0; i < Math.Min(result.Length, best.Length); i++)
+        {
+          result[i] = char.IsUpper(word[i]) ? char.ToUpperInvariant(best[i]) : best[i];
+        }
+        return new string(result);
+      }
+
+      // Also check dynamic dictionary with canonical lookup
+      var dynamicCanon = Canonicalize(lower);
+      foreach (var dw in _dynamicDictionary)
+      {
+        if (Canonicalize(dw) == dynamicCanon)
+        {
+          var result = word.ToCharArray();
+          for (int i = 0; i < Math.Min(result.Length, dw.Length); i++)
+          {
+            result[i] = char.IsUpper(word[i]) ? char.ToUpperInvariant(dw[i]) : dw[i];
+          }
+          return new string(result);
+        }
+      }
+
+      return word;
+    }
+
   }
 }

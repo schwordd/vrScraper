@@ -17,6 +17,7 @@ namespace vrScraper.Services
   {
     public string SiteName => "eporner.com";
     public string DisplayName => "Eporner";
+    public bool IsExperimental => false;
 
     public Dictionary<string, string> GetProxyHeaders() => new()
     {

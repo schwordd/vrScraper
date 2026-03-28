@@ -10,6 +10,7 @@ namespace vrScraper.Services
   {
     public string SiteName => "spankbang.com";
     public string DisplayName => "SpankBang VR";
+    public bool IsExperimental => true;
 
     public Dictionary<string, string> GetProxyHeaders() => new()
     {

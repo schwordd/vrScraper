@@ -45,14 +45,14 @@
             Title Normalization
         </h5>
         <p class="section-desc">
-            Decodes obfuscated video titles (Unicode tricks, leet-speak) and detects stars/tags from all titles.
+            Decodes obfuscated video titles using a dictionary-based decoder (234k words) and detects stars/tags.
         </p>
 
         <div class="action-row">
             <div class="action-card">
                 <div class="action-header">
                     <h6>Normalize &amp; Detect</h6>
-                    <small class="text-muted">Normalizes obfuscated titles + detects stars/tags from all video titles</small>
+                    <small class="text-muted">Decoder-basierte Normalisierung und Star/Tag-Erkennung</small>
                 </div>
                 <div class="action-controls">
                     <label class="form-check">
@@ -78,29 +78,41 @@
                         }
                         <i class="icon-wand-sparkles me-1"></i> Run Normalization
                     </button>
+                    @if (_normRunning)
+                    {
+                        <button class="btn btn-outline-danger" @onclick="CancelNormalization">
+                            <i class="icon-x me-1"></i> Stop
+                        </button>
+                    }
                 </div>
-                @if (_normRunning || _normResult != null)
+
+                @if (_normRunning && _normProgress != null)
                 {
                     <div class="progress-section">
-                        @if (_normRunning && _normProgress != null)
-                        {
-                            <div class="progress mb-2">
-                                <div class="progress-bar" role="progressbar"
-                                     style="width: @(_normProgress.Total > 0 ? (int)(_normProgress.Current * 100.0 / _normProgress.Total) : 0)%">
-                                    @_normProgress.Current / @_normProgress.Total
-                                </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar" role="progressbar"
+                                 style="width: @(_normProgress.Total > 0 ? (int)(_normProgress.Current * 100.0 / _normProgress.Total) : 0)%">
+                                @_normProgress.Current / @_normProgress.Total
                             </div>
-                            <div class="stats-row">
-                                <span class="stat-badge"><i class="icon-activity me-1"></i>@_normProgress.Phase</span>
-                                <span class="stat-badge"><i class="icon-type me-1"></i>@_normProgress.TitlesNormalized titles decoded</span>
-                                <span class="stat-badge"><i class="icon-user me-1"></i>@_normProgress.StarsDetected stars detected</span>
-                                <span class="stat-badge"><i class="icon-tag me-1"></i>@_normProgress.TagsDetected tags detected</span>
-                            </div>
-                        }
-                        @if (_normResult != null)
+                        </div>
+                        <div class="stats-row">
+                            <span class="stat-badge"><i class="icon-activity me-1"></i>@_normProgress.Phase</span>
+                            <span class="stat-badge"><i class="icon-type me-1"></i>@_normProgress.TitlesNormalized Titel dekodiert</span>
+                            <span class="stat-badge"><i class="icon-user me-1"></i>@_normProgress.StarsDetected Stars</span>
+                            <span class="stat-badge"><i class="icon-tag me-1"></i>@_normProgress.TagsDetected Tags</span>
+                        </div>
+                    </div>
+                }
+
+                @if (_logLines.Count > 0)
+                {
+                    <div class="log-output">
+                        @foreach (var line in _logLines)
                         {
-                            <div class="alert @(_normSuccess ? "alert-success" : "alert-danger") mt-2 mb-0">
-                                @_normResult
+                            <div class="log-line @line.Level">
+                                <span class="log-time">@line.Time.ToString("HH:mm:ss")</span>
+                                <span class="log-icon">@LogIcon(line.Level)</span>
+                                <span class="log-msg">@line.Message</span>
                             </div>
                         }
                     </div>
@@ -194,8 +206,7 @@
     // Normalization state
     private bool _normRunning;
     private NormalizationProgress? _normProgress;
-    private string? _normResult;
-    private bool _normSuccess;
+    private CancellationTokenSource? _normCts;
 
     // Enrichment state
     private bool _enrichRunning;
@@ -212,6 +223,24 @@
     private string _apiToken = "";
     private bool _showToken;
     private bool _tokenSaved;
+
+    // Log output
+    private record LogEntry(DateTime Time, string Level, string Message);
+    private List<LogEntry> _logLines = new();
+
+    private void Log(string message, string level = "info")
+    {
+        _logLines.Add(new LogEntry(DateTime.Now, level, message));
+    }
+
+    private static string LogIcon(string level) => level switch
+    {
+        "ok" => "\u2705",
+        "warn" => "\u26a0\ufe0f",
+        "error" => "\u274c",
+        "wait" => "\u23f3",
+        _ => "\u2139\ufe0f"
+    };
 
     protected override void OnInitialized()
     {
@@ -250,34 +279,75 @@
         }
     }
 
+    private void CancelNormalization()
+    {
+        _normCts?.Cancel();
+        Log("Cancellation requested...", "warn");
+    }
+
     private async Task RunNormalization()
     {
         _normRunning = true;
-        _normResult = null;
         _normProgress = new NormalizationProgress();
+        _logLines.Clear();
+        _normCts = new CancellationTokenSource();
         StateHasChanged();
 
-        using var cts = new CancellationTokenSource();
-        _ = RefreshUiPeriodically(cts.Token);
+        using var refreshCts = new CancellationTokenSource();
+        _ = RefreshUiPeriodically(refreshCts.Token);
 
         try
         {
-            var count = await TitleNormService.NormalizeAllTitles(_forceReprocess, _normTitles, _normStars, _normTags, _normProgress);
-            _normResult = $"Done! Processed {count} videos. " +
-                $"Decoded {_normProgress.TitlesNormalized} titles, " +
-                $"detected {_normProgress.StarsDetected} stars, " +
-                $"{_normProgress.TagsDetected} tags.";
-            _normSuccess = true;
+            var ct = _normCts.Token;
+
+            if (_normTitles)
+            {
+                Log("Starte Decoder (234k Wörter)...", "info");
+            }
+
+            var count = await TitleNormService.NormalizeAllTitles(
+                _forceReprocess, _normTitles, _normStars, _normTags, _normProgress,
+                onTitleProcessed: (original, normalized, status) =>
+                {
+                    var idx = _normProgress?.Current ?? 0;
+                    var total = _normProgress?.Total ?? 0;
+                    var shortOriginal = original.Length > 40 ? original[..40] + "..." : original;
+                    var shortNormalized = normalized != null && normalized.Length > 40 ? normalized[..40] + "..." : normalized;
+
+                    switch (status)
+                    {
+                        case "decoder":
+                            Log($"[{idx}/{total}] \"{shortOriginal}\" → \"{shortNormalized}\"", "ok");
+                            break;
+                        case "decoder-unsicher":
+                            Log($"[{idx}/{total}] \"{shortOriginal}\" → \"{shortNormalized}\" (unsicher)", "warn");
+                            break;
+                        default: // "skip"
+                            Log($"[{idx}/{total}] \"{shortOriginal}\" → nicht dekodierbar", "warn");
+                            break;
+                    }
+                },
+                ct: ct);
+
+            Log($"Fertig! {_normProgress!.TitlesNormalized} Titel dekodiert, " +
+                $"{_normProgress.StarsDetected} Stars erkannt, " +
+                $"{_normProgress.TagsDetected} Tags erkannt " +
+                $"({count} Videos verarbeitet).", "ok");
+        }
+        catch (OperationCanceledException)
+        {
+            Log("Normalization cancelled.", "warn");
         }
         catch (Exception ex)
         {
-            _normResult = $"Error: {ex.Message}";
-            _normSuccess = false;
+            Log($"Error: {ex.Message}", "error");
         }
         finally
         {
             _normRunning = false;
-            cts.Cancel();
+            _normCts?.Dispose();
+            _normCts = null;
+            refreshCts.Cancel();
             StateHasChanged();
         }
     }

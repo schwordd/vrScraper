@@ -115,6 +115,7 @@ namespace vrScraper
       builder.Services.AddSingleton<IRecommendationService, RecommendationService>();
       builder.Services.AddSingleton<IScrapeLogService, ScrapeLogService>();
       builder.Services.AddSingleton<ITagNormalizationService, TagNormalizationService>();
+      builder.Services.AddSingleton<IOllamaService, OllamaService>();
       builder.Services.AddSingleton<ITitleNormalizationService, TitleNormalizationService>();
       builder.Services.AddSingleton<IThePornDbService, ThePornDbService>();
       builder.Services.AddHttpClient();

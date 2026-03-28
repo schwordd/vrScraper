@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="VERSION" />
+    <EmbeddedResource Include="Resources\english_words.txt" />
   </ItemGroup>
 
   <ItemGroup>

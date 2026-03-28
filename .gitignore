@@ -351,3 +351,8 @@ MigrationBackup/
 
 # Ausnahmen
 /b3ttybot-service/Properties/launchSettings.json
+
+# vrScraper project-specific
+eporner-testlinks.txt
+unmapped_chars_report.txt
+unmapped_with_suggestions.txt

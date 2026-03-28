@@ -56,11 +56,15 @@ namespace vrScraper.Controllers
     {
       if (string.IsNullOrEmpty(title)) return BadRequest("title parameter required");
 
+      var legacy = titleNormService.NormalizeTitleLegacy(title);
+      var isObfuscated = titleNormService.IsObfuscated(title);
+
       return Ok(new
       {
         original = title,
-        isObfuscated = titleNormService.IsObfuscated(title),
-        normalized = titleNormService.NormalizeTitle(title)
+        isObfuscated,
+        decoder = legacy,
+        decoderChanged = legacy != title,
       });
     }
 
@@ -113,27 +117,29 @@ namespace vrScraper.Controllers
       var allStars = await context.Stars.ToListAsync();
       var allTags = await context.Tags.ToListAsync();
 
-      var results = obfuscated.Select(v =>
+      var results = new List<object>();
+      foreach (var v in obfuscated)
       {
         var normalized = titleNormService.NormalizeTitle(v.Title);
-        var stars = titleNormService.DetectStars(normalized, allStars)
+        var titleForDetection = normalized ?? v.Title;
+        var stars = titleNormService.DetectStars(titleForDetection, allStars)
           .Where(s => s.Confidence >= 0.7)
           .Select(s => new { s.Star.Name, s.Confidence })
           .ToList();
-        var tags = titleNormService.DetectTags(normalized, allTags)
+        var tags = titleNormService.DetectTags(titleForDetection, allTags)
           .Select(t => t.Name)
           .ToList();
 
-        return new
+        results.Add(new
         {
           v.Id,
           original = v.Title,
           normalized,
           stars,
           tags,
-          scrapedStars = v.Stars?.Select(s => s.Name).ToList() ?? []
-        };
-      });
+          scrapedStars = v.Stars?.Select(s => s.Name).ToList() ?? new List<string>()
+        });
+      }
 
       return Ok(new { count = obfuscated.Count, results });
     }

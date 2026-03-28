@@ -166,7 +166,28 @@
     display: grid;
     gap: 12px;
     grid-template-columns: repeat(2, 1fr);
+    align-items: start;
 }
+
+.video-gallery .thumbnail-container {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 */
+    height: 0;
+}
+
+.video-gallery .thumbnail-container img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
 
 @media (min-width: 640px) {
     .video-gallery {

@@ -204,11 +204,7 @@
                                 </button>
                             </div>
                         </div>
-                        <h3>@(item.NormalizedTitle ?? item.Title)</h3>
-                        @if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title)
-                        {
-                            <div class="original-title">@item.Title</div>
-                        }
+                        <h3>@if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title) { <i class="icon-sparkles ai-icon" title="KI-generierter Titel (Original: @item.Title)"></i> }@(item.NormalizedTitle ?? item.Title)</h3>
                         @if (item.Stars != null && item.Stars.Any())
                         {
                             <div class="star-container">
@@ -229,7 +225,7 @@
                                 {
                                     var isAutoTag = IsAutoDetectedTag(item, tagInfo.Id);
                                     <button type="button" class="btn btn-primary tag-pill @(isAutoTag ? "auto-detected" : "")" @onclick="() => AddTagFilter(tagInfo.Name)">
-                                        @tagInfo.Name
+                                        @if (isAutoTag) { <i class="icon-sparkles"></i> }@tagInfo.Name
                                     </button>
                                 }
                             }
@@ -302,10 +298,7 @@
                         </div>
                     </div>
                     <h3>@(item.NormalizedTitle ?? item.Title)</h3>
-                    @if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title)
-                    {
-                        <div class="original-title">@item.Title</div>
-                    }
+                    <div class="original-title">@if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title) { <span class="original-label">Original:</span> @item.Title } else { @("\u00A0") }</div>
                     @if (item.Stars != null && item.Stars.Any())
                     {
                         <div class="star-container">

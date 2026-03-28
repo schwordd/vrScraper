@@ -7,6 +7,7 @@ namespace vrScraper.Services
   {
     string SiteName { get; }
     string DisplayName { get; }
+    bool IsExperimental { get; }
     void Initialize();
     Task<VideoSource?> GetSource(DbVideoItem item, VrScraperContext context);
     Dictionary<string, string> GetProxyHeaders();

@@ -89,6 +89,11 @@
     opacity: 0.5;
 }
 
+.disabled-section {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 .site-input-sm {
     width: 90px;
 }

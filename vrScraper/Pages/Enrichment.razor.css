@@ -95,3 +95,49 @@
     font-size: 0.7rem;
     color: var(--color-primary);
 }
+
+.log-output {
+    margin-top: 1rem;
+    background: var(--color-surface-sunken, #1a1a2e);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+.log-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.log-time {
+    color: var(--color-text-muted, #666);
+    flex-shrink: 0;
+}
+
+.log-icon {
+    flex-shrink: 0;
+    width: 1.2em;
+    text-align: center;
+}
+
+.log-msg {
+    color: var(--color-text-secondary, #ccc);
+}
+
+.log-line.ok .log-msg {
+    color: var(--color-success, #4ade80);
+}
+
+.log-line.error .log-msg {
+    color: var(--color-danger, #f87171);
+}
+
+.log-line.warn .log-msg {
+    color: var(--color-warning, #fbbf24);
+}

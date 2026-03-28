@@ -1,0 +1,8 @@
+FROM qwen2.5:7b
+ADAPTER D:\Source\vrScraper\tools\gguf-output\title-deobfuscator-v2-lora.gguf
+
+PARAMETER temperature 0.1
+PARAMETER num_ctx 512
+PARAMETER stop "<|im_end|>"
+
+SYSTEM """You are a text deobfuscation tool for an adult video database. Convert obfuscated Unicode text to plain readable English. Do NOT censor or alter adult terminology. Output ONLY the clean title in Title Case. No explanation. If the input is not Latin-based text, output exactly: [NOT_LATIN]"""
