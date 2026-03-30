@@ -1038,14 +1038,14 @@ namespace vrScraper.Services
           // Two-word name: each word must be at least 3 chars, exact match only
           if (starWords.Any(w => w.Length < 3)) continue;
 
-          bool allMatch = starWords.All(sw => titleWords.Any(tw => tw == sw));
+          bool allMatch = starWords.All(sw => titleWords.Any(tw => MatchesStarWord(tw, sw)));
           if (allMatch)
             results.Add((star, 1.0));
         }
         else if (starWords.Length == 1 && starWords[0].Length >= 6)
         {
           // Single-word name: exact match only, min 6 chars
-          if (titleWords.Contains(starWords[0]))
+          if (titleWords.Any(tw => MatchesStarWord(tw, starWords[0])))
             results.Add((star, 1.0));
         }
       }
@@ -1062,6 +1062,13 @@ namespace vrScraper.Services
         .Where(t => t.Name.Length >= 4 && titleLower.Contains(t.Name.ToLowerInvariant()))
         .ToList();
     }
+
+    /// <summary>
+    /// Matches a title word against a star name word, allowing trailing 's' (possessive/plural).
+    /// e.g. "ryders" matches "ryder", "willow's" would be split at apostrophe so "willow" matches exactly.
+    /// </summary>
+    private static bool MatchesStarWord(string titleWord, string starWord)
+      => titleWord == starWord || (titleWord.Length == starWord.Length + 1 && titleWord[^1] == 's' && titleWord.AsSpan(0, starWord.Length).SequenceEqual(starWord));
 
     public async Task<int> NormalizeAllTitles(bool forceReprocess = false, bool normalizeTitles = true, bool detectStars = true, bool detectTags = true, NormalizationProgress? progress = null, Action<string, string?, string>? onTitleProcessed = null, CancellationToken ct = default)
     {
@@ -1243,6 +1250,44 @@ namespace vrScraper.Services
       await videoService.ReloadVideos();
 
       return processed;
+    }
+
+    public async Task EnrichSingleVideo(long videoId, CancellationToken ct = default)
+    {
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+      var video = await context.VideoItems.FindAsync([videoId], ct);
+      if (video == null) return;
+
+      var titleToUse = video.Title;
+      var normalized = NormalizeTitle(titleToUse);
+      if (normalized != null && IsPlausible(normalized))
+        titleToUse = normalized;
+      else if (normalized != null)
+        titleToUse = normalized;
+
+      video.NormalizedTitle = titleToUse;
+
+      var allStars = await context.Stars.ToListAsync(ct);
+      var allTags = await context.Tags.ToListAsync(ct);
+
+      var detectedStars = DetectStars(titleToUse, allStars).Where(d => d.Confidence >= 0.7).ToList();
+      var detectedTags = DetectTags(titleToUse, allTags);
+
+      foreach (var (star, _) in detectedStars)
+      {
+        if (!await context.VideoStars.AnyAsync(vs => vs.VideoId == video.Id && vs.StarId == star.Id, ct))
+          context.VideoStars.Add(new DbVideoStar { VideoId = video.Id, StarId = star.Id, IsAutoDetected = true });
+      }
+
+      foreach (var tag in detectedTags)
+      {
+        if (!await context.VideoTags.AnyAsync(vt => vt.VideoId == video.Id && vt.TagId == tag.Id, ct))
+          context.VideoTags.Add(new DbVideoTag { VideoId = video.Id, TagId = tag.Id, IsAutoDetected = true });
+      }
+
+      await context.SaveChangesAsync(ct);
     }
 
     private async Task<(int Stars, int Tags)> SaveNormalization(VrScraperContext context, DbVideoItem video,

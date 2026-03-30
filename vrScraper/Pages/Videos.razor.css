@@ -74,6 +74,7 @@
     height: 30px;
     font-size: 13px;
     padding: 4px 8px 4px 28px;
+    background-color: var(--color-surface) !important;
 }
 
 .filter-select {
@@ -117,10 +118,55 @@
     font-size: 13px;
 }
 
-.filter-item .form-check-input {
+.filter-item .form-check {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: auto;
+    padding-left: 2.5em;
+}
+
+.filter-item .form-check .form-check-input {
     margin: 0;
-    width: 14px;
-    height: 14px;
+    float: none;
+}
+
+.filter-item .form-check .form-check-label {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    padding: 0;
+}
+
+.filter-separator {
+    width: 1px;
+    height: 24px;
+    background-color: var(--color-border-strong);
+    flex-shrink: 0;
+}
+
+.watchlist-create-inline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.watchlist-create-inline input {
+    width: 140px;
+    height: 30px;
+    font-size: 13px;
+}
+
+.watchlist-create-inline .btn {
+    height: 28px;
+    width: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.watchlist-create-inline .btn i {
+    font-size: 12px;
 }
 
 

@@ -343,6 +343,13 @@ namespace vrScraper.Services
 
         logger.LogInformation($"{newInsertions.Count} new videos found and added to database");
 
+        // Check if auto-enrich is enabled for this site
+        var autoEnrichSetting = await settingService.GetSetting($"Site:{SiteName}:AutoEnrichEnabled");
+        var autoEnrich = autoEnrichSetting == null || autoEnrichSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+        ITitleNormalizationService? titleNormService = autoEnrich
+          ? serviceProvider.GetRequiredService<ITitleNormalizationService>()
+          : null;
+
         logger.LogInformation($"Parsing details (tags and artists) of {newInsertions.Count} new videos...this will take a while");
 
         for (var i = 0; i < newInsertions.Count; i++)
@@ -354,6 +361,10 @@ namespace vrScraper.Services
           try
           {
             await ParseDetails(newInsertions[i], context);
+
+            // Auto-enrich: normalize title + detect stars/tags
+            if (titleNormService != null)
+              await titleNormService.EnrichSingleVideo(newInsertions[i].Id, cancellationToken);
           }
           catch (Exception ex)
           {
@@ -679,6 +690,14 @@ namespace vrScraper.Services
 
     public async Task ReparseInformations(CancellationToken cancellationToken = default)
     {
+      // Check if auto-enrich is enabled for this site
+      var settingService = serviceProvider.GetRequiredService<ISettingService>();
+      var autoEnrichSetting = await settingService.GetSetting($"Site:{SiteName}:AutoEnrichEnabled");
+      var autoEnrich = autoEnrichSetting == null || autoEnrichSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+      ITitleNormalizationService? titleNormService = autoEnrich
+        ? serviceProvider.GetRequiredService<ITitleNormalizationService>()
+        : null;
+
       // Load only IDs (lightweight, no navigation properties)
       List<long> videoIds;
       using (var scope = serviceProvider.CreateScope())
@@ -726,6 +745,11 @@ namespace vrScraper.Services
             logger.LogInformation("[{Current}/{Total}] Reparsing {Id} '{Title}'", i + 1, videoIds.Count, video.Id, video.Title);
 
             await ParseDetails(video, itemContext);
+
+            // Auto-enrich: normalize title + detect stars/tags
+            if (titleNormService != null)
+              await titleNormService.EnrichSingleVideo(video.Id, cancellationToken);
+
             success = true;
             successCount++;
             consecutiveErrors = 0;

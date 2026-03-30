@@ -6,10 +6,10 @@ function addPageKeyListener(dotNetRef) {
              document.activeElement.tagName === 'TEXTAREA')) {
             return;
         }
-        if (e.key === 'ArrowLeft') {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
             dotNetRef.invokeMethodAsync('HandleKeyNavigation', -1);
         }
-        if (e.key === 'ArrowRight') {
+        if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
             dotNetRef.invokeMethodAsync('HandleKeyNavigation', 1);
         }
     };

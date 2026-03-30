@@ -231,6 +231,13 @@ namespace vrScraper.Services
 
         logger.LogInformation("{NewCount} new videos added, {DuplicateCount} duplicates skipped.", newInsertions, duplicateCount);
 
+        // Check if auto-enrich is enabled for this site
+        var autoEnrichSetting = await settingService.GetSetting($"Site:{Site}:AutoEnrichEnabled");
+        var autoEnrich = autoEnrichSetting == null || autoEnrichSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+        ITitleNormalizationService? titleNormService = autoEnrich
+          ? serviceProvider.GetRequiredService<ITitleNormalizationService>()
+          : null;
+
         // Parse tags from scraped data
         _scrapingStatus = "Parsing tags for new videos...";
         var newVideos = await context.VideoItems
@@ -245,6 +252,10 @@ namespace vrScraper.Services
           try
           {
             await ParseVideoDetails(newVideos[i], context, cancellationToken);
+
+            // Auto-enrich: normalize title + detect stars/tags
+            if (titleNormService != null)
+              await titleNormService.EnrichSingleVideo(newVideos[i].Id, cancellationToken);
           }
           catch (Exception ex)
           {

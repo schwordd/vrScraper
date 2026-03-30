@@ -5,8 +5,6 @@
 @using Microsoft.EntityFrameworkCore
 
 @inject ITitleNormalizationService TitleNormService
-@inject IThePornDbService ThePornDbService
-@inject ISettingService SettingService
 @inject IServiceProvider ServiceProvider
 @inject IVideoService VideoService
 
@@ -208,21 +206,9 @@
     private NormalizationProgress? _normProgress;
     private CancellationTokenSource? _normCts;
 
-    // Enrichment state
-    private bool _enrichRunning;
-    private int _enrichCurrent;
-    private int _enrichTotal;
-    private string? _enrichResult;
-    private bool _enrichSuccess;
-
     // Reset state
     private bool _resetRunning;
     private string? _resetResult;
-
-    // API token
-    private string _apiToken = "";
-    private bool _showToken;
-    private bool _tokenSaved;
 
     // Log output
     private record LogEntry(DateTime Time, string Level, string Message);
@@ -242,10 +228,6 @@
         _ => "\u2139\ufe0f"
     };
 
-    protected override void OnInitialized()
-    {
-        _apiToken = SettingService.GetSettingValue("ThePornDbApiToken") ?? "";
-    }
 
     private async Task ResetEnrichmentData()
     {
@@ -348,50 +330,6 @@
             _normCts?.Dispose();
             _normCts = null;
             refreshCts.Cancel();
-            StateHasChanged();
-        }
-    }
-
-    private async Task SaveApiToken()
-    {
-        await SettingService.SaveSetting("ThePornDbApiToken", _apiToken);
-        _tokenSaved = true;
-        StateHasChanged();
-        await Task.Delay(2000);
-        _tokenSaved = false;
-        StateHasChanged();
-    }
-
-    private async Task RunEnrichment()
-    {
-        _enrichRunning = true;
-        _enrichResult = null;
-        _enrichCurrent = 0;
-        _enrichTotal = 0;
-        StateHasChanged();
-
-        using var cts = new CancellationTokenSource();
-        _ = RefreshUiPeriodically(cts.Token);
-
-        try
-        {
-            var count = await ThePornDbService.EnrichAllStars((current, total) =>
-            {
-                _enrichCurrent = current;
-                _enrichTotal = total;
-            });
-            _enrichResult = $"Done! Enriched {count} stars with additional tags.";
-            _enrichSuccess = true;
-        }
-        catch (Exception ex)
-        {
-            _enrichResult = $"Error: {ex.Message}";
-            _enrichSuccess = false;
-        }
-        finally
-        {
-            _enrichRunning = false;
-            cts.Cancel();
             StateHasChanged();
         }
     }

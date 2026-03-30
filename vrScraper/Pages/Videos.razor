@@ -43,18 +43,24 @@
             </span>
 
             <span class="filter-item">
-                <input class="form-check-input" type="checkbox" @bind="ShowOnlyLiked" id="showLikedCheck">
-                <label class="form-check-label" for="showLikedCheck">Liked</label>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyLiked" id="showLikedCheck">
+                    <label class="form-check-label" for="showLikedCheck">Liked</label>
+                </div>
             </span>
 
             <span class="filter-item">
-                <input class="form-check-input" type="checkbox" @bind="ShowOnlyUnwatched" id="showUnwatchedCheck">
-                <label class="form-check-label" for="showUnwatchedCheck">Unwatched</label>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyUnwatched" id="showUnwatchedCheck">
+                    <label class="form-check-label" for="showUnwatchedCheck">Unwatched</label>
+                </div>
             </span>
 
             <span class="filter-item">
-                <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
-                <label class="form-check-label" for="showErrorsCheck">Errors</label>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
+                    <label class="form-check-label" for="showErrorsCheck">Errors</label>
+                </div>
             </span>
 
             <span class="filter-item-count">@TotalItems videos</span>
@@ -93,26 +99,6 @@
                 </div>
             </span>
 
-            @if (WatchlistTabs.Any())
-            {
-                <span class="filter-item">
-                    <label><i class="icon-bookmark"></i> Watchlist:</label>
-                    <MultiSelect TItem="DbVrTab"
-                                    Data="@WatchlistTabs"
-                                    TextField="@((item) => item.Name)"
-                                    ValueField="@((item) => item.Id.ToString())"
-                                    @bind-Value="@SelectedWatchlistValue" />
-                    @if (_selectedWatchlistId > 0)
-                    {
-                        <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success" : "btn-outline-success")"
-                                @onclick="() => ToggleShowOnlyWatchlist()"
-                                title="Nur Watchlist-Videos anzeigen">
-                            <i class="icon-filter"></i>
-                        </button>
-                    }
-                </span>
-            }
-
             @if (AvailableSites.Count > 1)
             {
                 <span class="filter-item">
@@ -133,6 +119,47 @@
                 <DualRangeSlider Min="0" Max="120" Step="5"
                                  @bind-MinValue="MinDurationMinutes"
                                  @bind-MaxValue="MaxDurationMinutes" />
+            </span>
+
+            <span class="filter-separator"></span>
+
+            <span class="filter-item watchlist-filter">
+                <label><i class="icon-bookmark"></i> Watchlist:</label>
+                @if (_isCreatingWatchlist)
+                {
+                    <div class="watchlist-create-inline">
+                        <input type="text" class="form-control form-control-sm" placeholder="Name..."
+                               @bind="_newWatchlistName" @bind:event="oninput"
+                               @onkeydown="OnNewWatchlistKeyDown" />
+                        <button class="btn btn-sm btn-success" @onclick="CreateWatchlistConfirm"
+                                disabled="@string.IsNullOrWhiteSpace(_newWatchlistName)" title="Create">
+                            <i class="icon-check"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _isCreatingWatchlist = false" title="Cancel">
+                            <i class="icon-x"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <MultiSelect TItem="DbVrTab"
+                                    Data="@WatchlistTabs"
+                                    TextField="@((item) => item.Name)"
+                                    ValueField="@((item) => item.Id.ToString())"
+                                    Placeholder="Select..."
+                                    @bind-Value="@SelectedWatchlistValue" />
+                    @if (_selectedWatchlistId > 0)
+                    {
+                        <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success" : "btn-outline-success")"
+                                @onclick="() => ToggleShowOnlyWatchlist()"
+                                title="Nur Watchlist-Videos anzeigen">
+                            <i class="icon-filter"></i>
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-outline-primary" @onclick="StartCreateWatchlist" title="Neue Watchlist erstellen">
+                        <i class="icon-plus"></i>
+                    </button>
+                }
             </span>
         </div>
     </div>
@@ -666,7 +693,7 @@
 
     public string SelectedWatchlistValue
     {
-        get => _selectedWatchlistId.ToString();
+        get => _selectedWatchlistId == 0 ? "" : _selectedWatchlistId.ToString();
         set
         {
             SelectedWatchlistId = long.TryParse(value, out var id) ? id : 0;
@@ -679,7 +706,6 @@
         set
         {
             _selectedWatchlistId = value;
-            _showOnlyWatchlist = false;
             UpdateWatchlistVideoIds();
         }
     }
@@ -709,6 +735,47 @@
         {
             _selectedWatchlistVideoIds.Clear();
         }
+    }
+
+    private bool _isCreatingWatchlist;
+    private string _newWatchlistName = "";
+
+    private void StartCreateWatchlist()
+    {
+        _newWatchlistName = "";
+        _isCreatingWatchlist = true;
+    }
+
+    private async Task CreateWatchlistConfirm()
+    {
+        if (string.IsNullOrWhiteSpace(_newWatchlistName)) return;
+
+        var newTab = new DbVrTab
+        {
+            Name = _newWatchlistName.Trim(),
+            Type = "WATCHLIST",
+            Active = true,
+            Order = WatchlistTabs.Count + 1,
+            TagWhitelist = "[]",
+            ActressWhitelist = "[]",
+            TagBlacklist = "[]",
+            ActressBlacklist = "[]",
+            VideoWhitelist = "[]",
+            VideoBlacklist = "[]",
+            SiteFilter = "[]"
+        };
+
+        await TabService.AddTab(newTab);
+        WatchlistTabs = TabService.GetWatchlistTabs();
+        SelectedWatchlistId = newTab.Id;
+        _isCreatingWatchlist = false;
+        _newWatchlistName = "";
+    }
+
+    private async Task OnNewWatchlistKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CreateWatchlistConfirm();
+        else if (e.Key == "Escape") _isCreatingWatchlist = false;
     }
 
     private bool IsInSelectedWatchlist(long videoId)

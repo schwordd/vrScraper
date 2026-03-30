@@ -10,7 +10,6 @@
 @inject IVideoService VideoService
 @inject ISettingService SettingService
 @inject IScraperRegistry ScraperRegistry
-@inject ITagNormalizationService TagNormalizationService
 
 <h3>Settings</h3>
 
@@ -56,6 +55,7 @@
                         <th>Auto-Scrape</th>
                         <th>Scrape Time</th>
                         <th>Max Pages</th>
+                        <th>Auto-Enrich</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -67,6 +67,7 @@
                         var autoEnabled = GetSiteSetting(s, "AutoScrapeEnabled", "false") == "true";
                         var autoTime = GetSiteSetting(s, "AutoScrapeTime", "02:00");
                         var autoMaxPages = GetSiteSetting(s, "AutoScrapeMaxPages", "50");
+                        var autoEnrichEnabled = GetSiteSetting(s, "AutoEnrichEnabled", "true") == "true";
                         <tr class="@(!isEnabled ? "site-disabled" : "")">
                             <td>
                                 <span class="fw-semibold">@scraper.DisplayName</span>
@@ -100,56 +101,16 @@
                                 <input type="number" class="form-control form-control-sm site-input-sm" min="1" max="500"
                                        value="@autoMaxPages" @onchange="(e) => OnSiteInputChanged(s, nameof(autoMaxPages), e)" />
                             </td>
+                            <td>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" checked="@autoEnrichEnabled"
+                                           @onchange="(e) => OnSiteCheckboxChanged(s, nameof(autoEnrichEnabled), e)" />
+                                </div>
+                            </td>
                         </tr>
                     }
                 </tbody>
             </table>
-        </div>
-    </div>
-
-    <!-- Tag Synonym Editor -->
-    <div class="settings-section disabled-section">
-        <h5 class="section-title">
-            <i class="icon-tag me-2"></i>
-            Tag Normalization (Synonyms)
-            <span class="badge bg-secondary ms-2">Disabled</span>
-        </h5>
-        <div class="setting-card">
-            <small class="form-text text-muted mb-3 d-block">
-                Map synonym tags to a canonical name. During scraping, synonyms will be replaced with the canonical tag.
-            </small>
-            @foreach (var entry in _synonymMap)
-            {
-                var canonical = entry.Key;
-                <div class="synonym-row mb-2">
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <strong class="text-nowrap">@canonical</strong>
-                        <span class="text-muted">&larr;</span>
-                        <span class="text-muted">@string.Join(", ", entry.Value)</span>
-                        <button class="btn btn-sm btn-outline-danger ms-auto" disabled>Remove</button>
-                    </div>
-                </div>
-            }
-            <hr />
-            <div class="d-flex gap-2 align-items-end flex-wrap">
-                <div>
-                    <label class="form-label fw-semibold">Canonical Tag</label>
-                    <input type="text" class="form-control form-control-sm" disabled placeholder="e.g. Blonde" />
-                </div>
-                <div>
-                    <label class="form-label fw-semibold">Synonyms (comma-separated)</label>
-                    <input type="text" class="form-control form-control-sm" disabled placeholder="e.g. blond, blondes" />
-                </div>
-                <button class="btn btn-sm btn-primary" disabled>Add</button>
-            </div>
-            <div class="mt-3 d-flex gap-2">
-                <button class="btn btn-primary" disabled>
-                    <i class="icon-save me-1"></i> Save Synonyms
-                </button>
-                <button class="btn btn-warning" disabled>
-                    Normalize All Existing Tags
-                </button>
-            </div>
         </div>
     </div>
 
@@ -258,6 +219,7 @@
             nameof(Boolean) => "Enabled",
             "isEnabled" => "Enabled",
             "autoEnabled" => "AutoScrapeEnabled",
+            "autoEnrichEnabled" => "AutoEnrichEnabled",
             _ => field
         };
         SetSiteSetting(site, key, e.Value?.ToString()?.ToLowerInvariant() ?? "false");
@@ -286,7 +248,6 @@
     {
         await LoadTags();
         await LoadSettings();
-        _synonymMap = TagNormalizationService.GetSynonymMap();
     }
 
     private async Task LoadTags()
@@ -297,75 +258,6 @@
     private async Task LoadSettings()
     {
         AllSettings = (await SettingService.GetAllSettings()).ToList();
-    }
-
-    // Synonym editor fields
-    private Dictionary<string, List<string>> _synonymMap = new();
-    private string _newCanonical = "";
-    private string _newSynonyms = "";
-    private bool _normalizing;
-    private string? _synonymMessage;
-    private bool _synonymSuccess;
-
-    private void AddSynonymEntry()
-    {
-        _synonymMessage = null;
-        if (string.IsNullOrWhiteSpace(_newCanonical) || string.IsNullOrWhiteSpace(_newSynonyms)) return;
-        var synonyms = _newSynonyms.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
-        if (synonyms.Count == 0) return;
-
-        if (_synonymMap.ContainsKey(_newCanonical))
-        {
-            _synonymMap[_newCanonical] = _synonymMap[_newCanonical].Union(synonyms).ToList();
-        }
-        else
-        {
-            _synonymMap[_newCanonical] = synonyms;
-        }
-        _newCanonical = "";
-        _newSynonyms = "";
-    }
-
-    private void RemoveSynonymEntry(string canonical)
-    {
-        _synonymMap.Remove(canonical);
-    }
-
-    private async Task SaveSynonyms()
-    {
-        _synonymMessage = null;
-        try
-        {
-            await TagNormalizationService.SaveSynonymMap(_synonymMap);
-            _synonymSuccess = true;
-            _synonymMessage = "Synonym map saved successfully.";
-        }
-        catch
-        {
-            _synonymSuccess = false;
-            _synonymMessage = "Error saving synonym map.";
-        }
-    }
-
-    private async Task NormalizeAllTags()
-    {
-        _synonymMessage = null;
-        _normalizing = true;
-        try
-        {
-            await TagNormalizationService.NormalizeAllExistingTags();
-            _synonymSuccess = true;
-            _synonymMessage = "All existing tags normalized.";
-        }
-        catch
-        {
-            _synonymSuccess = false;
-            _synonymMessage = "Error normalizing tags.";
-        }
-        finally
-        {
-            _normalizing = false;
-        }
     }
 
     // Password change fields
