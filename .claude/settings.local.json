@@ -120,7 +120,8 @@
       "Bash(PYTHONIOENCODING=utf-8 python D:/Source/vrScraper/tools/test_decoder_comparison.py --csharp-only)",
       "Bash(cd:*)",
       "Bash(xargs cat:*)",
-      "Bash(xargs head:*)"
+      "Bash(xargs head:*)",
+      "Bash(netstat -aon)"
     ],
     "deny": []
   }

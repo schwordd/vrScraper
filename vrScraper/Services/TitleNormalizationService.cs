@@ -93,6 +93,8 @@ namespace vrScraper.Services
       // no small cap X
       map['\u028F'] = 'Y'; // ʏ
       map['\u1D22'] = 'Z'; // ᴢ
+      map['\uA730'] = 'F'; // ꜰ (Latin small cap F)
+      map['\uA731'] = 'S'; // ꜱ (Latin small cap S)
 
       // Coptic confusables
       map['\u2C80'] = 'A'; // Ⲁ
@@ -174,6 +176,7 @@ namespace vrScraper.Services
       map['\u1614'] = 'Z'; // ᘔ
       map['\u14BA'] = 'M'; // ᒺ→M? ᗰ
       map['\u15F0'] = 'M'; // ᗰ
+      map['\u146D'] = 'P'; // ᑭ (Canadian syllabic → P)
 
       // Armenian/Cyrillic confusables
       map['\u027E'] = 'r'; // ɾ
@@ -356,8 +359,21 @@ namespace vrScraper.Services
       map['\u043A'] = 'k'; // к (Cyrillic ka)
       map['\u0440'] = 'r'; // р (Cyrillic er → was mapped to p, but visually used as r too)
 
-      // Cent/currency signs used as letters
+      // Cent/currency signs and special symbols used as letters
       map['\u00A2'] = 'c'; // ¢ → c
+      map['\u00B5'] = 'u'; // µ (micro sign → u)
+      map['\u00A3'] = 'e'; // £ (pound sign → e, most common leet usage)
+      map['\u00A5'] = 'y'; // ¥ (yen sign → y)
+      map['\u00A7'] = 's'; // § (section sign → s)
+      map['\u00A1'] = 'i'; // ¡ (inverted exclamation → i)
+      map['\u00DF'] = 'b'; // ß (eszett → b, visual substitute in leet)
+      map['\u00F0'] = 'o'; // ð (eth → o, round shape used as o)
+      map['\u00D0'] = 'D'; // Ð (capital eth → D)
+      map['\u00FE'] = 'p'; // þ (thorn → p)
+      map['\u2020'] = 't'; // † (dagger → t)
+      map['\u20AC'] = 'e'; // € (euro sign → e)
+      map['\u20AD'] = 'K'; // ₭ (kip sign → K)
+      map['\u20A9'] = 'W'; // ₩ (won sign → W)
 
       // Latin Extended-A common diacritics (FormKD fails under InvariantGlobalization)
       map['\u010E'] = 'D'; // Ď
@@ -703,7 +719,6 @@ namespace vrScraper.Services
       ('l', 'i'), ('i', 'l'),  // l ↔ i
       ('I', 'l'), ('v', 'u'),  // I → l, v → u
       ('u', 'v'),              // u → v
-      ('b', 'g'), ('g', 'b'),  // b ↔ g (upside-down ambiguity)
     ];
 
     // ── Dictionary for post-processing correction ──
@@ -762,7 +777,7 @@ namespace vrScraper.Services
         {
           'i' or 'l' => '*',
           'v' or 'u' => '#',
-          'b' or 'g' => '@',
+          // b ↔ g removed: upside-down already handled by HandleUpsideDown/HandleReversedAscii
           _ => c
         });
       }
@@ -953,6 +968,8 @@ namespace vrScraper.Services
       if (full != title)
       {
         int fullWords = CountDictionaryWords(full);
+        logger.LogDebug("NormalizeTitle: orig={Orig} origWords={OW} full={Full} fullWords={FW} obfuscated={Obf}",
+          title, origWords, full, fullWords, obfuscated);
         // If known obfuscated: accept if dict words maintained or improved (>= trust the decoder)
         // If not known obfuscated: must strictly improve (> prevents damage to clean titles)
         if (obfuscated ? fullWords >= origWords : fullWords > origWords)
@@ -962,6 +979,8 @@ namespace vrScraper.Services
       if (safe != title)
       {
         int safeWords = CountDictionaryWords(safe);
+        logger.LogDebug("NormalizeTitle: safe={Safe} safeWords={SW} origWords={OW}",
+          safe, safeWords, origWords);
         // Safe pass: accept if it maintains or improves (>= is fine, safe can't damage)
         if (safeWords >= origWords)
           return safe;
@@ -986,8 +1005,9 @@ namespace vrScraper.Services
 
       var result = NormalizeUnicode(title);
       result = HandleReversedAscii(result);
+      var preDict = result; // snapshot before leet decode for change-tracking
       result = DecodeLeetSpeak(result);
-      result = PostProcessWithDictionary(result);
+      result = PostProcessWithDictionary(result, preDict);
       result = TryAltLeetFallback(result, title);
       result = CollapseSpaces(result);
       result = ToTitleCase(result);
@@ -1008,10 +1028,7 @@ namespace vrScraper.Services
       title = title.Replace("&#039;", "'").Replace("&amp;", "&")
                    .Replace("&lt;", "<").Replace("&gt;", ">").Replace("&quot;", "\"");
 
-      EnsureDynamicDictionary();
-
       var result = NormalizeUnicode(title);
-      result = PostProcessWithDictionary(result);
       result = CollapseSpaces(result);
       result = ToTitleCase(result);
 
@@ -1555,7 +1572,7 @@ namespace vrScraper.Services
     private static readonly Regex DatePattern = new(@"\d{1,4}[.\-/]\d{1,2}[.\-/]\d{1,4}", RegexOptions.Compiled);
 
     /// <summary>Regex for ordinals (1st, 2nd, 3rd, etc.) and digit-abbreviations (4some, 3way).</summary>
-    private static readonly Regex ProtectedPattern = new(@"(?<=^|\s)\d+(st|nd|rd|th|some|way)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ProtectedPattern = new(@"(?<=^|\s)\d+(st|nd|rd|th|some|way|k)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex PureNumberToken = new(@"(?<=^|\s)\d+(?=\s|$|-)", RegexOptions.Compiled);
 
     private static bool IsLetterOrLeet(char c) => char.IsLetter(c) || LeetMap.ContainsKey(c);
@@ -1690,14 +1707,22 @@ namespace vrScraper.Services
     /// Post-processes decoded text using dictionary lookup to resolve ambiguous characters.
     /// E.g. "Biake" → try I→l → "Blake" (in dictionary) → use "Blake"
     /// </summary>
-    private string PostProcessWithDictionary(string input)
+    private string PostProcessWithDictionary(string input, string? preDecodedInput = null)
     {
       var words = input.Split(' ');
+      var preWords = preDecodedInput?.Split(' ');
       var result = new string[words.Length];
 
       for (int w = 0; w < words.Length; w++)
       {
         var word = words[w];
+
+        // Skip correction for words that were not changed by decoding (prevents false corrections on clean ASCII)
+        if (preWords != null && w < preWords.Length && word == preWords[w])
+        {
+          result[w] = word;
+          continue;
+        }
 
         // Handle hyphenated words (e.g. "step-dad")
         if (word.Contains('-'))
