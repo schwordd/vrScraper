@@ -204,7 +204,7 @@
                                 </button>
                             </div>
                         </div>
-                        <h3>@if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title) { <i class="icon-sparkles ai-icon" title="KI-generierter Titel (Original: @item.Title)"></i> }@(item.NormalizedTitle ?? item.Title)</h3>
+                        <h3 title="@(!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title ? item.Title : "")">@if (!string.IsNullOrEmpty(item.NormalizedTitle) && item.NormalizedTitle != item.Title) { <i class="icon-sparkles ai-icon"></i> }@(item.NormalizedTitle ?? item.Title)</h3>
                         @if (item.Stars != null && item.Stars.Any())
                         {
                             <div class="star-container">

@@ -56,15 +56,15 @@ namespace vrScraper.Controllers
     {
       if (string.IsNullOrEmpty(title)) return BadRequest("title parameter required");
 
-      var legacy = titleNormService.NormalizeTitleLegacy(title);
       var isObfuscated = titleNormService.IsObfuscated(title);
+      var result = titleNormService.NormalizeTitle(title);
 
       return Ok(new
       {
         original = title,
         isObfuscated,
-        decoder = legacy,
-        decoderChanged = legacy != title,
+        result = result ?? title,
+        changed = result != null,
       });
     }
 

@@ -14,30 +14,6 @@
 
 <div class="enrichment-container">
 
-    <!-- Reset Section -->
-    <div class="enrichment-section">
-        <h5 class="section-title">
-            <i class="icon-trash-2 me-2"></i>
-            Reset Enrichment Data
-        </h5>
-        <p class="section-desc">
-            Removes all auto-detected data (NormalizedTitle, auto-detected stars/tags) so you can re-run enrichment from scratch.
-        </p>
-        <div class="action-controls">
-            <button class="btn btn-danger" @onclick="ResetEnrichmentData" disabled="@_resetRunning">
-                @if (_resetRunning)
-                {
-                    <span class="spinner-border spinner-border-sm me-2"></span>
-                }
-                <i class="icon-rotate-ccw me-1"></i> Reset All Enrichment Data
-            </button>
-            @if (_resetResult != null)
-            {
-                <span class="text-success ms-2">@_resetResult</span>
-            }
-        </div>
-    </div>
-
     <!-- Title Normalization Section -->
     <div class="enrichment-section">
         <h5 class="section-title">
@@ -52,7 +28,7 @@
             <div class="action-card">
                 <div class="action-header">
                     <h6>Normalize &amp; Detect</h6>
-                    <small class="text-muted">Decoder-basierte Normalisierung und Star/Tag-Erkennung</small>
+                    <small class="text-muted">Decoder-based normalization and star/tag detection</small>
                 </div>
                 <div class="action-controls">
                     <label class="form-check">
@@ -69,7 +45,7 @@
                     </label>
                     <label class="form-check">
                         <input type="checkbox" class="form-check-input" @bind="_forceReprocess" />
-                        <span class="form-check-label">Force reprocess</span>
+                        <span class="form-check-label">Reprocess all</span>
                     </label>
                     <button class="btn btn-primary" @onclick="RunNormalization" disabled="@(_normRunning || (!_normTitles && !_normStars && !_normTags))">
                         @if (_normRunning)
@@ -86,7 +62,7 @@
                     }
                 </div>
 
-                @if (_normRunning && _normProgress != null)
+                @if (_normProgress != null)
                 {
                     <div class="progress-section">
                         <div class="progress mb-2">
@@ -97,7 +73,7 @@
                         </div>
                         <div class="stats-row">
                             <span class="stat-badge"><i class="icon-activity me-1"></i>@_normProgress.Phase</span>
-                            <span class="stat-badge"><i class="icon-type me-1"></i>@_normProgress.TitlesNormalized Titel dekodiert</span>
+                            <span class="stat-badge"><i class="icon-type me-1"></i>@_normProgress.TitlesNormalized titles decoded</span>
                             <span class="stat-badge"><i class="icon-user me-1"></i>@_normProgress.StarsDetected Stars</span>
                             <span class="stat-badge"><i class="icon-tag me-1"></i>@_normProgress.TagsDetected Tags</span>
                         </div>
@@ -195,13 +171,37 @@
     </div>
     *@
 
+    <!-- Reset Section -->
+    <div class="enrichment-section">
+        <h5 class="section-title">
+            <i class="icon-trash-2 me-2"></i>
+            Reset Enrichment Data
+        </h5>
+        <p class="section-desc">
+            Removes all auto-detected data (NormalizedTitle, auto-detected stars/tags) so you can re-run enrichment from scratch.
+        </p>
+        <div class="action-controls">
+            <button class="btn btn-danger" @onclick="ResetEnrichmentData" disabled="@_resetRunning">
+                @if (_resetRunning)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                }
+                <i class="icon-rotate-ccw me-1"></i> Reset All Enrichment Data
+            </button>
+            @if (_resetResult != null)
+            {
+                <span class="text-success ms-2">@_resetResult</span>
+            }
+        </div>
+    </div>
+
 </div>
 
 @code {
     private bool _forceReprocess;
     private bool _normTitles = true;
-    private bool _normStars;
-    private bool _normTags;
+    private bool _normStars = true;
+    private bool _normTags = true;
 
     // Normalization state
     private bool _normRunning;
@@ -302,7 +302,7 @@
 
             if (_normTitles)
             {
-                Log("Starte Decoder (234k Wörter)...", "info");
+                Log("Starting decoder (234k words)...", "info");
             }
 
             var count = await TitleNormService.NormalizeAllTitles(
@@ -320,19 +320,19 @@
                             Log($"[{idx}/{total}] \"{shortOriginal}\" → \"{shortNormalized}\"", "ok");
                             break;
                         case "decoder-unsicher":
-                            Log($"[{idx}/{total}] \"{shortOriginal}\" → \"{shortNormalized}\" (unsicher)", "warn");
+                            Log($"[{idx}/{total}] \"{shortOriginal}\" → \"{shortNormalized}\" (uncertain)", "warn");
                             break;
                         default: // "skip"
-                            Log($"[{idx}/{total}] \"{shortOriginal}\" → nicht dekodierbar", "warn");
+                            Log($"[{idx}/{total}] \"{shortOriginal}\" → unchanged", "warn");
                             break;
                     }
                 },
                 ct: ct);
 
-            Log($"Fertig! {_normProgress!.TitlesNormalized} Titel dekodiert, " +
-                $"{_normProgress.StarsDetected} Stars erkannt, " +
-                $"{_normProgress.TagsDetected} Tags erkannt " +
-                $"({count} Videos verarbeitet).", "ok");
+            Log($"Done! {_normProgress!.TitlesNormalized} titles decoded, " +
+                $"{_normProgress.StarsDetected} stars detected, " +
+                $"{_normProgress.TagsDetected} tags detected " +
+                $"({count} videos processed).", "ok");
         }
         catch (OperationCanceledException)
         {

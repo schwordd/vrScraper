@@ -56,7 +56,7 @@ def csharp_decode(title: str) -> str | None:
         if r.status_code != 200:
             return None
         data = r.json()
-        return data.get("decoder", title)
+        return data.get("result", data.get("decoder", title))
     except Exception as e:
         return None
 

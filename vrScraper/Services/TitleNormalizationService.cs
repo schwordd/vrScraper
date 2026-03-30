@@ -921,17 +921,60 @@ namespace vrScraper.Services
           leetTransitions++;
       }
 
-      return suspiciousChars > 2 || leetTransitions > 4;
+      return suspiciousChars > 0 || leetTransitions > 1;
+    }
+
+    private int CountDictionaryWords(string text)
+    {
+      return text.Split([' ', '-', ',', '.'], StringSplitOptions.RemoveEmptyEntries)
+        .Count(w => w.Length >= 3 && w.All(char.IsLetter) && IsInDictionary(w));
     }
 
     public string? NormalizeTitle(string title)
     {
       if (string.IsNullOrWhiteSpace(title)) return null;
-      var decoded = NormalizeTitleLegacy(title);
-      return decoded != title ? decoded : null;
+
+      EnsureDynamicDictionary();
+
+      // Always run safe pass (Confusables + Dictionary i/l fix — can't damage anything)
+      var safe = NormalizeSafe(title);
+
+      // Always run full pass (Leet + Reversed + Alt-Leet)
+      var full = NormalizeFull(title);
+
+      // Pick the best result:
+      // 1. If full decode improved dict word count → use full (even if not "obfuscated")
+      // 2. If full decode didn't help but safe did → use safe
+      // 3. If nothing helped → null
+      int origWords = CountDictionaryWords(title);
+
+      bool obfuscated = IsObfuscated(title);
+
+      if (full != title)
+      {
+        int fullWords = CountDictionaryWords(full);
+        // If known obfuscated: accept if dict words maintained or improved (>= trust the decoder)
+        // If not known obfuscated: must strictly improve (> prevents damage to clean titles)
+        if (obfuscated ? fullWords >= origWords : fullWords > origWords)
+          return full;
+      }
+
+      if (safe != title)
+      {
+        int safeWords = CountDictionaryWords(safe);
+        // Safe pass: accept if it maintains or improves (>= is fine, safe can't damage)
+        if (safeWords >= origWords)
+          return safe;
+      }
+
+      return null;
     }
 
-    public string NormalizeTitleLegacy(string title)
+    /// <summary>
+    /// Full normalization pipeline: Unicode + Leet + Reversed + Dictionary + Alt-Leet.
+    /// Use for titles known to be obfuscated.
+    /// </summary>
+    private string NormalizeFull(string title)
     {
       if (string.IsNullOrWhiteSpace(title)) return title;
 
@@ -946,6 +989,29 @@ namespace vrScraper.Services
       result = DecodeLeetSpeak(result);
       result = PostProcessWithDictionary(result);
       result = TryAltLeetFallback(result, title);
+      result = CollapseSpaces(result);
+      result = ToTitleCase(result);
+
+      return result.Trim();
+    }
+
+    public string NormalizeTitleLegacy(string title) => NormalizeFull(title);
+
+    /// <summary>
+    /// Safe normalization pass: only Unicode confusables, accents, dictionary i/l correction.
+    /// Cannot damage clean titles — no leet decode, no reversed text detection.
+    /// </summary>
+    private string NormalizeSafe(string title)
+    {
+      if (string.IsNullOrWhiteSpace(title)) return title;
+
+      title = title.Replace("&#039;", "'").Replace("&amp;", "&")
+                   .Replace("&lt;", "<").Replace("&gt;", ">").Replace("&quot;", "\"");
+
+      EnsureDynamicDictionary();
+
+      var result = NormalizeUnicode(title);
+      result = PostProcessWithDictionary(result);
       result = CollapseSpaces(result);
       result = ToTitleCase(result);
 
@@ -1001,24 +1067,35 @@ namespace vrScraper.Services
     {
       var allVideos = await videoService.GetVideoItems();
 
-      // Phase 1: Obfuscated titles — normalize + detect stars/tags
-      var obfuscated = allVideos
-        .Where(v => IsObfuscated(v.Title) && (forceReprocess || string.IsNullOrEmpty(v.NormalizedTitle)))
-        .ToList();
+      // Info-Log: wie viele obfuskiert?
+      var obfuscatedCount = allVideos.Count(v => IsObfuscated(v.Title));
 
-      // Phase 2: Non-obfuscated videos without stars/tags (only if detection is enabled)
-      var withoutStarsOrTags = new List<DbVideoItem>();
+      // Bestimme welche Titel verarbeitet werden:
+      // - normalizeTitles: Titel die obfuskiert sind ODER noch kein NormalizedTitle haben
+      //   Bei forceReprocess: nur obfuskierte oder fehlende NormalizedTitle (clean bereits verarbeitete überspringen)
+      // - detectStars/detectTags: Videos ohne Stars/Tags
+      var toNormalize = new List<DbVideoItem>();
+      if (normalizeTitles)
+      {
+        toNormalize = allVideos
+          .Where(v => forceReprocess
+            ? (IsObfuscated(v.Title) || string.IsNullOrEmpty(v.NormalizedTitle))
+            : string.IsNullOrEmpty(v.NormalizedTitle))
+          .ToList();
+      }
+
+      var toDetectOnly = new List<DbVideoItem>();
       if (detectStars || detectTags)
       {
-        var nonObfuscatedIds = new HashSet<long>(obfuscated.Select(v => v.Id));
-        withoutStarsOrTags = allVideos
-          .Where(v => !nonObfuscatedIds.Contains(v.Id)
+        var normalizeIds = new HashSet<long>(toNormalize.Select(v => v.Id));
+        toDetectOnly = allVideos
+          .Where(v => !normalizeIds.Contains(v.Id)
             && ((detectStars && (v.Stars == null || v.Stars.Count == 0))
              || (detectTags && (v.Tags == null || v.Tags.Count == 0))))
           .ToList();
       }
 
-      var toProcess = normalizeTitles ? obfuscated.Concat(withoutStarsOrTags).ToList() : withoutStarsOrTags;
+      var toProcess = toNormalize.Concat(toDetectOnly).ToList();
 
       if (toProcess.Count == 0)
       {
@@ -1026,13 +1103,13 @@ namespace vrScraper.Services
         return 0;
       }
 
-      logger.LogInformation("Processing {Count} titles ({Obfuscated} obfuscated + {Normal} normal without stars/tags)",
-        toProcess.Count, obfuscated.Count, withoutStarsOrTags.Count);
+      logger.LogInformation("Processing {Count} titles ({Normalize} to normalize + {Detect} detect-only, {Obfuscated} obfuscated total)",
+        toProcess.Count, toNormalize.Count, toDetectOnly.Count, obfuscatedCount);
 
       if (progress != null)
       {
         progress.Total = toProcess.Count;
-        progress.Phase = "Initialisiere...";
+        progress.Phase = "Initializing...";
       }
 
       using var scope = serviceProvider.CreateScope();
@@ -1044,42 +1121,34 @@ namespace vrScraper.Services
       int starsDetected = 0;
       int tagsDetected = 0;
       int titlesNormalized = 0;
+      int unsicher = 0;
 
-      var obfuscatedIds = new HashSet<long>(obfuscated.Select(v => v.Id));
-
-      // Split into obfuscated and non-obfuscated (just star/tag detection)
-      var obfuscatedToProcess = toProcess.Where(v => obfuscatedIds.Contains(v.Id)).ToList();
-      var nonObfuscatedToProcess = toProcess.Where(v => !obfuscatedIds.Contains(v.Id)).ToList();
-
-      // Process obfuscated titles: decoder only
-      if (normalizeTitles && obfuscatedToProcess.Count > 0)
+      // Phase 1: Normalisierung — alle Titel durch NormalizeTitle() (Zwei-Pass)
+      if (normalizeTitles && toNormalize.Count > 0)
       {
-        int unsicher = 0;
-
-        for (int i = 0; i < obfuscatedToProcess.Count; i++)
+        for (int i = 0; i < toNormalize.Count; i++)
         {
           ct.ThrowIfCancellationRequested();
-          var video = obfuscatedToProcess[i];
+          var video = toNormalize[i];
 
-          var decoded = NormalizeTitleLegacy(video.Title);
-          if (decoded != video.Title && IsPlausible(decoded))
+          var normalized = NormalizeTitle(video.Title);
+          if (normalized != null && IsPlausible(normalized))
           {
-            // Decoder succeeded with plausible result
-            { var (s, t) = await SaveNormalization(context, video, decoded, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
-            onTitleProcessed?.Invoke(video.Title, decoded, "decoder");
+            { var (s, t) = await SaveNormalization(context, video, normalized, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
+            onTitleProcessed?.Invoke(video.Title, normalized, "decoder");
             titlesNormalized++;
           }
-          else if (decoded != video.Title)
+          else if (normalized != null)
           {
-            // Decoder changed the title but result is not plausible — save as "decoder-unsicher"
-            { var (s, t) = await SaveNormalization(context, video, decoded, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
-            onTitleProcessed?.Invoke(video.Title, decoded, "decoder-unsicher");
+            { var (s, t) = await SaveNormalization(context, video, normalized, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
+            onTitleProcessed?.Invoke(video.Title, normalized, "decoder-unsicher");
             titlesNormalized++;
             unsicher++;
           }
           else
           {
-            // Decoder didn't change anything
+            // NormalizeTitle returned null — no change, still run star/tag detection on original
+            { var (s, t) = await SaveNormalization(context, video, video.Title, allStars, allTags, detectStars, detectTags, ct); starsDetected += s; tagsDetected += t; }
             onTitleProcessed?.Invoke(video.Title, null, "skip");
           }
 
@@ -1090,71 +1159,80 @@ namespace vrScraper.Services
             progress.StarsDetected = starsDetected;
             progress.TagsDetected = tagsDetected;
             progress.TitlesNormalized = titlesNormalized;
-            progress.Phase = $"Decoder ({unsicher} unsicher)";
+            progress.Phase = $"Decoding ({unsicher} uncertain)";
           }
 
           if (processed % 100 == 0)
             await context.SaveChangesAsync(ct);
+
+          if (processed % 10 == 0)
+            await Task.Yield(); // Let UI thread update progress
         }
 
         await context.SaveChangesAsync(ct);
 
-        logger.LogInformation("Decoder handled {Total} obfuscated titles ({Unsicher} unsicher)",
-          obfuscatedToProcess.Count, unsicher);
+        logger.LogInformation("Normalization handled {Total} titles ({Normalized} changed, {Unsicher} unsicher)",
+          toNormalize.Count, titlesNormalized, unsicher);
       }
 
-      // Process non-obfuscated titles (star/tag detection only, no LLM)
-      if (progress != null && nonObfuscatedToProcess.Count > 0)
-        progress.Phase = $"Star/Tag Erkennung ({nonObfuscatedToProcess.Count} Titel)";
-
-      foreach (var video in nonObfuscatedToProcess)
+      // Phase 2: Star/Tag Erkennung für restliche Videos (ohne Normalisierung)
+      if (toDetectOnly.Count > 0)
       {
-        ct.ThrowIfCancellationRequested();
-
-        var detectedStarList = detectStars
-          ? DetectStars(video.Title, allStars).Where(d => d.Confidence >= 0.7).ToList()
-          : new List<(DbStar Star, double Confidence)>();
-        var detectedTagList = detectTags ? DetectTags(video.Title, allTags) : new List<DbTag>();
-
-        var dbVideo = await context.VideoItems.FindAsync([video.Id], ct);
-        if (dbVideo != null)
-        {
-          foreach (var (star, _) in detectedStarList)
-          {
-            if (!await context.VideoStars.AnyAsync(vs => vs.VideoId == dbVideo.Id && vs.StarId == star.Id, ct))
-            {
-              context.VideoStars.Add(new DbVideoStar { VideoId = dbVideo.Id, StarId = star.Id, IsAutoDetected = true });
-              starsDetected++;
-            }
-          }
-
-          foreach (var tag in detectedTagList)
-          {
-            if (!await context.VideoTags.AnyAsync(vt => vt.VideoId == dbVideo.Id && vt.TagId == tag.Id, ct))
-            {
-              context.VideoTags.Add(new DbVideoTag { VideoId = dbVideo.Id, TagId = tag.Id, IsAutoDetected = true });
-              tagsDetected++;
-            }
-          }
-        }
-
-        processed++;
         if (progress != null)
+          progress.Phase = $"Star/Tag detection ({toDetectOnly.Count} titles)";
+
+        foreach (var video in toDetectOnly)
         {
-          progress.Current = processed;
-          progress.StarsDetected = starsDetected;
-          progress.TagsDetected = tagsDetected;
+          ct.ThrowIfCancellationRequested();
+
+          var detectedStarList = detectStars
+            ? DetectStars(video.Title, allStars).Where(d => d.Confidence >= 0.7).ToList()
+            : new List<(DbStar Star, double Confidence)>();
+          var detectedTagList = detectTags ? DetectTags(video.Title, allTags) : new List<DbTag>();
+
+          var dbVideo = await context.VideoItems.FindAsync([video.Id], ct);
+          if (dbVideo != null)
+          {
+            foreach (var (star, _) in detectedStarList)
+            {
+              if (!await context.VideoStars.AnyAsync(vs => vs.VideoId == dbVideo.Id && vs.StarId == star.Id, ct))
+              {
+                context.VideoStars.Add(new DbVideoStar { VideoId = dbVideo.Id, StarId = star.Id, IsAutoDetected = true });
+                starsDetected++;
+              }
+            }
+
+            foreach (var tag in detectedTagList)
+            {
+              if (!await context.VideoTags.AnyAsync(vt => vt.VideoId == dbVideo.Id && vt.TagId == tag.Id, ct))
+              {
+                context.VideoTags.Add(new DbVideoTag { VideoId = dbVideo.Id, TagId = tag.Id, IsAutoDetected = true });
+                tagsDetected++;
+              }
+            }
+          }
+
+          processed++;
+          if (progress != null)
+          {
+            progress.Current = processed;
+            progress.StarsDetected = starsDetected;
+            progress.TagsDetected = tagsDetected;
+          }
+
+          if (processed % 100 == 0)
+            await context.SaveChangesAsync(ct);
+
+          if (processed % 10 == 0)
+            await Task.Yield();
         }
 
-        if (processed % 100 == 0)
-          await context.SaveChangesAsync(ct);
+        await context.SaveChangesAsync(ct);
       }
-
-      await context.SaveChangesAsync(ct);
 
       if (progress != null)
       {
-        progress.Phase = "Fertig";
+        progress.Phase = "Done";
         progress.Current = processed;
       }
 
@@ -1433,7 +1511,7 @@ namespace vrScraper.Services
     private static readonly Regex DatePattern = new(@"\d{1,4}[.\-/]\d{1,2}[.\-/]\d{1,4}", RegexOptions.Compiled);
 
     /// <summary>Regex for ordinals (1st, 2nd, 3rd, etc.) and digit-abbreviations (4some, 3way).</summary>
-    private static readonly Regex ProtectedPattern = new(@"\d+(st|nd|rd|th|some|way)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ProtectedPattern = new(@"(?<=^|\s)\d+(st|nd|rd|th|some|way)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex PureNumberToken = new(@"(?<=^|\s)\d+(?=\s|$|-)", RegexOptions.Compiled);
 
     private static bool IsLetterOrLeet(char c) => char.IsLetter(c) || LeetMap.ContainsKey(c);
@@ -1490,8 +1568,10 @@ namespace vrScraper.Services
             continue;
           }
 
-          // Decode if at least one neighbor is a letter or another leet char
-          if (prevValid || nextValid)
+          // '@' and '$' should always be decoded (even standalone " @ " = "a", "word$" = "words")
+          // Other leet chars need at least one letter/leet neighbor
+          bool alwaysDecode = c == '@' || c == '$';
+          if (alwaysDecode || prevValid || nextValid)
           {
             // Special case: '1' is ambiguous (l or i)
             // At word start (after space/punctuation or string start) → 'l' (like "1ittle")
@@ -1735,22 +1815,38 @@ namespace vrScraper.Services
 
     private string CorrectWord(string word)
     {
-      if (word.Length < 3) return word; // too short for reliable dictionary correction
+      if (word.Length < 2) return word;
       var lower = word.ToLowerInvariant();
       if (IsInDictionary(lower)) return word;
 
       var canon = Canonicalize(lower);
       if (CanonicalIndex.TryGetValue(canon, out var candidates))
       {
-        // Prefer same-length match
         var best = candidates.FirstOrDefault(c => c.Length == lower.Length) ?? candidates[0];
-        // Preserve original case pattern
         var result = word.ToCharArray();
         for (int i = 0; i < Math.Min(result.Length, best.Length); i++)
-        {
           result[i] = char.IsUpper(word[i]) ? char.ToUpperInvariant(best[i]) : best[i];
-        }
         return new string(result);
+      }
+
+      // Try with inflection stripping: "rldes" → strip "s" → canon("rlde") → find "ride" → rebuild "rides"
+      string[] suffixes = ["s", "es", "ed", "ing", "ers", "er"];
+      foreach (var suffix in suffixes)
+      {
+        if (lower.Length > suffix.Length + 2 && lower.EndsWith(suffix))
+        {
+          var stem = lower[..^suffix.Length];
+          var stemCanon = Canonicalize(stem);
+          if (CanonicalIndex.TryGetValue(stemCanon, out var stemCandidates))
+          {
+            var best = stemCandidates.FirstOrDefault(c => c.Length == stem.Length) ?? stemCandidates[0];
+            var corrected = best + suffix;
+            var result = word.ToCharArray();
+            for (int i = 0; i < Math.Min(result.Length, corrected.Length); i++)
+              result[i] = char.IsUpper(word[i]) ? char.ToUpperInvariant(corrected[i]) : corrected[i];
+            return new string(result);
+          }
+        }
       }
 
       // Also check dynamic dictionary with canonical lookup
