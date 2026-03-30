@@ -7,8 +7,9 @@ llama.cpp/
 lora-output/
 gguf-output/
 merged-model/
+benchmark-results/
 
-# Training data (too large for git, regenerate with scripts)
+# Training data (too large for git)
 training_data_final.jsonl
 training_data_v2.jsonl
 training_data_validated.jsonl
@@ -17,14 +18,13 @@ training_chat.jsonl
 # Reports and scan files (regenerable)
 validation_report.jsonl
 decoder_comparison_report.json
+decoder_results_scan.txt
+review_errors.txt
 verified_scan.txt
 review_scan.txt
 unmapped_chars_report.txt
 unmapped_with_suggestions.txt
-benchmark-results/
 
 # Logs and temp files
 log.txt
 *.log
-test_ollama.bat
-test_ollama.log

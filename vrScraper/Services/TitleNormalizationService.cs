@@ -1283,7 +1283,6 @@ namespace vrScraper.Services
 
     /// <summary>
     /// Checks if a decoded title looks plausible (contains real words).
-    /// Used to decide whether to trust the decoder or fall back to LLM.
     /// </summary>
     private bool IsPlausible(string decoded)
     {

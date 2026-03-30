@@ -11,7 +11,6 @@
 @inject ISettingService SettingService
 @inject IScraperRegistry ScraperRegistry
 @inject ITagNormalizationService TagNormalizationService
-@inject IOllamaService OllamaService
 
 <h3>Settings</h3>
 
@@ -105,48 +104,6 @@
                     }
                 </tbody>
             </table>
-        </div>
-    </div>
-
-    <!-- LLM Title Normalization -->
-    <div class="settings-section">
-        <h5 class="section-title">
-            <i class="icon-cpu me-2"></i>
-            LLM Title Normalization
-        </h5>
-        <div class="setting-card">
-            <div class="d-flex align-items-center gap-3 mb-3">
-                <span class="fw-semibold">Ollama Status:</span>
-                @if (_ollamaChecking)
-                {
-                    <span class="badge bg-secondary">Checking...</span>
-                }
-                else if (_ollamaAvailable)
-                {
-                    <span class="badge bg-success">Connected</span>
-                }
-                else
-                {
-                    <span class="badge bg-danger">Not available</span>
-                }
-                <button class="btn btn-sm btn-outline-secondary" @onclick="CheckOllamaStatus">
-                    Recheck
-                </button>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Ollama URL</label>
-                <input type="text" class="form-control" value="@_ollamaUrl"
-                       @onchange="OnOllamaUrlChanged" placeholder="http://localhost:11434" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Model</label>
-                <input type="text" class="form-control" value="@_ollamaModel"
-                       @onchange="OnOllamaModelChanged" placeholder="qwen2.5:3b" />
-            </div>
-            <small class="form-text text-muted">
-                Install Ollama from <a href="https://ollama.com" target="_blank">ollama.com</a> and run:
-                <code>ollama pull qwen2.5:3b</code>
-            </small>
         </div>
     </div>
 
@@ -325,43 +282,11 @@
         SetSiteSetting(site, "AutoScrapeTime", value);
     }
 
-    // Ollama fields
-    private bool _ollamaAvailable;
-    private bool _ollamaChecking;
-    private string _ollamaUrl = "http://localhost:11434";
-    private string _ollamaModel = "qwen2.5:3b";
-
     protected override async Task OnInitializedAsync()
     {
         await LoadTags();
         await LoadSettings();
         _synonymMap = TagNormalizationService.GetSynonymMap();
-        _ollamaUrl = AllSettings.FirstOrDefault(s => s.Key == "Ollama:Url")?.Value ?? "http://localhost:11434";
-        _ollamaModel = AllSettings.FirstOrDefault(s => s.Key == "Ollama:Model")?.Value ?? "qwen2.5:3b";
-        await CheckOllamaStatus();
-    }
-
-    private async Task CheckOllamaStatus()
-    {
-        _ollamaChecking = true;
-        StateHasChanged();
-        _ollamaAvailable = await OllamaService.IsAvailable();
-        _ollamaChecking = false;
-        StateHasChanged();
-    }
-
-    private async Task OnOllamaUrlChanged(ChangeEventArgs e)
-    {
-        _ollamaUrl = e.Value?.ToString() ?? "http://localhost:11434";
-        await SettingService.SaveSetting("Ollama:Url", _ollamaUrl);
-        await CheckOllamaStatus();
-    }
-
-    private async Task OnOllamaModelChanged(ChangeEventArgs e)
-    {
-        _ollamaModel = e.Value?.ToString() ?? "qwen2.5:3b";
-        await SettingService.SaveSetting("Ollama:Model", _ollamaModel);
-        await CheckOllamaStatus();
     }
 
     private async Task LoadTags()
