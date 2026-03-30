@@ -23,15 +23,16 @@ namespace vrScraper.Controllers
 
       var similar = recommendationService.GetSimilarVideos(videoId, filtered, limit);
 
-      var result = similar.Select(v => new
+      var result = similar.Select(s => new
       {
-        id = v.Id,
-        title = v.Title,
-        thumbnail = v.Thumbnail,
-        duration = (int)v.Duration.TotalSeconds,
-        rating = v.SiteRating,
-        tags = v.Tags.Select(t => t.Name),
-        stars = v.Stars.Select(s => s.Name)
+        id = s.Video.Id,
+        title = s.Video.Title,
+        thumbnail = s.Video.Thumbnail,
+        duration = (int)s.Video.Duration.TotalSeconds,
+        rating = s.Video.SiteRating,
+        score = Math.Round(s.Score * 100, 0),
+        tags = s.Video.Tags.Select(t => t.Name),
+        stars = s.Video.Stars.Select(st => st.Name)
       });
 
       return Ok(result);

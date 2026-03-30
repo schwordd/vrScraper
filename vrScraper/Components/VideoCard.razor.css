@@ -60,6 +60,21 @@
     background-color: var(--color-primary-hover);
 }
 
+.recommendation-reason {
+    font-size: 0.7rem;
+    color: var(--text-muted, #8b8fa3);
+    padding: 0 4px 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.recommendation-reason .icon-sparkles {
+    font-size: 0.6rem;
+    color: rgba(99, 102, 241, 0.8);
+    margin-right: 2px;
+}
+
 .star-container {
     display: flex;
     flex-wrap: wrap;
@@ -166,6 +181,21 @@
 
 .thumbnail-container:hover .duration-badge {
     opacity: 0;
+}
+
+.similarity-badge {
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    transform: translateY(-50%);
+    background: rgba(99, 102, 241, 0.9);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    z-index: 3;
+    pointer-events: none;
 }
 
 .delete-btn {

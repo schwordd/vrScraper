@@ -56,6 +56,8 @@ namespace vrScraper.DB.Models
 
     public string? NormalizedTitle { get; set; }
 
+    public virtual DbVideoEngagement? Engagement { get; set; }
+
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public bool IsThumbnailNotAvailable { get; set; }
   }

@@ -14,6 +14,7 @@ namespace vrScraper.DB
     public DbSet<DbSetting> Settings { get; set; }
     public DbSet<DbScrapeLog> ScrapeLogs { get; set; }
     public DbSet<DbPlaybackEvent> PlaybackEvents { get; set; }
+    public DbSet<DbVideoEngagement> VideoEngagements { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +29,12 @@ namespace vrScraper.DB
 
       modelBuilder.Entity<DbVrTab>()
         .HasIndex(e => new { e.Type, e.Active });
+
+      // VideoEngagement 1:1 with VideoItem (shared primary key)
+      modelBuilder.Entity<DbVideoEngagement>()
+        .HasOne(e => e.Video)
+        .WithOne(v => v.Engagement)
+        .HasForeignKey<DbVideoEngagement>(e => e.VideoId);
 
       // Video <-> Star many-to-many via explicit junction entity with IsAutoDetected
       modelBuilder.Entity<DbVideoItem>()

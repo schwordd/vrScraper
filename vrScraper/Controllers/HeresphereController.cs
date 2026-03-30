@@ -115,7 +115,8 @@ namespace vrScraper.Controllers
           return NotFound();
         }
 
-        videoService.SetPlayedVideo(foundVideo);
+        logger.LogDebug("[TRACK] HereSphere Detail: NeedsMediaSource=true for video {VidId}", videoId);
+        videoService.SetPlayedVideo(foundVideo, callerSource: "HereSphere.Detail");
       }
 
       if (model.IsFavorite.HasValue)

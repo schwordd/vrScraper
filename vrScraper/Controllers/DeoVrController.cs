@@ -61,7 +61,8 @@ namespace vrScraper.Controllers
       var foundVideo = await videoService.GetVideoById(videoId);
       if (foundVideo == null) return NotFound();
 
-      videoService.SetPlayedVideo(foundVideo);
+      logger.LogDebug("[TRACK] DeoVR Detail: video {VidId}", videoId);
+      videoService.SetPlayedVideo(foundVideo, callerSource: "DeoVR.Detail");
 
       var scraper = scraperRegistry.GetScraperForSite(foundVideo.Site);
       if (scraper == null) return NotFound();

@@ -250,11 +250,11 @@
             </button>
         </div>
         <div class="video-gallery">
-            @foreach (var item in _similarVideos)
+            @foreach (var scored in _similarVideos)
             {
-                <VideoCard Item="item"
+                <VideoCard Item="scored.Video"
                            SelectedWatchlistId="_selectedWatchlistId"
-                           IsInWatchlist="IsInSelectedWatchlist(item.Id)"
+                           IsInWatchlist="IsInSelectedWatchlist(scored.Video.Id)"
                            OnPlay="PlayVideo"
                            OnDelete="DeleteVideo"
                            OnShowSimilar="ShowSimilar"
@@ -263,7 +263,8 @@
                            OnToggleWatchlist="ToggleWatchlist"
                            OnAddStarFilter="AddStarFilter"
                            OnAddTagFilter="AddTagFilter"
-                           OnImageError="HandleImageErrorFromCard" />
+                           OnImageError="HandleImageErrorFromCard"
+                           SimilarityScore="@scored.Score" />
             }
         </div>
     </div>
@@ -487,7 +488,7 @@
                 // Always compute recommendations from full video list, then intersect with filters
                 var recommended = RecommendationService.GetRecommendedVideos(VideoItems);
                 var filteredIds = filteredItems.Select(v => v.Id).ToHashSet();
-                sortedItems = recommended.Where(v => filteredIds.Contains(v.Id)).ToList();
+                sortedItems = recommended.Where(s => filteredIds.Contains(s.Video.Id)).Select(s => s.Video).ToList();
             }
             else if (_currentSortOption == "recentlywatched")
             {
@@ -956,7 +957,7 @@
         return $"{d.Minutes}:{d.Seconds:D2}";
     }
 
-    private List<DbVideoItem>? _similarVideos;
+    private List<ScoredVideo>? _similarVideos;
     private string? _similarToTitle;
 
     private async Task ShowSimilar(DbVideoItem item)

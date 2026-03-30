@@ -23,11 +23,6 @@ namespace vrScraper.Services
     private DbVideoItem? currentVideo;
     private DateTime? requestedCurrentVideoItem;
 
-    private object listLock = new object();
-    List<(long Id, DateTime Requested)> Requests = new List<(long Id, DateTime Requested)>();
-    private bool nextRecordValid = false;
-    private int _backgroundTaskStarted = 0;
-    private CancellationTokenSource? _backgroundCts;
 
     public DbVideoItem? CurrentLiveVideo => this.currentVideo;
 
@@ -47,6 +42,7 @@ namespace vrScraper.Services
       var items = await context.VideoItems
         .Include(a => a.Tags).Include(a => a.Stars)
         .Include(a => a.VideoStars).Include(a => a.VideoTags)
+        .Include(a => a.Engagement)
         .AsNoTracking().AsSplitQuery().ToListAsync();
       lock (_videoLock)
       {
@@ -54,52 +50,11 @@ namespace vrScraper.Services
       }
       logger.LogInformation("all video meta data reloaded ({items} items)", items.Count);
 
-      if (Interlocked.CompareExchange(ref _backgroundTaskStarted, 1, 0) == 0)
-      {
-        StartBackgroundTask();
-      }
-    }
-
-    private void StartBackgroundTask()
-    {
-      _backgroundCts = new CancellationTokenSource();
-      var token = _backgroundCts.Token;
-
-      _ = Task.Run(async () =>
-      {
-        try
-        {
-          while (!token.IsCancellationRequested)
-          {
-            lock (listLock)
-            {
-              var count = this.Requests.RemoveAll(x => (DateTime.UtcNow - x.Requested > TimeSpan.FromSeconds(3)));
-              if (count > 1)
-                nextRecordValid = false;
-              else if (count == 1)
-                nextRecordValid = true;
-              else if (count == 0)
-              {
-                nextRecordValid = true;
-              }
-
-              if (count > 0)
-                logger.LogInformation("Removed {0} from list. Next record is {1}", count, nextRecordValid ? "valid" : "invalid");
-            }
-            await Task.Delay(2000, token);
-          }
-        }
-        catch (OperationCanceledException)
-        {
-          // Expected on shutdown
-        }
-      }, token);
     }
 
     public void Dispose()
     {
-      _backgroundCts?.Cancel();
-      _backgroundCts?.Dispose();
+      // Cleanup if needed
     }
 
     public Task<List<DbVideoItem>> GetVideoItems()
@@ -153,46 +108,44 @@ namespace vrScraper.Services
     }
 
 
-    public void SetPlayedVideo(DbVideoItem vid)
+    public void SetPlayedVideo(DbVideoItem vid, [System.Runtime.CompilerServices.CallerMemberName] string? caller = null, string? callerSource = null)
     {
+      var source = callerSource ?? caller ?? "unknown";
+      logger.LogDebug("[TRACK] SetPlayedVideo(vid={VidId}) from {Source}", vid.Id, source);
+
       lock (dblock)
       {
-        lock (listLock)
+        // Record previous video if switching to a different one
+        if (this.currentVideoId != null && this.currentVideoId != vid.Id && requestedCurrentVideoItem != null)
         {
-          this.Requests.Add((vid.Id, DateTime.UtcNow));
+          TimeSpan watchedTime = DateTime.UtcNow - (DateTime)requestedCurrentVideoItem;
 
-          logger.LogInformation("Items on List {0}", this.Requests.Count);
+          using var scope = serviceProvider.CreateScope();
+          var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+          var prevVideo = context.VideoItems.Find(currentVideoId);
 
-          if (this.Requests.Any(a => a.Id == currentVideoId))
+          if (prevVideo != null)
           {
-            logger.LogInformation("Skipping stats record for {0}. Item still in list", currentVideoId);
-          }
-          else if (nextRecordValid && this.currentVideoId != null && requestedCurrentVideoItem != null)
-          {
-            TimeSpan watchedTime = DateTime.UtcNow - (DateTime)requestedCurrentVideoItem;
+            // Cap PlayDurationEst at video duration (if known)
+            if (prevVideo.Duration > TimeSpan.Zero)
+              watchedTime = TimeSpan.FromSeconds(Math.Min(watchedTime.TotalSeconds, prevVideo.Duration.TotalSeconds));
 
-            using var scope = serviceProvider.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-            var currentVideo = context.VideoItems.Find(currentVideoId);
+            prevVideo.PlayDurationEst += watchedTime;
+            prevVideo.PlayCount += 1;
+            context.SaveChanges();
 
-            if (currentVideo != null)
+            lock (_videoLock)
             {
-              currentVideo.PlayDurationEst += watchedTime;
-              currentVideo.PlayCount += 1;
-              context.SaveChanges();
-
-              lock (_videoLock)
+              var memVid = this.videoItems.FirstOrDefault(a => a.Id == prevVideo.Id);
+              if (memVid != null)
               {
-                var memVid = this.videoItems.Where(a => a.Id == currentVideo.Id).FirstOrDefault();
-                if (memVid != null)
-                {
-                  memVid.PlayCount = currentVideo.PlayCount;
-                  memVid.PlayDurationEst = currentVideo.PlayDurationEst;
-                }
+                memVid.PlayCount = prevVideo.PlayCount;
+                memVid.PlayDurationEst = prevVideo.PlayDurationEst;
               }
-
-              logger.LogInformation("Added PlayCount {0} and PlayDuration {1} for video {2}", currentVideo.PlayCount, currentVideo.PlayDurationEst, currentVideo.Id);
             }
+
+            logger.LogDebug("[TRACK] RECORD: video {VidId} PlayCount={Count}, PlayDurationEst={Est}",
+              prevVideo.Id, prevVideo.PlayCount, prevVideo.PlayDurationEst);
           }
         }
 
@@ -427,6 +380,10 @@ namespace vrScraper.Services
 
         if (video != null)
         {
+          // Cap PlayDurationEst at video duration (if known)
+          if (video.Duration > TimeSpan.Zero)
+            watchedTime = TimeSpan.FromSeconds(Math.Min(watchedTime.TotalSeconds, video.Duration.TotalSeconds));
+
           video.PlayDurationEst += watchedTime;
           video.PlayCount += 1;
           context.SaveChanges();

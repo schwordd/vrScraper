@@ -41,6 +41,14 @@ namespace vrScraper.Controllers
         ? DateTimeOffset.FromUnixTimeMilliseconds((long)model.Utc).UtcDateTime
         : DateTime.UtcNow;
 
+      // Clean up stale sessions (since CLOSE never comes from HereSphere)
+      CleanupStaleSessions();
+
+      // Resolve SessionId from active session (if exists)
+      string? sessionId = null;
+      if (_sessions.TryGetValue(videoId, out var existingSession))
+        sessionId = existingSession.SessionId;
+
       // Log event to DB
       try
       {
@@ -53,7 +61,8 @@ namespace vrScraper.Controllers
           EventType = model.Event,
           TimeMs = model.Time,
           Speed = model.Speed,
-          UtcTimestamp = utcTimestamp
+          UtcTimestamp = utcTimestamp,
+          SessionId = sessionId
         });
         await context.SaveChangesAsync();
       }
@@ -63,36 +72,82 @@ namespace vrScraper.Controllers
       }
 
       // Track sessions
+      var eventNames = new[] { "OPEN", "PLAY", "PAUSE", "CLOSE" };
+      var eventName = model.Event >= 0 && model.Event < eventNames.Length ? eventNames[model.Event] : $"UNKNOWN({model.Event})";
+      logger.LogDebug("[EVENT] {EventName} videoId={VideoId} timeMs={TimeMs} speed={Speed}",
+        eventName, videoId, model.Time, model.Speed);
+
       switch (model.Event)
       {
         case 0: // Open
+          var newSessionId = Guid.NewGuid().ToString();
           var session = new PlaybackSession
           {
             VideoId = videoId,
+            SessionId = newSessionId,
             OpenedUtc = utcTimestamp,
             LastPlayStartUtc = null,
-            AccumulatedPlayTime = TimeSpan.Zero
+            AccumulatedPlayTime = TimeSpan.Zero,
+            LastTimeMs = 0
           };
           _sessions[videoId] = session;
 
-          // Update LastPlayedUtc
-          var video = await videoService.GetVideoById(videoId);
-          if (video != null)
+          // Update the just-saved event with the new SessionId (it was saved before session creation)
+          try
           {
-            videoService.SetPlayedVideo(video);
+            using var scope = serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+            var lastEvent = context.PlaybackEvents
+              .Where(e => e.VideoId == videoId && e.EventType == 0 && e.SessionId == null)
+              .OrderByDescending(e => e.Id)
+              .FirstOrDefault();
+            if (lastEvent != null)
+            {
+              lastEvent.SessionId = newSessionId;
+              await context.SaveChangesAsync();
+            }
           }
-          logger.LogInformation("EventServer: Video {VideoId} opened", videoId);
+          catch (Exception ex)
+          {
+            logger.LogError(ex, "EventServer: Error updating SessionId for OPEN event");
+          }
+
+          // Update VideoEngagement.OpenCount (NO SetPlayedVideo — that comes from HereSphere.Detail)
+          await UpdateEngagement(videoId, engagement =>
+          {
+            engagement.OpenCount += 1;
+            engagement.LastSessionUtc = utcTimestamp;
+          });
+
+          logger.LogDebug("[EVENT] Session created for video {VideoId} (session {SessionId})", videoId, newSessionId);
           break;
 
-        case 1: // Play
+        case 1: // Play (= Scrub position update)
           if (_sessions.TryGetValue(videoId, out var playSession))
           {
             playSession.LastPlayStartUtc = utcTimestamp;
+
+            // Update VideoEngagement: scrub count, backward detection, coverage
+            var currentTimeMs = model.Time;
+            var previousTimeMs = playSession.LastTimeMs;
+
+            await UpdateEngagement(videoId, engagement =>
+            {
+              engagement.ScrubEventCount += 1;
+
+              // Backward scrub detection (threshold: 5 seconds)
+              if (previousTimeMs - currentTimeMs > 5000)
+                engagement.BackwardScrubCount += 1;
+
+              // Coverage: max position reached / video duration
+              UpdateCoverage(engagement, currentTimeMs, videoId);
+            });
+
+            playSession.LastTimeMs = currentTimeMs;
           }
-          logger.LogDebug("EventServer: Video {VideoId} play at {Time}ms", videoId, model.Time);
           break;
 
-        case 2: // Pause
+        case 2: // Pause (= user pressed stop or headset standby)
           if (_sessions.TryGetValue(videoId, out var pauseSession) && pauseSession.LastPlayStartUtc.HasValue)
           {
             var playDuration = utcTimestamp - pauseSession.LastPlayStartUtc.Value;
@@ -102,13 +157,16 @@ namespace vrScraper.Controllers
             }
             pauseSession.LastPlayStartUtc = null;
           }
-          logger.LogDebug("EventServer: Video {VideoId} paused at {Time}ms", videoId, model.Time);
+
+          // PAUSE = session end (HereSphere sends this on stop/standby)
+          videoService.FinishCurrentPlayback();
+          _sessions.TryRemove(videoId, out _);
+          logger.LogDebug("[EVENT] PAUSE video {VideoId} — session finished", videoId);
           break;
 
-        case 3: // Close
+        case 3: // Close (never sent by HereSphere, kept for protocol completeness)
           if (_sessions.TryRemove(videoId, out var closeSession))
           {
-            // If still playing when closed, accumulate remaining
             if (closeSession.LastPlayStartUtc.HasValue)
             {
               var remaining = utcTimestamp - closeSession.LastPlayStartUtc.Value;
@@ -118,29 +176,8 @@ namespace vrScraper.Controllers
               }
             }
 
-            // Update PlayDurationEst in DB
-            if (closeSession.AccumulatedPlayTime > TimeSpan.FromSeconds(5))
-            {
-              try
-              {
-                using var scope = serviceProvider.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-                var dbVideo = await context.VideoItems.FindAsync(videoId);
-                if (dbVideo != null)
-                {
-                  dbVideo.PlayDurationEst += closeSession.AccumulatedPlayTime;
-                  dbVideo.LastPlayedUtc = utcTimestamp;
-                  await context.SaveChangesAsync();
-                }
-              }
-              catch (Exception ex)
-              {
-                logger.LogError(ex, "EventServer: Error updating PlayDurationEst for {VideoId}", videoId);
-              }
-            }
-
-            logger.LogInformation("EventServer: Video {VideoId} closed, total play time: {PlayTime}",
-              videoId, closeSession.AccumulatedPlayTime);
+            videoService.FinishCurrentPlayback();
+            logger.LogDebug("[EVENT] CLOSE video {VideoId}", videoId);
           }
           break;
       }
@@ -148,12 +185,57 @@ namespace vrScraper.Controllers
       return Ok();
     }
 
+    private async Task UpdateEngagement(long videoId, Action<DbVideoEngagement> update)
+    {
+      try
+      {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+        var engagement = await context.VideoEngagements.FindAsync(videoId);
+        if (engagement == null)
+        {
+          engagement = new DbVideoEngagement { VideoId = videoId };
+          context.VideoEngagements.Add(engagement);
+        }
+
+        update(engagement);
+        await context.SaveChangesAsync();
+      }
+      catch (Exception ex)
+      {
+        logger.LogError(ex, "EventServer: Error updating VideoEngagement for {VideoId}", videoId);
+      }
+    }
+
+    private void UpdateCoverage(DbVideoEngagement engagement, double timeMs, long videoId)
+    {
+      // Get video duration from in-memory cache
+      var video = videoService.GetVideoById(videoId).Result;
+      if (video == null || video.Duration.TotalMilliseconds <= 0)
+        return;
+
+      var coverageAtPosition = timeMs / video.Duration.TotalMilliseconds;
+      if (coverageAtPosition > engagement.ScrubCoveragePercent)
+        engagement.ScrubCoveragePercent = Math.Min(1.0, coverageAtPosition);
+    }
+
+    private void CleanupStaleSessions()
+    {
+      var staleThreshold = DateTime.UtcNow.AddHours(-8);
+      var staleKeys = _sessions.Where(kv => kv.Value.OpenedUtc < staleThreshold).Select(kv => kv.Key).ToList();
+      foreach (var key in staleKeys)
+        _sessions.TryRemove(key, out _);
+    }
+
     private class PlaybackSession
     {
       public long VideoId { get; set; }
+      public string SessionId { get; set; } = "";
       public DateTime OpenedUtc { get; set; }
       public DateTime? LastPlayStartUtc { get; set; }
       public TimeSpan AccumulatedPlayTime { get; set; }
+      public double LastTimeMs { get; set; }
     }
   }
 }

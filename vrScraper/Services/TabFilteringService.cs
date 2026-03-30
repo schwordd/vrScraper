@@ -92,7 +92,8 @@ namespace vrScraper.Services
               var recommendedSetting = await settingService.GetSetting("RecommendationsEnabled");
               if (recommendedSetting != null && bool.TryParse(recommendedSetting.Value, out bool recEnabled) && recEnabled)
               {
-                var recommended = recommendationService.GetRecommendedVideos(allItems);
+                var recommended = recommendationService.GetRecommendedVideos(allItems)
+                  .Select(s => s.Video).ToList();
                 if (recommended.Any())
                 {
                   tabs.Add((t.Name, recommended));

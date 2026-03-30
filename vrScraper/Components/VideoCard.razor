@@ -19,6 +19,10 @@
             </div>
         }
         <div class="duration-badge">@FormatDuration(Item.Duration)</div>
+        @if (SimilarityScore.HasValue)
+        {
+            <div class="similarity-badge">@((SimilarityScore.Value * 100).ToString("F0"))%</div>
+        }
         <div class="thumbnail-overlay">
             <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => OnDelete.InvokeAsync(Item.Id)" title="Delete video">
                 <i class="icon-trash-2"></i>
@@ -52,6 +56,10 @@
         </div>
     </div>
     <h3 title="@(!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title ? Item.Title : "")">@if (!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title) { <i class="icon-sparkles ai-icon"></i> }@(Item.NormalizedTitle ?? Item.Title)</h3>
+    @if (!string.IsNullOrEmpty(RecommendationReason))
+    {
+        <div class="recommendation-reason"><i class="icon-sparkles"></i> @RecommendationReason</div>
+    }
     @if (Item.Stars != null && Item.Stars.Any())
     {
         <div class="star-container">
@@ -93,6 +101,8 @@
     [Parameter] public EventCallback<string> OnAddStarFilter { get; set; }
     [Parameter] public EventCallback<string> OnAddTagFilter { get; set; }
     [Parameter] public EventCallback<(Microsoft.AspNetCore.Components.Web.ErrorEventArgs Error, DbVideoItem Item)> OnImageError { get; set; }
+    [Parameter] public double? SimilarityScore { get; set; }
+    [Parameter] public string? RecommendationReason { get; set; }
 
     private async Task OnThumbnailClick()
     {

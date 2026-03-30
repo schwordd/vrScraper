@@ -11,5 +11,6 @@ namespace vrScraper.DB.Models
         public double TimeMs { get; set; }
         public double Speed { get; set; }
         public DateTime UtcTimestamp { get; set; }
+        public string? SessionId { get; set; }
     }
 }

@@ -205,6 +205,13 @@ namespace vrScraper
       var tabService = app.Services.GetRequiredService<ITabService>();
       await tabService.Initialize();
 
+      // Graceful shutdown: finish current playback tracking
+      var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+      lifetime.ApplicationStopping.Register(() =>
+      {
+        videoService.FinishCurrentPlayback();
+      });
+
       // Open the browser unless --headless flag is set
       var url = $"http://127.0.0.1:{builder.Configuration.GetValue<int>("Port")}";
       if (!args.Contains("--headless"))
