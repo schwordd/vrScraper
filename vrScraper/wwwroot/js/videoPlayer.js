@@ -24,7 +24,7 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
         let videoElement = document.getElementById(videoElementId);
 
         if (!videoElement) {
-            console.error("Video-Element nicht gefunden:", videoElementId);
+            console.warn("Video-Element nicht gefunden, wird neu erstellt:", videoElementId);
 
             // Versuche, das Element neu zu erstellen
             const container = document.querySelector('.video-container');
