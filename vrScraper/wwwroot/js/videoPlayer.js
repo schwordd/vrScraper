@@ -12,12 +12,13 @@ function registerPlayerErrorCallback(dotnetRef) {
 function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, vrType, videoId) {
     console.log("Initialisiere VR-Player:", videoElementId, sourceUrl, vrType);
     currentVideoId = videoId;
+    window._vrPlayerOpen = true;
 
     try {
         // Stelle sicher, dass kein vorheriger Player existiert
         if (player) {
             console.log("Bestehender Player gefunden, wird entfernt");
-            disposeVRPlayer();
+            disposeVRPlayer(true); // keepOpen=true to preserve _vrPlayerOpen flag
         }
 
         // Überprüfe, ob das Video-Element existiert
@@ -35,7 +36,7 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
                 videoElement.className = 'video-js vjs-big-play-centered';
                 container.appendChild(videoElement);
             } else {
-                throw new Error("Video-Container nicht gefunden");
+                throw new Error("Video container not found");
             }
         }
 
@@ -51,6 +52,9 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
             playsinline: true,
             muted: false,
             volume: savedVolume,
+            userActions: {
+                hotkeys: false // Wir übernehmen Keyboard-Handling selbst
+            },
             html5: {
                 vhs: {
                     overrideNative: true
@@ -119,7 +123,7 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
                 .catch(error => {
                     console.error('Fehler beim Starten der Wiedergabe:', error);
                     if (dotNetRef) {
-                        dotNetRef.invokeMethodAsync('OnPlayerError', error.message || 'Unbekannter Fehler beim Starten der Wiedergabe');
+                        dotNetRef.invokeMethodAsync('OnPlayerError', error.message || 'Unknown playback error');
                     }
                 });
         });
@@ -128,7 +132,7 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
         player.on('error', function(error) {
             console.error('Player-Fehler:', error);
             if (dotNetRef) {
-                const errorMsg = player.error_ ? player.error_.message : 'Unbekannter Fehler';
+                const errorMsg = player.error_ ? player.error_.message : 'Unknown error';
                 dotNetRef.invokeMethodAsync('OnPlayerError', errorMsg);
             }
         });
@@ -139,11 +143,85 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
         document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
+        // Keyboard-Handler registrieren (capture phase, damit VideoJS nicht schluckt)
+        if (window._vrPlayerKeyHandler) {
+            document.removeEventListener('keydown', window._vrPlayerKeyHandler, true);
+        }
+        window._vrPlayerKeyHandler = handlePlayerKeydown;
+        document.addEventListener('keydown', window._vrPlayerKeyHandler, true);
+
     } catch (error) {
         console.error('Fehler bei Player-Initialisierung:', error);
         if (dotNetRef) {
-            dotNetRef.invokeMethodAsync('OnPlayerError', error.message || 'Fehler bei der Player-Initialisierung');
+            dotNetRef.invokeMethodAsync('OnPlayerError', error.message || 'Player initialization failed');
         }
+    }
+}
+
+// Keyboard-Handler für den Player
+function handlePlayerKeydown(e) {
+    if (!player) return;
+    // Nicht verarbeiten wenn User in einem Eingabefeld tippt
+    if (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+    const key = e.key;
+    const ctrl = e.ctrlKey;
+
+    switch (key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            player.currentTime(Math.max(0, player.currentTime() - (ctrl ? 30 : 5)));
+            player.userActive(true);
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            player.currentTime(Math.min(player.duration() || Infinity, player.currentTime() + (ctrl ? 30 : 5)));
+            player.userActive(true);
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            player.volume(Math.min(1, player.volume() + 0.05));
+            break;
+        case 'ArrowDown':
+            e.preventDefault();
+            player.volume(Math.max(0, player.volume() - 0.05));
+            break;
+        case 'm':
+        case 'M':
+            player.muted(!player.muted());
+            break;
+        case ' ':
+            e.preventDefault();
+            player.paused() ? player.play() : player.pause();
+            break;
+        case 'f':
+        case 'F':
+            player.isFullscreen() ? player.exitFullscreen() : player.requestFullscreen();
+            break;
+        case 'n':
+        case 'N':
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardNext');
+            break;
+        case 'p':
+        case 'P':
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardPrevious');
+            break;
+        case 'l':
+        case 'L':
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardToggleLike');
+            break;
+        case 'b':
+        case 'B':
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardToggleWatchlist');
+            break;
+        case 'Escape':
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardClose');
+            break;
+        case '?':
+        case 'h':
+        case 'H':
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardToggleHelp');
+            break;
     }
 }
 
@@ -193,7 +271,8 @@ function fixPlayerDimensions() {
 }
 
 // VideoJS-Player beenden
-function disposeVRPlayer() {
+// keepOpen: wenn true, wird _vrPlayerOpen nicht zurückgesetzt (für Re-Init bei Navigation)
+function disposeVRPlayer(keepOpen) {
     try {
         // Speichere aktuelle Lautstärke bevor Player beendet wird
         if (player && player.volume) {
@@ -215,7 +294,16 @@ function disposeVRPlayer() {
         console.error("Fehler beim Beenden des Players:", error);
     } finally {
         player = null;
-        currentVideoId = null;
+
+        if (!keepOpen) {
+            currentVideoId = null;
+            window._vrPlayerOpen = false;
+            // Keyboard-Handler entfernen
+            if (window._vrPlayerKeyHandler) {
+                document.removeEventListener('keydown', window._vrPlayerKeyHandler, true);
+                window._vrPlayerKeyHandler = null;
+            }
+        }
     }
 }
 

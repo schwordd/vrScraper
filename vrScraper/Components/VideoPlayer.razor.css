@@ -115,3 +115,179 @@
     font-size: 3rem;
     margin-bottom: 1rem;
 }
+
+/* Navigation buttons */
+.nav-button {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10000;
+    font-size: 24px;
+    transition: background-color var(--transition-base), transform var(--transition-base);
+    opacity: 0.6;
+}
+
+.nav-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    opacity: 1;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.nav-prev {
+    left: 15px;
+}
+
+.nav-next {
+    right: 15px;
+}
+
+/* Player toolbar */
+.player-toolbar {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 10000;
+    opacity: 0.7;
+    transition: opacity var(--transition-base);
+}
+
+.player-toolbar:hover {
+    opacity: 1;
+}
+
+.player-toolbar .like-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-base) ease;
+    padding: 0;
+}
+
+.player-toolbar .like-btn.liked {
+    background-color: var(--color-liked);
+    color: white;
+}
+
+.player-toolbar .like-btn.not-liked {
+    background-color: rgba(225, 29, 72, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.player-toolbar .like-btn:hover {
+    transform: scale(1.15);
+}
+
+.player-toolbar .like-btn.pulse {
+    animation: btnPulse 0.4s ease;
+}
+
+.player-toolbar .like-btn i {
+    font-size: 18px;
+}
+
+.player-toolbar .watchlist-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-base) ease;
+    padding: 0;
+}
+
+.player-toolbar .watchlist-btn.in-watchlist {
+    background-color: var(--color-watchlist);
+    color: white;
+}
+
+.player-toolbar .watchlist-btn.not-in-watchlist {
+    background-color: rgba(22, 163, 74, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.player-toolbar .watchlist-btn:hover {
+    transform: scale(1.15);
+}
+
+.player-toolbar .watchlist-btn.pulse {
+    animation: btnPulse 0.4s ease;
+}
+
+.player-toolbar .watchlist-btn i {
+    font-size: 18px;
+}
+
+.video-counter {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    user-select: none;
+}
+
+/* Shortcuts overlay */
+.shortcuts-overlay {
+    position: absolute;
+    top: 15px;
+    right: 65px;
+    z-index: 10001;
+    animation: fadeInOut 8s ease forwards;
+    pointer-events: none;
+}
+
+.shortcuts-content {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+}
+
+.shortcuts-grid {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 3px 12px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 11px;
+}
+
+.shortcut-key {
+    color: rgba(255, 255, 255, 0.6);
+    font-family: monospace;
+    font-size: 10px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+@keyframes btnPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    5% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}

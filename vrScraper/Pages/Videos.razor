@@ -271,7 +271,18 @@
 }
 
 <!-- Video-Player-Komponente hinzufügen -->
-<VideoPlayer @ref="VideoPlayerComponent" OnClose="HandlePlayerClosed" />
+<VideoPlayer @ref="VideoPlayerComponent"
+             OnClose="HandlePlayerClosed"
+             HasNext="_playerHasNext"
+             HasPrevious="_playerHasPrevious"
+             VideoIndex="_currentPlayerIndex"
+             VideoListCount="_playerListCount"
+             SelectedWatchlistId="_selectedWatchlistId"
+             IsInWatchlist="_playerVideoInWatchlist"
+             OnNavigateNext="NavigatePlayerNext"
+             OnNavigatePrevious="NavigatePlayerPrevious"
+             OnToggleLike="ToggleLike"
+             OnToggleWatchlist="ToggleWatchlist" />
 
 @code {
 
@@ -863,19 +874,56 @@
     }
 
     private VideoPlayer? VideoPlayerComponent { get; set; }
+    private int _currentPlayerIndex = -1;
+
+    private bool _playerHasNext => _currentPlayerIndex >= 0 && _currentPlayerIndex < FilteredItems.Count - 1;
+    private bool _playerHasPrevious => _currentPlayerIndex > 0;
+    private int _playerListCount => FilteredItems.Count;
+    private bool _playerVideoInWatchlist => _currentPlayerIndex >= 0
+        && _currentPlayerIndex < FilteredItems.Count
+        && IsInSelectedWatchlist(FilteredItems[_currentPlayerIndex].Id);
 
     private async Task PlayVideo(DbVideoItem item)
     {
         if (VideoPlayerComponent != null)
         {
+            _currentPlayerIndex = FilteredItems.IndexOf(item);
+            StateHasChanged();
             await VideoPlayerComponent.ShowVideo(item);
         }
     }
 
     private void HandlePlayerClosed()
     {
-        // Hier könntest du Aktionen ausführen, nachdem der Player geschlossen wurde
-        // z.B. Aktualisieren des Play Count
+        _currentPlayerIndex = -1;
+    }
+
+    private async Task NavigatePlayerNext()
+    {
+        if (!_playerHasNext || VideoPlayerComponent == null) return;
+        _currentPlayerIndex++;
+        EnsurePageContainsIndex(_currentPlayerIndex);
+        StateHasChanged();
+        await VideoPlayerComponent.ShowVideo(FilteredItems[_currentPlayerIndex]);
+    }
+
+    private async Task NavigatePlayerPrevious()
+    {
+        if (!_playerHasPrevious || VideoPlayerComponent == null) return;
+        _currentPlayerIndex--;
+        EnsurePageContainsIndex(_currentPlayerIndex);
+        StateHasChanged();
+        await VideoPlayerComponent.ShowVideo(FilteredItems[_currentPlayerIndex]);
+    }
+
+    private void EnsurePageContainsIndex(int index)
+    {
+        var targetPage = (index / PageSize) + 1;
+        if (targetPage != CurrentPage)
+        {
+            CurrentPage = targetPage;
+            SyncUrlState();
+        }
     }
 
     private async Task ToggleLike(DbVideoItem item)

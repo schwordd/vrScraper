@@ -1,5 +1,6 @@
 function addPageKeyListener(dotNetRef) {
     window._pageKeyHandler = function (e) {
+        if (window._vrPlayerOpen) return;
         if (document.activeElement &&
             (document.activeElement.tagName === 'INPUT' ||
              document.activeElement.tagName === 'SELECT' ||

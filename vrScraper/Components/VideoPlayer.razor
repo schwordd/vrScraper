@@ -8,9 +8,23 @@
 
 <div class="video-player-overlay @(_isVisible ? "visible" : "")" @onclick="ClosePlayer">
     <div class="video-player-container" @onclick:stopPropagation>
-        <div class="close-button" @onclick="ClosePlayer">
+        <div class="close-button" @onclick="ClosePlayer" title="Close (Esc)">
             <i class="icon-x"></i>
         </div>
+
+        @if (HasPrevious)
+        {
+            <button class="nav-button nav-prev" @onclick="NavigatePrevious" title="Previous video (P)">
+                <i class="icon-chevron-left"></i>
+            </button>
+        }
+
+        @if (HasNext)
+        {
+            <button class="nav-button nav-next" @onclick="NavigateNext" title="Next video (N)">
+                <i class="icon-chevron-right"></i>
+            </button>
+        }
 
         @if (_isLoading)
         {
@@ -18,7 +32,7 @@
                 <div class="spinner-border text-light" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <div class="mt-2 text-light">Video wird geladen...</div>
+                <div class="mt-2 text-light">Loading video...</div>
             </div>
         }
 
@@ -27,13 +41,56 @@
             <div class="error-message">
                 <i class="icon-triangle-alert text-warning"></i>
                 <div>@_errorMessage</div>
-                <button class="btn btn-sm btn-light mt-3" @onclick="ClosePlayer">Schließen</button>
+                <button class="btn btn-sm btn-light mt-3" @onclick="ClosePlayer">Close</button>
             </div>
         }
 
         <div class="video-container @(_isLoading || _errorMessage != null ? "d-none" : "")">
             <video id="vr-video" class="video-js vjs-big-play-centered"></video>
         </div>
+
+        @if (_isVisible && !_isLoading && _errorMessage == null)
+        {
+            <div class="player-toolbar">
+                <button class="like-btn @(CurrentVideo?.Liked == true ? "liked" : "not-liked") @(_feedbackTarget == "like" ? "pulse" : "")"
+                        @key="@($"like-{_feedbackKey}")"
+                        @onclick="ClickToggleLike" title="Like (L)">
+                    <i class="icon-heart"></i>
+                </button>
+
+                @if (SelectedWatchlistId > 0)
+                {
+                    <button class="watchlist-btn @(IsInWatchlist ? "in-watchlist" : "not-in-watchlist") @(_feedbackTarget == "watchlist" ? "pulse" : "")"
+                            @key="@($"wl-{_feedbackKey}")"
+                            @onclick="ClickToggleWatchlist" title="Watchlist (B)">
+                        <i class="icon-bookmark"></i>
+                    </button>
+                }
+
+                <span class="video-counter">@(VideoIndex + 1) / @VideoListCount</span>
+            </div>
+        }
+
+        @if (_showShortcutsOverlay)
+        {
+            <div class="shortcuts-overlay" @key="_shortcutsKey">
+                <div class="shortcuts-content">
+                    <div class="shortcuts-grid">
+                        <span class="shortcut-key">← →</span><span>±5s</span>
+                        <span class="shortcut-key">Ctrl+← →</span><span>±30s</span>
+                        <span class="shortcut-key">↑ ↓</span><span>Vol</span>
+                        <span class="shortcut-key">Space</span><span>Play/Pause</span>
+                        <span class="shortcut-key">M</span><span>Mute</span>
+                        <span class="shortcut-key">F</span><span>Fullscreen</span>
+                        <span class="shortcut-key">N / P</span><span>Next / Prev</span>
+                        <span class="shortcut-key">L</span><span>Like</span>
+                        <span class="shortcut-key">B</span><span>Bookmark</span>
+                        <span class="shortcut-key">H</span><span>Help</span>
+                        <span class="shortcut-key">Esc</span><span>Close</span>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 </div>
 
@@ -44,13 +101,48 @@
     [Parameter]
     public EventCallback OnClose { get; set; }
 
+    [Parameter]
+    public bool HasNext { get; set; }
+
+    [Parameter]
+    public bool HasPrevious { get; set; }
+
+    [Parameter]
+    public int VideoIndex { get; set; }
+
+    [Parameter]
+    public int VideoListCount { get; set; }
+
+    [Parameter]
+    public long SelectedWatchlistId { get; set; }
+
+    [Parameter]
+    public bool IsInWatchlist { get; set; }
+
+    [Parameter]
+    public EventCallback OnNavigateNext { get; set; }
+
+    [Parameter]
+    public EventCallback OnNavigatePrevious { get; set; }
+
+    [Parameter]
+    public EventCallback<DbVideoItem> OnToggleLike { get; set; }
+
+    [Parameter]
+    public EventCallback<long> OnToggleWatchlist { get; set; }
+
     private bool _isVisible = false;
     private bool _isLoading = false;
+    private bool _isNavigating = false;
     private string? _errorMessage = null;
     private VideoSource? _videoSource;
     private string? _videoType = "180";
     private long? _videoId = null;
     private DotNetObjectReference<VideoPlayer>? _dotNetRef;
+    private bool _showShortcutsOverlay = false;
+    private int _shortcutsKey = 0;
+    private string? _feedbackTarget = null;
+    private int _feedbackKey = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -76,12 +168,18 @@
             // Setze Zustand zurück
             _errorMessage = null;
             _isLoading = true;
+            _isNavigating = false;
             this.CurrentVideo = video;
             _videoId = video.Id;
 
-            // Element sichtbar machen
+            // Element sichtbar machen + Shortcuts-Overlay anzeigen
             _isVisible = true;
+            _showShortcutsOverlay = true;
+            _shortcutsKey++;
             StateHasChanged();
+
+            // Flag sofort setzen damit Page-Keyboard-Handler blockiert wird
+            await JSRuntime.InvokeVoidAsync("eval", "window._vrPlayerOpen = true");
 
             // Video-Quelle abrufen
             var foundVideo = await context.VideoItems
@@ -91,7 +189,7 @@
 
             if (foundVideo == null)
             {
-                _errorMessage = "Video konnte nicht gefunden werden.";
+                _errorMessage = "Video not found.";
                 _isLoading = false;
                 StateHasChanged();
                 return;
@@ -108,7 +206,7 @@
             _videoSource = await scraper.GetSource(foundVideo, context);
             if (_videoSource == null)
             {
-                _errorMessage = "Video-Quelle konnte nicht geladen werden.";
+                _errorMessage = "Video source not available.";
                 _isLoading = false;
                 StateHasChanged();
                 return;
@@ -127,7 +225,7 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Fehler beim Laden des Videos: {ex.Message}";
+            _errorMessage = $"Error loading video: {ex.Message}";
             _isLoading = false;
             StateHasChanged();
         }
@@ -170,7 +268,7 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Fehler bei der Initialisierung des Players: {ex.Message}";
+            _errorMessage = $"Player initialization error: {ex.Message}";
             StateHasChanged();
         }
     }
@@ -178,16 +276,104 @@
     [JSInvokable]
     public void OnPlayerError(string errorMessage)
     {
-        _errorMessage = $"Videowiedergabe-Fehler: {errorMessage}";
+        _errorMessage = $"Playback error: {errorMessage}";
         StateHasChanged();
     }
 
-    // Neues JSInvokable für Fullscreen-Exit-Event
     [JSInvokable]
     public void OnFullscreenExit()
     {
-        // Diese Methode kann verwendet werden, um auf Blazor-Seite auf Fullscreen-Änderungen zu reagieren
         StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardNext()
+    {
+        if (_isNavigating || !HasNext) return;
+        _isNavigating = true;
+        await OnNavigateNext.InvokeAsync();
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardPrevious()
+    {
+        if (_isNavigating || !HasPrevious) return;
+        _isNavigating = true;
+        await OnNavigatePrevious.InvokeAsync();
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardToggleLike()
+    {
+        if (CurrentVideo != null)
+        {
+            await OnToggleLike.InvokeAsync(CurrentVideo);
+            _feedbackTarget = "like";
+            _feedbackKey++;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardToggleWatchlist()
+    {
+        if (CurrentVideo != null && SelectedWatchlistId > 0)
+        {
+            await OnToggleWatchlist.InvokeAsync(CurrentVideo.Id);
+            _feedbackTarget = "watchlist";
+            _feedbackKey++;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnKeyboardClose()
+    {
+        await ClosePlayer();
+    }
+
+    [JSInvokable]
+    public void OnKeyboardToggleHelp()
+    {
+        _showShortcutsOverlay = !_showShortcutsOverlay;
+        _shortcutsKey++;
+        StateHasChanged();
+    }
+
+    private async Task NavigateNext()
+    {
+        if (_isNavigating || !HasNext) return;
+        _isNavigating = true;
+        await OnNavigateNext.InvokeAsync();
+    }
+
+    private async Task NavigatePrevious()
+    {
+        if (_isNavigating || !HasPrevious) return;
+        _isNavigating = true;
+        await OnNavigatePrevious.InvokeAsync();
+    }
+
+    private async Task ClickToggleLike()
+    {
+        if (CurrentVideo != null)
+        {
+            await OnToggleLike.InvokeAsync(CurrentVideo);
+            _feedbackTarget = "like";
+            _feedbackKey++;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClickToggleWatchlist()
+    {
+        if (CurrentVideo != null && SelectedWatchlistId > 0)
+        {
+            await OnToggleWatchlist.InvokeAsync(CurrentVideo.Id);
+            _feedbackTarget = "watchlist";
+            _feedbackKey++;
+            StateHasChanged();
+        }
     }
 
     private async Task ClosePlayer()
@@ -204,8 +390,10 @@
 
         _isVisible = false;
         _isLoading = false;
+        _isNavigating = false;
         _errorMessage = null;
         _videoId = null;
+        _showShortcutsOverlay = false;
         StateHasChanged();
 
         await OnClose.InvokeAsync();
