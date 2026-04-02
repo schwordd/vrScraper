@@ -241,6 +241,11 @@
     color: inherit;
 }
 
+.tag-pill:focus-visible, .star-pill:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
 .tag-pill {
     background-color: var(--color-primary);
     color: white;
@@ -293,6 +298,11 @@
 .vr-action-btn:hover {
     background-color: rgba(0, 0, 0, 0.75);
     transform: scale(1.1);
+}
+
+.vr-action-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
 .vr-action-btn:active {

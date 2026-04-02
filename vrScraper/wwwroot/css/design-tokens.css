@@ -277,3 +277,18 @@
     --bs-btn-hover-color: var(--color-text);
     --bs-btn-focus-shadow-rgb: 100, 116, 139;
 }
+
+/* ==========================================================================
+   Accessibility — Reduced Motion
+   Respect the user's OS-level motion preference by disabling all
+   animations, transitions, and smooth scrolling globally.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

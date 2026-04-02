@@ -2,8 +2,13 @@ let player = null;
 let dotNetRef = null;
 let currentVideoId = null;
 // Speichere die Lautstärke und Mute-Zustand in globalen Variablen
-let savedVolume = localStorage.getItem('vrPlayerVolume') ? parseFloat(localStorage.getItem('vrPlayerVolume')) : 0.7;
-let savedMuted = localStorage.getItem('vrPlayerMuted') === 'true';
+let savedVolume = 0.7;
+let savedMuted = false;
+try {
+    const vol = localStorage.getItem('vrPlayerVolume');
+    if (vol) savedVolume = parseFloat(vol);
+    savedMuted = localStorage.getItem('vrPlayerMuted') === 'true';
+} catch (e) { /* Private browsing or storage unavailable */ }
 
 function setPlayerOpen(value) {
     window._vrPlayerOpen = value;
@@ -92,8 +97,10 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
             this.on('volumechange', function() {
                 savedVolume = player.volume();
                 savedMuted = player.muted();
-                localStorage.setItem('vrPlayerVolume', savedVolume);
-                localStorage.setItem('vrPlayerMuted', savedMuted);
+                try {
+                    localStorage.setItem('vrPlayerVolume', savedVolume);
+                    localStorage.setItem('vrPlayerMuted', savedMuted);
+                } catch (e) { /* Private browsing or storage unavailable */ }
             });
 
             // Event-Listener für Vollbildänderungen
@@ -285,8 +292,10 @@ function disposeVRPlayer(keepOpen) {
         if (player && player.volume) {
             savedVolume = player.volume();
             savedMuted = player.muted();
-            localStorage.setItem('vrPlayerVolume', savedVolume);
-            localStorage.setItem('vrPlayerMuted', savedMuted);
+            try {
+                localStorage.setItem('vrPlayerVolume', savedVolume);
+                localStorage.setItem('vrPlayerMuted', savedMuted);
+            } catch (e) { /* Private browsing or storage unavailable */ }
         }
 
         // Event-Listener entfernen

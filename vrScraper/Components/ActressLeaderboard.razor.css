@@ -75,6 +75,12 @@
     color: var(--color-primary);
 }
 
+.actress-link:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
 ::deep tr:hover .actress-link {
     opacity: 1;
 }

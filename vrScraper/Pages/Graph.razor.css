@@ -115,16 +115,59 @@
 }
 
 .star-dot {
-    background: #d97706;
+    background: var(--color-primary);
 }
 
 .tag-dot {
-    background: #0284c7;
+    background: var(--color-info);
 }
 
 .legend-line {
     width: 16px;
     height: 2px;
-    background: #94a3b8;
+    background: var(--color-text-muted);
     flex-shrink: 0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .graph-toolbar {
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+    }
+
+    .graph-title {
+        font-size: var(--font-size-base);
+        width: 100%;
+    }
+
+    .filter-group {
+        min-width: 100px;
+        flex: 1 1 auto;
+    }
+
+    .graph-stats {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .graph-container {
+        width: 100%;
+    }
+
+    .graph-legend {
+        font-size: 10px;
+        padding: var(--space-2);
+        bottom: var(--space-2);
+        right: var(--space-2);
+    }
+
+    .legend-dot {
+        width: 8px;
+        height: 8px;
+    }
+
+    .legend-line {
+        width: 12px;
+    }
 }

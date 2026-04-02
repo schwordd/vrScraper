@@ -334,3 +334,23 @@
 .similar-btn i {
     font-size: 14px;
 }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .video-item h3 {
+        font-size: 12px;
+        height: 2.2em;
+    }
+
+    .duration-badge {
+        font-size: 10px;
+    }
+
+    .play-overlay i {
+        font-size: 36px;
+    }
+
+    .recommendation-reason {
+        font-size: 0.6rem;
+    }
+}
