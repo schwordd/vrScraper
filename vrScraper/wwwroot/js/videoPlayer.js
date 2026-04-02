@@ -1,8 +1,9 @@
 let player = null;
 let dotNetRef = null;
 let currentVideoId = null;
-// Speichere die Lautstärke in einer globalen Variable, Standard: 70%
+// Speichere die Lautstärke und Mute-Zustand in globalen Variablen
 let savedVolume = localStorage.getItem('vrPlayerVolume') ? parseFloat(localStorage.getItem('vrPlayerVolume')) : 0.7;
+let savedMuted = localStorage.getItem('vrPlayerMuted') === 'true';
 
 function registerPlayerErrorCallback(dotnetRef) {
     dotNetRef = dotnetRef;
@@ -50,7 +51,7 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
             fluid: true,
             preload: 'auto',
             playsinline: true,
-            muted: false,
+            muted: savedMuted,
             volume: savedVolume,
             userActions: {
                 hotkeys: false // Wir übernehmen Keyboard-Handling selbst
@@ -72,8 +73,9 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
         player = videojs(videoElementId, options, function onPlayerReady() {
             console.log('Player bereit:', this);
 
-            // Stelle das gespeicherte Volumen ein
+            // Stelle gespeichertes Volumen und Mute-Zustand ein
             player.volume(savedVolume);
+            player.muted(savedMuted);
 
             // VR-Plugin initialisieren
             this.vr({
@@ -82,11 +84,12 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
                 debug: false
             });
 
-            // Event-Listener für Lautstärkenänderungen
+            // Event-Listener für Lautstärken- und Mute-Änderungen
             this.on('volumechange', function() {
                 savedVolume = player.volume();
+                savedMuted = player.muted();
                 localStorage.setItem('vrPlayerVolume', savedVolume);
-                console.log('Lautstärke gespeichert:', savedVolume);
+                localStorage.setItem('vrPlayerMuted', savedMuted);
             });
 
             // Event-Listener für Vollbildänderungen
@@ -274,10 +277,12 @@ function fixPlayerDimensions() {
 // keepOpen: wenn true, wird _vrPlayerOpen nicht zurückgesetzt (für Re-Init bei Navigation)
 function disposeVRPlayer(keepOpen) {
     try {
-        // Speichere aktuelle Lautstärke bevor Player beendet wird
+        // Speichere Lautstärke und Mute-Zustand bevor Player beendet wird
         if (player && player.volume) {
             savedVolume = player.volume();
+            savedMuted = player.muted();
             localStorage.setItem('vrPlayerVolume', savedVolume);
+            localStorage.setItem('vrPlayerMuted', savedMuted);
         }
 
         // Event-Listener entfernen

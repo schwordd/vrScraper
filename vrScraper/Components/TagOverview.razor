@@ -4,7 +4,8 @@
 
 <CollapsibleItemList Title="Tags"
                      Items="@items"
-                     PillClass="item-pill item-pill-tag" />
+                     PillClass="tag-pill"
+                     FilterParam="tags" />
 
 @code {
     private List<(string Name, long Count)> items = new();

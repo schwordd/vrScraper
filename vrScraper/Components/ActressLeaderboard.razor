@@ -27,7 +27,12 @@
                     @foreach (var row in GetSortedRows())
                     {
                         <tr>
-                            <td class="fw-semibold">@row.Name</td>
+                            <td class="fw-semibold actress-name-cell">
+                                @row.Name
+                                <a href="/videos?actresses=@Uri.EscapeDataString(row.Name)" class="actress-link" title="Show videos for @row.Name">
+                                    <i class="icon-external-link"></i>
+                                </a>
+                            </td>
                             <td>@row.Videos</td>
                             <td>@row.Watched</td>
                             <td>@row.Liked</td>

@@ -38,6 +38,13 @@
                 <span class="nav-text">Settings</span>
             </NavLink>
         </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="graph" @onclick="HandleNavigation">
+                <i class="nav-icon icon-git-fork"></i>
+                <span class="nav-text">Graph</span>
+                <span class="nav-badge">ALPHA</span>
+            </NavLink>
+        </li>
     </ul>
     <div class="nav-logout">
         <a class="nav-link" href="api/auth/logout" @onclick="HandleNavigation">

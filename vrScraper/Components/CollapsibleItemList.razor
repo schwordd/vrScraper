@@ -5,9 +5,18 @@
     {
         @foreach (var item in Items)
         {
-            <span class="@PillClass">
-                @item.Name <span class="item-count">@item.Count</span>
-            </span>
+            @if (string.IsNullOrEmpty(FilterParam))
+            {
+                <span class="@PillClass">
+                    @item.Name <span class="item-count">@item.Count</span>
+                </span>
+            }
+            else
+            {
+                <a href="/videos?@FilterParam=@Uri.EscapeDataString(item.Name)" class="@PillClass">
+                    @item.Name <span class="item-count">@item.Count</span>
+                </a>
+            }
         }
     }
 </div>
@@ -15,6 +24,6 @@
 @code {
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public List<(string Name, long Count)> Items { get; set; } = new();
-    [Parameter] public string BadgeColor { get; set; } = "#007bff";
-    [Parameter] public string PillClass { get; set; } = "item-pill";
+    [Parameter] public string PillClass { get; set; } = "tag-pill";
+    [Parameter] public string FilterParam { get; set; } = "";
 }

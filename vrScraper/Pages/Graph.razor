@@ -1,0 +1,376 @@
+@page "/graph"
+@using vrScraper.DB.Models
+@using vrScraper.Services
+@inject IVideoService VideoService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+<div class="graph-page">
+    <div class="graph-toolbar">
+        <h4 class="graph-title">Network</h4>
+
+        <div class="filter-group">
+            <label>Min Videos (Stars): @_minStarVideos</label>
+            <input type="range" class="form-range" min="1" max="20" step="1"
+                   value="@_minStarVideos" @onchange="OnMinStarVideosChanged" />
+        </div>
+
+        <div class="filter-group">
+            <label>Tag Set</label>
+            <select class="form-select form-select-sm" @onchange="OnTagSetChanged">
+                @foreach (var set in _tagSets)
+                {
+                    <option value="@set.Key" selected="@(set.Key == _selectedTagSet)">@set.Key</option>
+                }
+            </select>
+        </div>
+
+        <div class="graph-stats">
+            @_nodeCount Nodes &middot; @_linkCount Edges
+        </div>
+    </div>
+
+    <div class="graph-wrapper">
+        <div id="network-graph-container" class="graph-container"></div>
+
+        <div class="graph-legend">
+            @if (_tagLegend != null)
+            {
+                @foreach (var item in _tagLegend)
+                {
+                    <div class="legend-item">
+                        <span class="legend-dot" style="background: @item.Color"></span> @item.Label (@item.Count)
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<DbVideoItem> _allVideos = new();
+    private DotNetObjectReference<Graph>? _dotNetRef;
+    private bool _initialized;
+
+    private int _minStarVideos = 2;
+    private string _selectedTagSet = "Ethnicity";
+
+    private int _nodeCount;
+    private int _linkCount;
+    private List<LegendItem>? _tagLegend;
+
+    private record LegendItem(string Label, string Color, int Count);
+
+    // Farb-Palette: 15 gut unterscheidbare Farben
+    private static readonly string[] _palette = {
+        "#e11d48", "#d97706", "#16a34a", "#2563eb", "#9333ea",
+        "#0891b2", "#c026d3", "#ea580c", "#4f46e5", "#059669",
+        "#dc2626", "#0284c7", "#7c3aed", "#ca8a04", "#db2777"
+    };
+
+    private static readonly Dictionary<string, HashSet<string>> _tagSets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Ethnicity"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Asian", "Japanese", "Ebony", "Latina", "Indian"
+        },
+        ["Hair"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Brunette", "Blonde", "Redhead"
+        },
+        ["Body"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Petite", "BBW", "Fat", "Big Tits", "Small Tits", "Big Ass"
+        },
+        ["Age / Status"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Teen", "MILF", "Mature", "Students", "Housewives", "Older Men"
+        },
+        ["Pro vs Amateur"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Pornstar", "Amateur", "Homemade", "Webcam"
+        },
+        ["Scene Type"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Threesome", "Group Sex", "Orgy", "Lesbian", "Interracial", "Swinger"
+        },
+        ["Setting"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Massage", "Outdoor", "Hotel", "Office", "Public", "Doctor", "Nurses"
+        },
+        ["Kink"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "BDSM", "Bondage", "Fetish", "Fisting", "Footjob",
+            "Lingerie", "Uniform", "Toys", "ASMR"
+        },
+        ["Activity"] = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Blowjob", "Anal", "Creampie", "Cumshot", "Squirt",
+            "Masturbation", "Double Penetration", "Bukkake", "Striptease"
+        },
+        ["All"] = new()
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        _allVideos = await VideoService.GetVideoItems();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _initialized = true;
+            var graphData = BuildGraphData();
+            StateHasChanged();
+            await JSRuntime.InvokeVoidAsync("networkGraph.init", "network-graph-container", graphData, _dotNetRef);
+        }
+    }
+
+    private object BuildGraphData()
+    {
+        var totalVideos = _allVideos.Count;
+        var ubiquitousThreshold = totalVideos * 0.3;
+
+        // Star-Statistiken
+        var starStats = _allVideos
+            .Where(v => v.Stars != null)
+            .SelectMany(v => v.Stars.Select(s => new { Star = s, Video = v }))
+            .GroupBy(x => x.Star.Id)
+            .Select(g => new
+            {
+                Star = g.First().Star,
+                Count = g.Count(),
+                Liked = g.Count(x => x.Video.Liked),
+                LikeRate = g.Count() > 0 ? Math.Round(g.Count(x => x.Video.Liked) * 100.0 / g.Count(), 1) : 0,
+                VideoIds = g.Select(x => x.Video.Id).ToHashSet()
+            })
+            .Where(s => s.Count >= _minStarVideos)
+            .ToDictionary(s => s.Star.Id);
+
+        // Tag-Statistiken (gefiltert nach Tag-Set)
+        var activeTagSet = _tagSets.GetValueOrDefault(_selectedTagSet) ?? new();
+        var useAllTags = _selectedTagSet == "All" || activeTagSet.Count == 0;
+
+        var tagStats = _allVideos
+            .Where(v => v.Tags != null)
+            .SelectMany(v => v.Tags.Select(t => new { Tag = t, Video = v }))
+            .GroupBy(x => x.Tag.Id)
+            .Select(g => new
+            {
+                Tag = g.First().Tag,
+                Count = g.Count(),
+                VideoIds = g.Select(x => x.Video.Id).ToHashSet()
+            })
+            .Where(t => t.Count >= 1
+                && (useAllTags ? t.Count <= ubiquitousThreshold : activeTagSet.Contains(t.Tag.Name)))
+            .ToDictionary(t => t.Tag.Id);
+
+        // Farbe pro Tag zuweisen
+        var tagColors = new Dictionary<long, string>();
+        var tagIndex = 0;
+        foreach (var t in tagStats.Values.OrderByDescending(t => t.Count))
+        {
+            tagColors[t.Tag.Id] = _palette[tagIndex % _palette.Length];
+            tagIndex++;
+        }
+
+        // Star↔Tag Links berechnen + Primary Tag pro Star bestimmen
+        var simLinks = new List<object>();
+        var linkedTagIds = new HashSet<long>();
+        var linkedStarIds = new HashSet<long>();
+        var starPrimaryTag = new Dictionary<long, long>(); // starId → tagId (stärkste Verbindung)
+        var starTagWeights = new Dictionary<long, List<(long tagId, int weight)>>();
+
+        foreach (var starEntry in starStats.Values)
+        {
+            var starVideoCount = starEntry.Count;
+            var tagLinks = tagStats.Values
+                .Select(t =>
+                {
+                    var overlap = starEntry.VideoIds.Intersect(t.VideoIds).Count();
+                    var proportion = (double)overlap / starVideoCount;
+                    return new { Tag = t, Overlap = overlap, Proportion = proportion };
+                })
+                .Where(x => x.Overlap >= 1 && x.Proportion >= 0.15)
+                .OrderByDescending(x => x.Proportion)
+                .ThenByDescending(x => x.Overlap)
+                .Take(5)
+                .ToList();
+
+            if (tagLinks.Count == 0) continue;
+
+            starPrimaryTag[starEntry.Star.Id] = tagLinks[0].Tag.Tag.Id;
+            starTagWeights[starEntry.Star.Id] = tagLinks
+                .Select(t => (t.Tag.Tag.Id, t.Overlap))
+                .ToList();
+
+            foreach (var tt in tagLinks)
+            {
+                linkedTagIds.Add(tt.Tag.Tag.Id);
+                linkedStarIds.Add(starEntry.Star.Id);
+                simLinks.Add(new
+                {
+                    source = $"star:{starEntry.Star.Id}",
+                    target = $"tag:{tt.Tag.Tag.Id}",
+                    weight = tt.Overlap
+                });
+            }
+        }
+
+        // Nodes erstellen
+        var nodes = new List<object>();
+
+        foreach (var s in starStats.Values.Where(s => linkedStarIds.Contains(s.Star.Id)))
+        {
+            var primaryTagId = starPrimaryTag.GetValueOrDefault(s.Star.Id);
+            var color = tagColors.GetValueOrDefault(primaryTagId, "#94a3b8");
+
+            nodes.Add(new
+            {
+                id = $"star:{s.Star.Id}",
+                label = s.Star.Name,
+                type = "star",
+                count = s.Count,
+                liked = s.Liked,
+                likeRate = s.LikeRate,
+                val = LogScale(s.Count, 1, 25),
+                color,
+                primaryTag = $"tag:{primaryTagId}"
+            });
+        }
+
+        // Tag-Nodes
+        var legend = new List<LegendItem>();
+        foreach (var t in tagStats.Values
+            .Where(t => linkedTagIds.Contains(t.Tag.Id))
+            .OrderByDescending(t => t.Count))
+        {
+            var color = tagColors.GetValueOrDefault(t.Tag.Id, "#94a3b8");
+            var starsInCluster = starPrimaryTag.Count(kvp => kvp.Value == t.Tag.Id);
+
+            nodes.Add(new
+            {
+                id = $"tag:{t.Tag.Id}",
+                label = t.Tag.Name,
+                type = "tag",
+                count = t.Count,
+                liked = 0,
+                likeRate = 0.0,
+                val = LogScale(t.Count, 3, 30),
+                color,
+                primaryTag = ""
+            });
+
+            legend.Add(new LegendItem(t.Tag.Name, color, starsInCluster));
+        }
+        _tagLegend = legend;
+
+        // Hover-Links: Co-Appearances
+        var hoverLinks = new List<object>();
+
+        var coAppearances = new Dictionary<(long, long), int>();
+        foreach (var video in _allVideos)
+        {
+            if (video.Stars == null || video.Stars.Count < 2) continue;
+
+            var filteredStars = video.Stars
+                .Where(s => linkedStarIds.Contains(s.Id))
+                .Select(s => s.Id)
+                .OrderBy(id => id)
+                .ToList();
+
+            for (int i = 0; i < filteredStars.Count; i++)
+            {
+                for (int j = i + 1; j < filteredStars.Count; j++)
+                {
+                    var key = (filteredStars[i], filteredStars[j]);
+                    coAppearances.TryGetValue(key, out var count);
+                    coAppearances[key] = count + 1;
+                }
+            }
+        }
+
+        foreach (var (pair, weight) in coAppearances)
+        {
+            hoverLinks.Add(new
+            {
+                source = $"star:{pair.Item1}",
+                target = $"star:{pair.Item2}",
+                weight = weight
+            });
+        }
+
+        foreach (var sl in simLinks)
+            hoverLinks.Add(sl);
+
+        _nodeCount = nodes.Count;
+        _linkCount = simLinks.Count;
+
+        return new { nodes, simLinks, hoverLinks };
+    }
+
+    private static double LogScale(int count, double min, double max)
+    {
+        var scaled = min + (max - min) * Math.Min(1.0, Math.Sqrt(count) / 12.0);
+        return Math.Round(scaled, 1);
+    }
+
+    private async Task UpdateGraph()
+    {
+        if (!_initialized) return;
+        var graphData = BuildGraphData();
+        StateHasChanged();
+        await JSRuntime.InvokeVoidAsync("networkGraph.update", graphData);
+    }
+
+    private async Task OnMinStarVideosChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            _minStarVideos = val;
+            await UpdateGraph();
+        }
+    }
+
+    private async Task OnTagSetChanged(ChangeEventArgs e)
+    {
+        _selectedTagSet = e.Value?.ToString() ?? "Appearance";
+        await UpdateGraph();
+    }
+
+    [JSInvokable]
+    public void OnNodeClicked(string nodeId)
+    {
+        if (string.IsNullOrEmpty(nodeId)) return;
+
+        if (nodeId.StartsWith("star:"))
+        {
+            var name = _allVideos
+                .SelectMany(v => v.Stars ?? Enumerable.Empty<DbStar>())
+                .FirstOrDefault(s => $"star:{s.Id}" == nodeId)?.Name;
+            if (name != null)
+                NavigationManager.NavigateTo($"/videos?actresses={Uri.EscapeDataString(name)}");
+        }
+        else if (nodeId.StartsWith("tag:"))
+        {
+            var name = _allVideos
+                .SelectMany(v => v.Tags ?? Enumerable.Empty<DbTag>())
+                .FirstOrDefault(t => $"tag:{t.Id}" == nodeId)?.Name;
+            if (name != null)
+                NavigationManager.NavigateTo($"/videos?tags={Uri.EscapeDataString(name)}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("networkGraph.dispose");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
+    }
+}

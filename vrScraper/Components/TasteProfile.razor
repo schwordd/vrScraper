@@ -15,7 +15,12 @@
             @foreach (var t in _topTags)
             {
                 <div class="taste-bar-row">
-                    <span class="taste-label" title="@t.Name">@t.Name</span>
+                    <span class="taste-label" title="@t.Name">
+                        @t.Name
+                        <a href="/videos?tags=@Uri.EscapeDataString(t.Name)" class="taste-link" title="Show videos tagged @t.Name">
+                            <i class="icon-external-link"></i>
+                        </a>
+                    </span>
                     <div class="taste-bar-track">
                         <div class="taste-bar-fill taste-bar-tag" style="width: @(t.Pct.ToString("F0"))%"></div>
                     </div>
@@ -40,7 +45,12 @@
             @foreach (var s in _topStars)
             {
                 <div class="taste-bar-row">
-                    <span class="taste-label" title="@s.Name">@s.Name</span>
+                    <span class="taste-label" title="@s.Name">
+                        @s.Name
+                        <a href="/videos?actresses=@Uri.EscapeDataString(s.Name)" class="taste-link" title="Show videos for @s.Name">
+                            <i class="icon-external-link"></i>
+                        </a>
+                    </span>
                     <div class="taste-bar-track">
                         <div class="taste-bar-fill taste-bar-star" style="width: @(s.Pct.ToString("F0"))%"></div>
                     </div>

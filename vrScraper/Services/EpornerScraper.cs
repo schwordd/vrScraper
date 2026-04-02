@@ -458,12 +458,20 @@ namespace vrScraper.Services
                   videoDetails.Views = views;
               }
 
-              // Extract rating from aggregateRating
+              // Extract rating from aggregateRating, normalized to 0-1
               if (jsonObject.RootElement.TryGetProperty("aggregateRating", out var ratingProp)
                   && ratingProp.TryGetProperty("ratingValue", out var ratingVal))
               {
                 if (double.TryParse(ratingVal.ToString(), out var rating))
-                  videoDetails.Rating = rating;
+                {
+                  double bestRating = 100;
+                  if (ratingProp.TryGetProperty("bestRating", out var bestRatingVal)
+                      && double.TryParse(bestRatingVal.ToString(), out var best) && best > 0)
+                  {
+                    bestRating = best;
+                  }
+                  videoDetails.Rating = rating / bestRating;
+                }
               }
 
               // Extract actors from JSON-LD (most reliable source for stars)

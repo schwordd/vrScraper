@@ -167,6 +167,12 @@ namespace vrScraper
         //seeding
         DbDefaults.SeedDefaultSettings(context);
         DbDefaults.SeedDefaultTabs(context);
+
+        // Fix SiteRating values that were stored unnormalized (raw percentage instead of 0-1)
+        int fixedRatings = context.Database.ExecuteSqlRaw(
+            "UPDATE VideoItems SET SiteRating = SiteRating / 100.0 WHERE SiteRating > 1.0");
+        if (fixedRatings > 0)
+          Console.WriteLine($"Fixed {fixedRatings} video(s) with unnormalized SiteRating.");
       }
 
       // Enable CORS

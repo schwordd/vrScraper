@@ -57,3 +57,24 @@
 .leaderboard-table tbody tr:hover {
     background: var(--color-surface-sunken);
 }
+
+.actress-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.actress-link {
+    color: var(--color-text-secondary);
+    opacity: 0;
+    font-size: 0.75em;
+    transition: opacity 0.15s;
+}
+
+.actress-link:hover {
+    color: var(--color-primary);
+}
+
+::deep tr:hover .actress-link {
+    opacity: 1;
+}

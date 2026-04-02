@@ -121,7 +121,19 @@
       "Bash(cd:*)",
       "Bash(xargs cat:*)",
       "Bash(xargs head:*)",
-      "Bash(netstat -aon)"
+      "Bash(netstat -aon)",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:app.unpkg.com)",
+      "Bash(find ./vrScraper -name *Controller.cs -type f)",
+      "Bash(find ./vrScraper -name *PlaybackEvent* -o -name *Playback*)",
+      "Bash(find ./vrScraper -name \"*.js\" -exec grep -l \"fetch\\\\|ajax\\\\|xhr\\\\|post\" {})",
+      "Bash(find ./vrScraper -name *Player* -o -name *Video*)",
+      "Bash(pkill -f \"dotnet.*vrScraper\")",
+      "Bash(netstat -ano)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(ls -la /d/Source/vrScraper/vrScraper/Services/*Recommendation*)",
+      "Bash(ls -la /d/Source/vrScraper/vrScraper/DB/Models/DbVideo*)"
     ],
     "deny": []
   }

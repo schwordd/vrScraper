@@ -29,6 +29,22 @@
     white-space: nowrap;
 }
 
+.taste-link {
+    color: var(--color-text-secondary);
+    opacity: 0;
+    font-size: 0.75em;
+    transition: opacity 0.15s;
+    margin-left: 0.2rem;
+}
+
+.taste-link:hover {
+    color: var(--color-primary);
+}
+
+.taste-bar-row:hover .taste-link {
+    opacity: 1;
+}
+
 .taste-bar-track {
     flex: 1;
     height: 6px;

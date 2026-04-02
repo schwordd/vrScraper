@@ -213,6 +213,62 @@
     color: var(--color-text-secondary);
 }
 
+/* Tag pill — used in VideoCard and overview lists */
+.tag-pill, .star-pill {
+    cursor: pointer;
+    border: none;
+    transition: all var(--transition-base) ease-in-out;
+    padding: 2px 6px;
+    border-radius: var(--radius-lg);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: capitalize;
+    box-shadow: var(--shadow-sm);
+    line-height: 1;
+    min-height: 18px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.tag-pill:hover, .star-pill:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    color: inherit;
+}
+
+.tag-pill {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.tag-pill:hover {
+    background-color: var(--color-primary-hover);
+    color: white;
+}
+
+/* Star pill — dark with gold text */
+.star-pill {
+    background-color: var(--color-text);
+    color: var(--color-primary-light);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    box-shadow: none;
+    text-transform: none;
+    gap: 3px;
+    border-radius: var(--radius-xl);
+}
+
+.star-pill:hover {
+    background-color: var(--color-liked);
+    color: var(--color-primary-subtle);
+}
+
 
 /* ==========================================================================
    Action Buttons (circular overlay buttons)
