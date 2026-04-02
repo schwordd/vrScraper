@@ -66,45 +66,51 @@
     protected override async Task OnInitializedAsync()
     {
         var videos = await VideoService.GetVideoItems();
-        var (tagAffinities, starAffinities) = RecommendationService.GetAffinities(videos);
-
-        // Build tag stats — exclude ubiquitous tags (>40% of all videos)
         var totalVideoCount = videos.Count;
-        var tagCounts = videos
-            .SelectMany(v => v.Tags.Select(t => t.Name))
-            .GroupBy(n => n)
-            .ToDictionary(g => g.Key, g => g.Count());
-        var noiseTags = tagCounts.Where(kv => (double)kv.Value / totalVideoCount > 0.4).Select(kv => kv.Key).ToHashSet();
 
-        var filteredTagAffinities = tagAffinities.Where(kv => !noiseTags.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
-        var tagMax = filteredTagAffinities.Values.Any() ? filteredTagAffinities.Values.Max() : 1;
-        _topTags = filteredTagAffinities
-            .OrderByDescending(kv => kv.Value)
-            .Take(10)
-            .Select(kv =>
+        // Build tag stats — ranked by like count, exclude ubiquitous tags (>30%)
+        var tagGroups = videos
+            .SelectMany(v => v.Tags.Select(t => new { Tag = t.Name, Video = v }))
+            .GroupBy(x => x.Tag, StringComparer.OrdinalIgnoreCase)
+            .Where(g => (double)g.Count() / totalVideoCount <= 0.3)
+            .Select(g =>
             {
-                var count = tagCounts.GetValueOrDefault(kv.Key, 0);
-                var tagVideos = videos.Where(v => v.Tags.Any(t => t.Name == kv.Key)).ToList();
-                var watched = tagVideos.Count(v => v.PlayCount > 0);
+                var tagVideos = g.Select(x => x.Video).ToList();
                 var liked = tagVideos.Count(v => v.Liked);
+                var watched = tagVideos.Count(v => v.PlayCount > 0);
                 var likeRate = tagVideos.Count > 0 ? (double)liked / tagVideos.Count * 100 : 0;
-                return new TagRow(kv.Key, kv.Value / tagMax * 100, tagVideos.Count, watched, liked, likeRate);
+                return new { Name = g.Key, Videos = tagVideos.Count, Watched = watched, Liked = liked, LikeRate = likeRate };
             })
+            .Where(t => t.Liked > 0)
+            .OrderByDescending(t => t.Liked)
+            .Take(10)
             .ToList();
 
-        // Build star stats
-        var starMax = starAffinities.Values.Any() ? starAffinities.Values.Max() : 1;
-        _topStars = starAffinities
-            .OrderByDescending(kv => kv.Value)
-            .Take(10)
-            .Select(kv =>
+        var tagMaxLikes = tagGroups.Any() ? tagGroups.Max(t => t.Liked) : 1;
+        _topTags = tagGroups
+            .Select(t => new TagRow(t.Name, (double)t.Liked / tagMaxLikes * 100, t.Videos, t.Watched, t.Liked, t.LikeRate))
+            .ToList();
+
+        // Build star stats — ranked by like count
+        var starGroups = videos
+            .SelectMany(v => v.Stars.Select(s => new { Star = s.Name, Video = v }))
+            .GroupBy(x => x.Star, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
             {
-                var starVideos = videos.Where(v => v.Stars.Any(s => s.Name == kv.Key)).ToList();
-                var watched = starVideos.Count(v => v.PlayCount > 0);
+                var starVideos = g.Select(x => x.Video).ToList();
                 var liked = starVideos.Count(v => v.Liked);
+                var watched = starVideos.Count(v => v.PlayCount > 0);
                 var watchTime = TimeSpan.FromTicks(starVideos.Sum(v => v.PlayDurationEst.Ticks));
-                return new StarRow(kv.Key, kv.Value / starMax * 100, starVideos.Count, watched, liked, watchTime);
+                return new { Name = g.Key, Videos = starVideos.Count, Watched = watched, Liked = liked, WatchTime = watchTime };
             })
+            .Where(s => s.Liked > 0)
+            .OrderByDescending(s => s.Liked)
+            .Take(10)
+            .ToList();
+
+        var starMaxLikes = starGroups.Any() ? starGroups.Max(s => s.Liked) : 1;
+        _topStars = starGroups
+            .Select(s => new StarRow(s.Name, (double)s.Liked / starMaxLikes * 100, s.Videos, s.Watched, s.Liked, s.WatchTime))
             .ToList();
     }
 

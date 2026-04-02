@@ -82,14 +82,7 @@ namespace vrScraper.Services
         }
       }
 
-      // Normalize affinities
-      double totalSignalVideos = signalVideos.Count;
-      foreach (var key in tagAffinity.Keys.ToList())
-        tagAffinity[key] /= totalSignalVideos;
-      foreach (var key in starAffinity.Keys.ToList())
-        starAffinity[key] /= totalSignalVideos;
-
-      // Apply IDF weighting: common tags (on many videos) count less, rare tags count more
+      // Count videos per tag/star (used for normalization and IDF)
       double totalVideos = allItems.Count;
       var tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
       var starCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -109,15 +102,23 @@ namespace vrScraper.Services
           }
       }
 
+      // Normalize per-tag/star by video count, remove ubiquitous tags (>30%)
+      // Inverse dampened IDF: rare tags slightly penalized (more noise), common tags trusted more
+      double prevalenceThreshold = totalVideos * 0.3;
       foreach (var key in tagAffinity.Keys.ToList())
       {
         if (tagCounts.TryGetValue(key, out int count) && count > 0)
-          tagAffinity[key] *= Math.Log(totalVideos / count);
+        {
+          if (count > prevalenceThreshold)
+            tagAffinity.Remove(key);
+          else
+            tagAffinity[key] = tagAffinity[key] / count / (1.0 + 0.15 * Math.Log(totalVideos / count));
+        }
       }
       foreach (var key in starAffinity.Keys.ToList())
       {
         if (starCounts.TryGetValue(key, out int count) && count > 0)
-          starAffinity[key] *= Math.Log(totalVideos / count);
+          starAffinity[key] = starAffinity[key] / count / (1.0 + 0.15 * Math.Log(totalVideos / count));
       }
 
       return (tagAffinity, starAffinity);
@@ -125,21 +126,18 @@ namespace vrScraper.Services
 
     private static double ComputeSignalWeight(DbVideoItem video)
     {
-      // Base weight from explicit signals
+      // Likes dominate massively; watches are weak background signal
       double weight;
       if (video.Liked)
-        weight = 2.5;
+        weight = 20.0;
       else if (video.PlayCount >= 5)
         weight = 1.5;
       else if (video.PlayCount >= 2)
-        weight = 1.0;
-      else if (video.PlayCount == 1 && video.Duration.TotalSeconds > 0)
-      {
-        double completionRatio = video.PlayDurationEst.TotalSeconds / video.Duration.TotalSeconds;
-        weight = completionRatio > 0.5 ? 0.8 : completionRatio < 0.1 ? 0.2 : 0.5;
-      }
+        weight = 0.6;
+      else if (video.PlayCount == 1)
+        weight = 0.1;
       else
-        weight = 0.3;
+        weight = 0.05;
 
       // Engagement boost from VideoEngagement (scrub data)
       var engagement = video.Engagement;
@@ -154,12 +152,6 @@ namespace vrScraper.Services
         if (engagement.ScrubEventCount <= 3 && engagement.OpenCount == 1 && !video.Liked)
           weight -= 0.2; // Quick-skip signal
       }
-
-      // Temporal decay: recent interactions count more
-      var refDate = video.LastPlayedUtc ?? video.AddedUTC ?? DateTime.UtcNow;
-      double daysSince = (DateTime.UtcNow - refDate).TotalDays;
-      double decay = 0.3 + 0.7 * Math.Exp(-daysSince / 180.0);
-      weight *= decay;
 
       return weight;
     }
@@ -195,6 +187,7 @@ namespace vrScraper.Services
           continue;
 
         double tagScore = 0;
+        int tagMatches = 0;
         string? topTag = null;
         double topTagScore = 0;
         if (video.Tags != null && video.Tags.Count > 0)
@@ -204,13 +197,16 @@ namespace vrScraper.Services
             if (tagAffinity.TryGetValue(tag.Name, out var affinity))
             {
               tagScore += affinity;
+              tagMatches++;
               if (affinity > topTagScore) { topTagScore = affinity; topTag = tag.Name; }
             }
           }
-          tagScore /= video.Tags.Count;
+          if (tagMatches > 0)
+            tagScore /= tagMatches; // average only matching tags, ignore neutral ones
         }
 
         double starScore = 0;
+        int starMatches = 0;
         string? topStar = null;
         double topStarScore = 0;
         if (video.Stars != null && video.Stars.Count > 0)
@@ -220,10 +216,12 @@ namespace vrScraper.Services
             if (starAffinity.TryGetValue(star.Name, out var affinity))
             {
               starScore += affinity;
+              starMatches++;
               if (affinity > topStarScore) { topStarScore = affinity; topStar = star.Name; }
             }
           }
-          starScore /= video.Stars.Count;
+          if (starMatches > 0)
+            starScore /= starMatches; // average only matching stars
         }
 
         double combinedScore = tagScore * 0.6 + starScore * 0.4;
@@ -405,8 +403,8 @@ namespace vrScraper.Services
       double diff = Math.Abs(video.Duration.TotalMinutes - preferredMin);
       double gaussian = Math.Exp(-(diff * diff) / (2 * stdDev * stdDev));
 
-      // Map from [0,1] to [0.85, 1.0] — mild preference, not harsh penalty
-      return 0.85 + 0.15 * gaussian;
+      // Map from [0,1] to [0.97, 1.0] — very minimal influence
+      return 0.97 + 0.03 * gaussian;
     }
 
     /// <summary>
@@ -434,8 +432,8 @@ namespace vrScraper.Services
         if (!ApplyPerformerRotation(item, starCounts, limit))
           continue;
 
-        // Tag-cluster suppression: skip if any tag is already in >50% of results (after first 10 items)
-        if (result.Count > 10 && IsTagOverRepresented(item, tagCounts, result.Count))
+        // Tag-cluster suppression: skip if any tag is already in >70% of results (after first 20 items)
+        if (result.Count > 20 && IsTagOverRepresented(item, tagCounts, result.Count))
           continue;
 
         AddToResult(result, selectedIds, starCounts, tagCounts, item);
@@ -446,7 +444,7 @@ namespace vrScraper.Services
 
     private static bool ApplyPerformerRotation(ScoredVideo item, Dictionary<string, int> starCounts, int limit)
     {
-      int maxPerStar = Math.Max(5, limit / 10);
+      int maxPerStar = Math.Max(10, limit / 5);
       return !(item.Video.Stars?.Any(s =>
       {
         starCounts.TryGetValue(s.Name, out int count);
@@ -476,7 +474,7 @@ namespace vrScraper.Services
 
     private static bool IsTagOverRepresented(ScoredVideo candidate, Dictionary<string, int> tagCounts, int resultCount)
     {
-      double threshold = resultCount * 0.5;
+      double threshold = resultCount * 0.7;
       return candidate.Video.Tags?.Any(t =>
       {
         tagCounts.TryGetValue(t.Name, out int count);
