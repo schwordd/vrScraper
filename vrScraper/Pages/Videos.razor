@@ -292,8 +292,8 @@
     private int _maxDurationMinutes = 120;
     private const int DurationSliderMax = 120;
 
-    public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); } }
-    public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); } }
+    public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; _cachedFilteredItems = null; SyncUrlState(); } }
+    public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; _cachedFilteredItems = null; SyncUrlState(); } }
 
     public List<string> _selectedTags = new List<string>();
     public IEnumerable<string> SelectedTagValues
@@ -344,7 +344,7 @@
             {
                 _searchQuery = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null;
+                _cachedRandomItems = null; _cachedFilteredItems = null;
                 SyncUrlState();
             }
         }
@@ -356,6 +356,7 @@
     private bool _showOnlyWatchlist;
     private Random rng = new Random();
     private List<DbVideoItem>? _cachedRandomItems = null;
+    private List<DbVideoItem>? _cachedFilteredItems = null;
     private string? _lastRandomSeed = null;
 
     public bool ShowOnlyLiked
@@ -367,7 +368,7 @@
             {
                 _showOnlyLiked = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null;
+                _cachedRandomItems = null; _cachedFilteredItems = null;
                 SyncUrlState();
             }
         }
@@ -382,7 +383,7 @@
             {
                 _showOnlyUnwatched = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null;
+                _cachedRandomItems = null; _cachedFilteredItems = null;
                 SyncUrlState();
             }
         }
@@ -397,7 +398,7 @@
             {
                 _showOnlyWithErrors = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null;
+                _cachedRandomItems = null; _cachedFilteredItems = null;
                 SyncUrlState();
             }
         }
@@ -416,14 +417,14 @@
                 // Clear random cache when switching away from random
                 if (value != "random")
                 {
-                    _cachedRandomItems = null;
+                    _cachedRandomItems = null; _cachedFilteredItems = null;
                     _lastRandomSeed = null;
                 }
                 // Generate new random seed when switching to random
                 else if (value == "random")
                 {
                     _lastRandomSeed = Guid.NewGuid().ToString();
-                    _cachedRandomItems = null;
+                    _cachedRandomItems = null; _cachedFilteredItems = null;
                 }
                 SyncUrlState();
             }
@@ -438,6 +439,11 @@
             if (_currentSortOption == "random" && _cachedRandomItems != null)
             {
                 return _cachedRandomItems;
+            }
+
+            if (_cachedFilteredItems != null)
+            {
+                return _cachedFilteredItems;
             }
             
             var items = VideoItems;
@@ -484,7 +490,8 @@
                 // Best unwatched: filter unwatched and sort by Bayesian Average
                 var allUnwatched = filteredItems.Where(v => v.PlayCount == 0).ToList();
                 var k = 16000; // Tuning-Parameter
-                var averageRating = items.Where(a => a.SiteRating.HasValue).Average(a => a.SiteRating);
+                var ratedItems = items.Where(a => a.SiteRating.HasValue);
+                var averageRating = ratedItems.Any() ? ratedItems.Average(a => a.SiteRating) : 0.5;
 
                 sortedItems = allUnwatched
                     .Where(a => a.Views.HasValue && a.SiteRating.HasValue)
@@ -522,6 +529,7 @@
                     .ToList();
             }
             
+            _cachedFilteredItems = sortedItems;
             return sortedItems;
         }
     }
@@ -611,7 +619,7 @@
     public IEnumerable<string> SelectedSitesValues
     {
         get => _selectedSites;
-        set { _selectedSites = value.ToList(); CurrentPage = 1; _cachedRandomItems = null; SyncUrlState(); }
+        set { _selectedSites = value.ToList(); CurrentPage = 1; _cachedRandomItems = null; _cachedFilteredItems = null; SyncUrlState(); }
     }
     private void ClearSites() { SelectedSitesValues = new List<string>(); }
 
@@ -638,7 +646,7 @@
     {
         _showOnlyWatchlist = !_showOnlyWatchlist;
         CurrentPage = 1;
-        _cachedRandomItems = null;
+        _cachedRandomItems = null; _cachedFilteredItems = null;
     }
 
     private void UpdateWatchlistVideoIds()
@@ -763,7 +771,7 @@
     {
         SelectedTags = e.ToHashSet();
         CurrentPage = 1;
-        _cachedRandomItems = null;
+        _cachedRandomItems = null; _cachedFilteredItems = null;
         SyncUrlState();
     }
 
@@ -771,7 +779,7 @@
     {
         SelectedActresses = e.ToHashSet();
         CurrentPage = 1;
-        _cachedRandomItems = null;
+        _cachedRandomItems = null; _cachedFilteredItems = null;
         SyncUrlState();
     }
 
@@ -833,6 +841,7 @@
         if (videoToRemove != null)
         {
             _videoItems.Remove(videoToRemove);
+            _cachedFilteredItems = null; _cachedRandomItems = null;
 
             // Aktualisiere die Tag- und Star-Zähler
             foreach (var tag in videoToRemove.Tags)

@@ -16,9 +16,9 @@ namespace vrScraper.Services
   public class VideoService(ILogger<VideoService> logger, IServiceProvider serviceProvider) : IVideoService, IDisposable
   {
     private List<DbVideoItem> videoItems = new List<DbVideoItem>();
-    private readonly object _videoLock = new object();
+    private readonly ReaderWriterLockSlim _videoLock = new ReaderWriterLockSlim();
 
-    private object dblock = new object();
+    private readonly object dblock = new object();
     private long? currentVideoId;
     private DbVideoItem? currentVideo;
     private DateTime? requestedCurrentVideoItem;
@@ -44,33 +44,30 @@ namespace vrScraper.Services
         .Include(a => a.VideoStars).Include(a => a.VideoTags)
         .Include(a => a.Engagement)
         .AsNoTracking().AsSplitQuery().ToListAsync();
-      lock (_videoLock)
-      {
-        this.videoItems = items;
-      }
+      _videoLock.EnterWriteLock();
+      try { this.videoItems = items; }
+      finally { _videoLock.ExitWriteLock(); }
       logger.LogInformation("all video meta data reloaded ({items} items)", items.Count);
 
     }
 
     public void Dispose()
     {
-      // Cleanup if needed
+      _videoLock.Dispose();
     }
 
     public Task<List<DbVideoItem>> GetVideoItems()
     {
-      lock (_videoLock)
-      {
-        return Task.FromResult(videoItems);
-      }
+      _videoLock.EnterReadLock();
+      try { return Task.FromResult(videoItems); }
+      finally { _videoLock.ExitReadLock(); }
     }
 
     public Task<DbVideoItem?> GetVideoById(long id)
     {
-      lock (_videoLock)
-      {
-        return Task.FromResult(videoItems.Where(a => a.Id == id).FirstOrDefault());
-      }
+      _videoLock.EnterReadLock();
+      try { return Task.FromResult(videoItems.FirstOrDefault(a => a.Id == id)); }
+      finally { _videoLock.ExitReadLock(); }
     }
 
     public async Task<List<(DbTag Tag, long Count)>> GetTagInfos()
@@ -134,18 +131,24 @@ namespace vrScraper.Services
             prevVideo.PlayCount += 1;
             context.SaveChanges();
 
-            lock (_videoLock)
+            var savedPlayCount = prevVideo.PlayCount;
+            var savedPlayDuration = prevVideo.PlayDurationEst;
+            var savedId = prevVideo.Id;
+
+            _videoLock.EnterWriteLock();
+            try
             {
-              var memVid = this.videoItems.FirstOrDefault(a => a.Id == prevVideo.Id);
+              var memVid = this.videoItems.FirstOrDefault(a => a.Id == savedId);
               if (memVid != null)
               {
-                memVid.PlayCount = prevVideo.PlayCount;
-                memVid.PlayDurationEst = prevVideo.PlayDurationEst;
+                memVid.PlayCount = savedPlayCount;
+                memVid.PlayDurationEst = savedPlayDuration;
               }
             }
+            finally { _videoLock.ExitWriteLock(); }
 
             logger.LogDebug("[TRACK] RECORD: video {VidId} PlayCount={Count}, PlayDurationEst={Est}",
-              prevVideo.Id, prevVideo.PlayCount, prevVideo.PlayDurationEst);
+              savedId, savedPlayCount, savedPlayDuration);
           }
         }
 
@@ -158,11 +161,13 @@ namespace vrScraper.Services
           var ctx2 = scope2.ServiceProvider.GetRequiredService<VrScraperContext>();
           var dbVid = ctx2.VideoItems.Find(vid.Id);
           if (dbVid != null) { dbVid.LastPlayedUtc = DateTime.UtcNow; ctx2.SaveChanges(); }
-          lock (_videoLock)
+          _videoLock.EnterWriteLock();
+          try
           {
             var memVid = this.videoItems.FirstOrDefault(v => v.Id == vid.Id);
             if (memVid != null) memVid.LastPlayedUtc = DateTime.UtcNow;
           }
+          finally { _videoLock.ExitWriteLock(); }
         }
 
         if (OnLiveVideoChanged != null)
@@ -224,15 +229,17 @@ namespace vrScraper.Services
 
       context.SaveChanges();
 
-      lock (_videoLock)
+      _videoLock.EnterWriteLock();
+      try
       {
-        var memVid = this.videoItems.Where(a => a.Id == vid.Id).FirstOrDefault();
+        var memVid = this.videoItems.FirstOrDefault(a => a.Id == vid.Id);
         if (memVid != null)
         {
           memVid.Liked = vid.Liked;
           memVid.Disliked = vid.Disliked;
         }
       }
+      finally { _videoLock.ExitWriteLock(); }
 
       return vid;
     }
@@ -261,7 +268,8 @@ namespace vrScraper.Services
         await context.SaveChangesAsync();
 
         // Aktualisieren des Videos im Speicher-Cache
-        lock (_videoLock)
+        _videoLock.EnterWriteLock();
+        try
         {
           var memVid = this.videoItems.FirstOrDefault(a => a.Id == id);
           if (memVid != null)
@@ -273,6 +281,7 @@ namespace vrScraper.Services
             }
           }
         }
+        finally { _videoLock.ExitWriteLock(); }
 
         return true;
       }
@@ -294,7 +303,8 @@ namespace vrScraper.Services
       video.LocalRating = rating;
       await context.SaveChangesAsync();
 
-      lock (_videoLock)
+      _videoLock.EnterWriteLock();
+      try
       {
         var memVideo = videoItems.FirstOrDefault(v => v.Id == id);
         if (memVideo != null)
@@ -302,6 +312,7 @@ namespace vrScraper.Services
           memVideo.LocalRating = rating;
         }
       }
+      finally { _videoLock.ExitWriteLock(); }
 
       logger.LogInformation("Rating for video {id} updated to {rating}", id, rating);
       return true;
@@ -324,7 +335,8 @@ namespace vrScraper.Services
       await context.SaveChangesAsync();
 
       // Update video in memory
-      lock (_videoLock)
+      _videoLock.EnterWriteLock();
+      try
       {
         var memVideo = videoItems.FirstOrDefault(v => v.Id == id);
         if (memVideo != null)
@@ -332,6 +344,7 @@ namespace vrScraper.Services
           memVideo.ErrorCount = video.ErrorCount;
         }
       }
+      finally { _videoLock.ExitWriteLock(); }
 
       logger.LogWarning("Fehler für Video-ID {0} erhöht auf {1}", id, video.ErrorCount);
       return true;
@@ -340,10 +353,9 @@ namespace vrScraper.Services
     public async Task DeleteVideo(long id)
     {
       DbVideoItem? video;
-      lock (_videoLock)
-      {
-        video = videoItems.Where(a => a.Id == id).FirstOrDefault();
-      }
+      _videoLock.EnterReadLock();
+      try { video = videoItems.FirstOrDefault(a => a.Id == id); }
+      finally { _videoLock.ExitReadLock(); }
       if (video == null) return;
 
       using var scope = serviceProvider.CreateScope();
@@ -352,11 +364,9 @@ namespace vrScraper.Services
       context.VideoItems.Remove(video);
       await context.SaveChangesAsync();
 
-      // Entferne das Video auch aus dem Cache
-      lock (_videoLock)
-      {
-        videoItems.RemoveAll(v => v.Id == id);
-      }
+      _videoLock.EnterWriteLock();
+      try { videoItems.RemoveAll(v => v.Id == id); }
+      finally { _videoLock.ExitWriteLock(); }
 
       logger.LogInformation($"Video with ID {id} deleted");
     }
@@ -389,7 +399,8 @@ namespace vrScraper.Services
           context.SaveChanges();
 
           // Aktualisiere In-Memory-Cache
-          lock (_videoLock)
+          _videoLock.EnterWriteLock();
+          try
           {
             var memVid = this.videoItems.FirstOrDefault(v => v.Id == currentVideoId);
             if (memVid != null)
@@ -398,6 +409,7 @@ namespace vrScraper.Services
               memVid.PlayDurationEst = video.PlayDurationEst;
             }
           }
+          finally { _videoLock.ExitWriteLock(); }
 
           logger.LogInformation("Finished playback for video {0}. PlayCount: {1}, Total PlayDuration: {2}",
               video.Id, video.PlayCount, video.PlayDurationEst);

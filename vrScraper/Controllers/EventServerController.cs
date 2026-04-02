@@ -44,12 +44,29 @@ namespace vrScraper.Controllers
       // Clean up stale sessions (since CLOSE never comes from HereSphere)
       CleanupStaleSessions();
 
-      // Resolve SessionId from active session (if exists)
+      // For OPEN events, create session first so we can save the SessionId with the event
       string? sessionId = null;
-      if (_sessions.TryGetValue(videoId, out var existingSession))
+      if (model.Event == 0)
+      {
+        var newSessionId = Guid.NewGuid().ToString();
+        var session = new PlaybackSession
+        {
+          VideoId = videoId,
+          SessionId = newSessionId,
+          OpenedUtc = utcTimestamp,
+          LastPlayStartUtc = null,
+          AccumulatedPlayTime = TimeSpan.Zero,
+          LastTimeMs = 0
+        };
+        _sessions[videoId] = session;
+        sessionId = newSessionId;
+      }
+      else if (_sessions.TryGetValue(videoId, out var existingSession))
+      {
         sessionId = existingSession.SessionId;
+      }
 
-      // Log event to DB
+      // Log event to DB (SessionId is always set correctly now)
       try
       {
         using var scope = serviceProvider.CreateScope();
@@ -80,38 +97,6 @@ namespace vrScraper.Controllers
       switch (model.Event)
       {
         case 0: // Open
-          var newSessionId = Guid.NewGuid().ToString();
-          var session = new PlaybackSession
-          {
-            VideoId = videoId,
-            SessionId = newSessionId,
-            OpenedUtc = utcTimestamp,
-            LastPlayStartUtc = null,
-            AccumulatedPlayTime = TimeSpan.Zero,
-            LastTimeMs = 0
-          };
-          _sessions[videoId] = session;
-
-          // Update the just-saved event with the new SessionId (it was saved before session creation)
-          try
-          {
-            using var scope = serviceProvider.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
-            var lastEvent = context.PlaybackEvents
-              .Where(e => e.VideoId == videoId && e.EventType == 0 && e.SessionId == null)
-              .OrderByDescending(e => e.Id)
-              .FirstOrDefault();
-            if (lastEvent != null)
-            {
-              lastEvent.SessionId = newSessionId;
-              await context.SaveChangesAsync();
-            }
-          }
-          catch (Exception ex)
-          {
-            logger.LogError(ex, "EventServer: Error updating SessionId for OPEN event");
-          }
-
           // Update VideoEngagement.OpenCount (NO SetPlayedVideo — that comes from HereSphere.Detail)
           await UpdateEngagement(videoId, engagement =>
           {
@@ -119,7 +104,7 @@ namespace vrScraper.Controllers
             engagement.LastSessionUtc = utcTimestamp;
           });
 
-          logger.LogDebug("[EVENT] Session created for video {VideoId} (session {SessionId})", videoId, newSessionId);
+          logger.LogDebug("[EVENT] Session created for video {VideoId} (session {SessionId})", videoId, sessionId);
           break;
 
         case 1: // Play (= Scrub position update)
@@ -127,20 +112,24 @@ namespace vrScraper.Controllers
           {
             playSession.LastPlayStartUtc = utcTimestamp;
 
-            // Update VideoEngagement: scrub count, backward detection, coverage
             var currentTimeMs = model.Time;
             var previousTimeMs = playSession.LastTimeMs;
+
+            // Pre-compute coverage outside the sync delegate
+            var video = await videoService.GetVideoById(videoId);
+            double? coverageAtPosition = null;
+            if (video != null && video.Duration.TotalMilliseconds > 0)
+              coverageAtPosition = Math.Min(1.0, currentTimeMs / video.Duration.TotalMilliseconds);
 
             await UpdateEngagement(videoId, engagement =>
             {
               engagement.ScrubEventCount += 1;
 
-              // Backward scrub detection (threshold: 5 seconds)
               if (previousTimeMs - currentTimeMs > 5000)
                 engagement.BackwardScrubCount += 1;
 
-              // Coverage: max position reached / video duration
-              UpdateCoverage(engagement, currentTimeMs, videoId);
+              if (coverageAtPosition.HasValue && coverageAtPosition.Value > engagement.ScrubCoveragePercent)
+                engagement.ScrubCoveragePercent = coverageAtPosition.Value;
             });
 
             playSession.LastTimeMs = currentTimeMs;
@@ -206,18 +195,6 @@ namespace vrScraper.Controllers
       {
         logger.LogError(ex, "EventServer: Error updating VideoEngagement for {VideoId}", videoId);
       }
-    }
-
-    private void UpdateCoverage(DbVideoEngagement engagement, double timeMs, long videoId)
-    {
-      // Get video duration from in-memory cache
-      var video = videoService.GetVideoById(videoId).Result;
-      if (video == null || video.Duration.TotalMilliseconds <= 0)
-        return;
-
-      var coverageAtPosition = timeMs / video.Duration.TotalMilliseconds;
-      if (coverageAtPosition > engagement.ScrubCoveragePercent)
-        engagement.ScrubCoveragePercent = Math.Min(1.0, coverageAtPosition);
     }
 
     private void CleanupStaleSessions()

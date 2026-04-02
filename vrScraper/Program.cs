@@ -178,7 +178,13 @@ namespace vrScraper
       // Enable CORS
       app.UseCors("AllowAll");
 
-      app.UseStaticFiles();
+      app.UseStaticFiles(new StaticFileOptions
+      {
+        OnPrepareResponse = ctx =>
+        {
+          ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=604800"; // 7 days
+        }
+      });
 
       app.UseRouting();
       app.UseAuthentication();
