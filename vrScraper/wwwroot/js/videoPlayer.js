@@ -5,6 +5,10 @@ let currentVideoId = null;
 let savedVolume = localStorage.getItem('vrPlayerVolume') ? parseFloat(localStorage.getItem('vrPlayerVolume')) : 0.7;
 let savedMuted = localStorage.getItem('vrPlayerMuted') === 'true';
 
+function setPlayerOpen(value) {
+    window._vrPlayerOpen = value;
+}
+
 function registerPlayerErrorCallback(dotnetRef) {
     dotNetRef = dotnetRef;
     console.log("Callback-Referenz registriert");

@@ -820,10 +820,8 @@ namespace vrScraper.Services
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
-      // Nur Videos ohne Fehler und ohne Abspielzählung prüfen
       var items = await context.VideoItems
           .OrderByDescending(a => a.Id)
-          .Where(x => x.PlayCount < 1)
           .ToListAsync(cancellationToken);
 
       var totalCount = items.Count;

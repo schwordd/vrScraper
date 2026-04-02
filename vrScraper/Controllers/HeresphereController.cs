@@ -127,7 +127,7 @@ namespace vrScraper.Controllers
       // Handle rating write-back
       if (model.Rating.HasValue)
       {
-        foundVideo.LocalRating = model.Rating.Value / 5.0;
+        foundVideo.LocalRating = Math.Clamp(model.Rating.Value, 0, 5) / 5.0;
         await videoService.UpdateVideoRating(foundVideo.Id, foundVideo.LocalRating.Value);
         logger.LogInformation("HereSphere rating update for video {videoId}: {rating}", videoId, foundVideo.LocalRating);
       }

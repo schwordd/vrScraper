@@ -832,6 +832,8 @@
         var videoToRemove = VideoItems.FirstOrDefault(v => v.Id == videoId);
         if (videoToRemove != null)
         {
+            _videoItems.Remove(videoToRemove);
+
             // Aktualisiere die Tag- und Star-Zähler
             foreach (var tag in videoToRemove.Tags)
             {
@@ -936,7 +938,7 @@
         StateHasChanged();
     }
 
-    private async void HandleImageError(Microsoft.AspNetCore.Components.Web.ErrorEventArgs e, DbVideoItem item)
+    private async Task HandleImageError(Microsoft.AspNetCore.Components.Web.ErrorEventArgs e, DbVideoItem item)
     {
         item.Thumbnail = "/images/thumbnail-not-available.svg";
         item.IsThumbnailNotAvailable = true;
@@ -948,7 +950,7 @@
 
     private async Task HandleImageErrorFromCard((Microsoft.AspNetCore.Components.Web.ErrorEventArgs Error, DbVideoItem Item) args)
     {
-        HandleImageError(args.Error, args.Item);
+        await HandleImageError(args.Error, args.Item);
     }
 
     private async Task DownloadVideo(DbVideoItem item)

@@ -16,6 +16,11 @@ namespace vrScraper.Services
       // Apply global tag blacklist
       allItems = allItems.Where(item => !item.Tags.Exists(a => globalBlackList.Any(b => b == a.Name))).ToList();
 
+      List<string> SafeDeserializeList(string? json) {
+        try { return JsonConvert.DeserializeObject<List<string>>(json ?? "[]") ?? new List<string>(); }
+        catch { return new List<string>(); }
+      }
+
       using var scope = scopeFactory.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
@@ -59,7 +64,8 @@ namespace vrScraper.Services
             {
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
               var k = 16000;
-              var averageRating = allItems.Where(a => a.SiteRating.HasValue).Average(a => a.SiteRating);
+              var ratedItems = allItems.Where(a => a.SiteRating.HasValue);
+              var averageRating = ratedItems.Any() ? ratedItems.Average(a => a.SiteRating) : 0.5;
 
               var list = allUnwatched.Where(a => a.Views.HasValue && a.SiteRating.HasValue).OrderByDescending(a =>
                       ((a.Views!.Value / (double)(a.Views.Value + k)) * a.SiteRating!.Value) +
@@ -78,7 +84,8 @@ namespace vrScraper.Services
             {
               var allUnwatched = allItems.Where(x => x.PlayCount == 0);
               var k = 16000;
-              var averageRating = allItems.Where(a => a.SiteRating.HasValue).Average(a => a.SiteRating);
+              var ratedItems2 = allItems.Where(a => a.SiteRating.HasValue);
+              var averageRating = ratedItems2.Any() ? ratedItems2.Average(a => a.SiteRating) : 0.5;
 
               var list = allUnwatched.Where(a => a.Views.HasValue && a.SiteRating.HasValue).OrderByDescending(a =>
                       ((a.Views!.Value / (double)(a.Views.Value + k)) * a.SiteRating!.Value) +
@@ -107,18 +114,18 @@ namespace vrScraper.Services
 
             var matchingItems = allItems.AsQueryable();
 
-            var siteFilter = JsonConvert.DeserializeObject<List<string>>(t.SiteFilter ?? "[]") ?? new List<string>();
+            var siteFilter = SafeDeserializeList(t.SiteFilter);
             if (siteFilter.Any())
             {
               matchingItems = matchingItems.Where(v => siteFilter.Contains(v.Site));
             }
 
-            var tagsWL = JsonConvert.DeserializeObject<List<string>>(t.TagWhitelist) ?? new List<string>();
-            var tagsBL = JsonConvert.DeserializeObject<List<string>>(t.TagBlacklist) ?? new List<string>();
-            var acctressWL = JsonConvert.DeserializeObject<List<string>>(t.ActressWhitelist) ?? new List<string>();
-            var acctressBL = JsonConvert.DeserializeObject<List<string>>(t.ActressBlacklist) ?? new List<string>();
-            var videoWl = JsonConvert.DeserializeObject<List<string>>(t.VideoWhitelist) ?? new List<string>();
-            var videoBl = JsonConvert.DeserializeObject<List<string>>(t.VideoBlacklist) ?? new List<string>();
+            var tagsWL = SafeDeserializeList(t.TagWhitelist);
+            var tagsBL = SafeDeserializeList(t.TagBlacklist);
+            var acctressWL = SafeDeserializeList(t.ActressWhitelist);
+            var acctressBL = SafeDeserializeList(t.ActressBlacklist);
+            var videoWl = SafeDeserializeList(t.VideoWhitelist);
+            var videoBl = SafeDeserializeList(t.VideoBlacklist);
 
             foreach (var item in tagsWL)
               matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.Name == item));
@@ -145,7 +152,8 @@ namespace vrScraper.Services
             }
 
             var kCustom = 16000;
-            var averageRatingCustom = matchingItems.Where(a => a.SiteRating.HasValue).Average(a => a.SiteRating);
+            var ratedCustomItems = matchingItems.Where(a => a.SiteRating.HasValue);
+            var averageRatingCustom = ratedCustomItems.Any() ? ratedCustomItems.Average(a => a.SiteRating) : 0.5;
 
             var customList = matchingItems
                 .Where(a => a.Views.HasValue && a.SiteRating.HasValue)
@@ -160,14 +168,14 @@ namespace vrScraper.Services
             break;
 
           case "WATCHLIST":
-            var wlSiteFilter = JsonConvert.DeserializeObject<List<string>>(t.SiteFilter ?? "[]") ?? new List<string>();
+            var wlSiteFilter = SafeDeserializeList(t.SiteFilter);
             var wlItems = allItems;
             if (wlSiteFilter.Any())
             {
               wlItems = wlItems.Where(v => wlSiteFilter.Contains(v.Site)).ToList();
             }
 
-            var wlVideoIds = JsonConvert.DeserializeObject<List<string>>(t.VideoWhitelist);
+            var wlVideoIds = SafeDeserializeList(t.VideoWhitelist);
             if (wlVideoIds != null && wlVideoIds.Any())
             {
               var wlIdSet = wlVideoIds.Select(v => Convert.ToInt64(v)).ToHashSet();

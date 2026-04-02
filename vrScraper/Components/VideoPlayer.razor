@@ -2,6 +2,7 @@
 @using vrScraper.DB
 @using vrScraper.DB.Models
 @using vrScraper.Services
+@implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject IScraperRegistry scraperRegistry
 @inject VrScraperContext context
@@ -179,7 +180,7 @@
             StateHasChanged();
 
             // Flag sofort setzen damit Page-Keyboard-Handler blockiert wird
-            await JSRuntime.InvokeVoidAsync("eval", "window._vrPlayerOpen = true");
+            await JSRuntime.InvokeVoidAsync("setPlayerOpen", true);
 
             // Video-Quelle abrufen
             var foundVideo = await context.VideoItems
