@@ -112,13 +112,13 @@ namespace vrScraper.Services
           if (count > prevalenceThreshold)
             tagAffinity.Remove(key);
           else
-            tagAffinity[key] = tagAffinity[key] / count / (1.0 + 0.15 * Math.Log(totalVideos / count));
+            tagAffinity[key] = tagAffinity[key] / count / (1.0 + 0.15 * Math.Log(Math.Max(1.0, totalVideos / (double)count)));
         }
       }
       foreach (var key in starAffinity.Keys.ToList())
       {
         if (starCounts.TryGetValue(key, out int count) && count > 0)
-          starAffinity[key] = starAffinity[key] / count / (1.0 + 0.15 * Math.Log(totalVideos / count));
+          starAffinity[key] = starAffinity[key] / count / (1.0 + 0.15 * Math.Log(Math.Max(1.0, totalVideos / (double)count)));
       }
 
       return (tagAffinity, starAffinity);
@@ -162,8 +162,13 @@ namespace vrScraper.Services
 
       if (tagAffinity.Count == 0 && starAffinity.Count == 0)
       {
-        _logger.LogDebug("No signal videos found, returning empty recommendations");
-        return new List<ScoredVideo>();
+        _logger.LogDebug("No signal videos found, returning top-rated unwatched videos as fallback");
+        return allItems
+          .Where(v => !v.Disliked && v.PlayCount == 0)
+          .OrderByDescending(v => v.SiteRating ?? 0)
+          .Take(limit)
+          .Select(v => new ScoredVideo(v, v.SiteRating ?? 0, "top-rated"))
+          .ToList();
       }
 
       _logger.LogDebug("Computing recommendations from {TagCount} tag affinities, {StarCount} star affinities",

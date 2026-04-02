@@ -346,7 +346,7 @@
         for (int i = 0; i < newOrder.Length; i++)
         {
             var tab = AvailableTabs.FirstOrDefault(t => t.Id == newOrder[i]);
-            if (tab != null)
+            if (tab != null && tab.Type != "DEFAULT")
             {
                 tab.Order = i;
                 tab.IsDirty = true;

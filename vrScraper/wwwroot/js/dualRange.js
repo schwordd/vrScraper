@@ -8,6 +8,14 @@ window.dualRange = {
         const minLabel = el.querySelector('.dual-range-label-min');
         const maxLabel = el.querySelector('.dual-range-label-max');
 
+        // Clean up previous handlers if re-initializing
+        if (minInput._inputHandler) minInput.removeEventListener('input', minInput._inputHandler);
+        if (minInput._commitHandler) minInput.removeEventListener('mouseup', minInput._commitHandler);
+        if (minInput._touchCommit) minInput.removeEventListener('touchend', minInput._touchCommit);
+        if (maxInput._inputHandler) maxInput.removeEventListener('input', maxInput._inputHandler);
+        if (maxInput._commitHandler) maxInput.removeEventListener('mouseup', maxInput._commitHandler);
+        if (maxInput._touchCommit) maxInput.removeEventListener('touchend', maxInput._touchCommit);
+
         function updateFill() {
             const lo = parseInt(minInput.value);
             const hi = parseInt(maxInput.value);
@@ -18,28 +26,35 @@ window.dualRange = {
             maxLabel.textContent = hi < max ? hi + 'm' : 'Max';
         }
 
-        minInput.addEventListener('input', function () {
+        minInput._inputHandler = function () {
             if (parseInt(minInput.value) >= parseInt(maxInput.value) - step) {
                 minInput.value = parseInt(maxInput.value) - step;
             }
             updateFill();
-        });
+        };
+        minInput.addEventListener('input', minInput._inputHandler);
 
-        maxInput.addEventListener('input', function () {
+        maxInput._inputHandler = function () {
             if (parseInt(maxInput.value) <= parseInt(minInput.value) + step) {
                 maxInput.value = parseInt(minInput.value) + step;
             }
             updateFill();
-        });
+        };
+        maxInput.addEventListener('input', maxInput._inputHandler);
 
         function commit() {
             dotNetRef.invokeMethodAsync('OnSliderCommit', parseInt(minInput.value), parseInt(maxInput.value));
         }
 
-        minInput.addEventListener('mouseup', commit);
-        minInput.addEventListener('touchend', commit);
-        maxInput.addEventListener('mouseup', commit);
-        maxInput.addEventListener('touchend', commit);
+        minInput._commitHandler = commit;
+        minInput._touchCommit = commit;
+        minInput.addEventListener('mouseup', minInput._commitHandler);
+        minInput.addEventListener('touchend', minInput._touchCommit);
+
+        maxInput._commitHandler = commit;
+        maxInput._touchCommit = commit;
+        maxInput.addEventListener('mouseup', maxInput._commitHandler);
+        maxInput.addEventListener('touchend', maxInput._touchCommit);
 
         // Set initial values
         minInput.value = minVal;

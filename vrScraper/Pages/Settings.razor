@@ -1,6 +1,6 @@
 @page "/settings"
 
-@using System.Text.Json
+@using Newtonsoft.Json
 @using System.Text.RegularExpressions
 @using vrScraper.DB.Models
 @using vrScraper.Components
@@ -179,14 +179,14 @@
         {
             var s = AllSettings.FirstOrDefault(s => s.Key == "TagBlacklist");
             if (s == null) return Enumerable.Empty<string>();
-            return JsonSerializer.Deserialize<List<string>>(s.Value ?? "[]") ?? new List<string>();
+            return JsonConvert.DeserializeObject<List<string>>(s.Value ?? "[]") ?? new List<string>();
         }
 
         set
         {
             var s = AllSettings.FirstOrDefault(s => s.Key == "TagBlacklist");
             if (s == null) return;
-            s.Value = JsonSerializer.Serialize(value);
+            s.Value = JsonConvert.SerializeObject(value);
             this.SettingService.UpdateSetting(s);
         }
     }

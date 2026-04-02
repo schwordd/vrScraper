@@ -477,8 +477,8 @@ window.networkGraph = {
             sel.call(this._zoom.transform, this._transform);
         }
 
-        // Hover
-        canvas.addEventListener('mousemove', function (e) {
+        // Hover — store references for cleanup in dispose()
+        this._onMouseMove = function (e) {
             if (self._dragNode) return;
             var rect = canvas.getBoundingClientRect();
             var mx = e.clientX - rect.left;
@@ -505,21 +505,24 @@ window.networkGraph = {
                 canvas.style.cursor = found ? 'pointer' : 'default';
                 self._needsRedraw = true;
             }
-        });
+        };
+        canvas.addEventListener('mousemove', this._onMouseMove);
 
-        canvas.addEventListener('mouseleave', function () {
+        this._onMouseLeave = function () {
             if (self._hoverNode) {
                 self._hoverNode = null;
                 canvas.style.cursor = 'default';
                 self._needsRedraw = true;
             }
-        });
+        };
+        canvas.addEventListener('mouseleave', this._onMouseLeave);
 
-        canvas.addEventListener('click', function () {
+        this._onClick = function () {
             if (self._hoverNode && self._dotNetRef) {
                 self._dotNetRef.invokeMethodAsync('OnNodeClicked', self._hoverNode.id);
             }
-        });
+        };
+        canvas.addEventListener('click', this._onClick);
 
         // Drag
         sel.call(d3.drag()
@@ -582,7 +585,15 @@ window.networkGraph = {
         if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
         if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
         if (this._sim) { this._sim.stop(); this._sim = null; }
-        if (this._canvas && this._canvas.parentNode) this._canvas.parentNode.removeChild(this._canvas);
+        if (this._canvas) {
+            if (this._onMouseMove) this._canvas.removeEventListener('mousemove', this._onMouseMove);
+            if (this._onMouseLeave) this._canvas.removeEventListener('mouseleave', this._onMouseLeave);
+            if (this._onClick) this._canvas.removeEventListener('click', this._onClick);
+            d3.select(this._canvas).on('.zoom', null);
+            d3.select(this._canvas).on('.drag', null);
+            if (this._canvas.parentNode) this._canvas.parentNode.removeChild(this._canvas);
+        }
+        this._onMouseMove = null; this._onMouseLeave = null; this._onClick = null;
         this._canvas = null; this._ctx = null; this._nodes = null;
         this._simLinks = null; this._hoverLinks = null;
         this._neighbors = null; this._neighborLinks = null;
