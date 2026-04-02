@@ -2,6 +2,8 @@ using vrScraper.Controllers.Models.HereSphere;
 using vrScraper.DB;
 using vrScraper.DB.Models;
 using vrScraper.Services;
+using vrScraper.Services.Interfaces;
+using vrScraper.Scrapers.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;

@@ -1,5 +1,6 @@
 using vrScraper.DB.Models;
 using vrScraper.DB;
+using vrScraper.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace vrScraper.Services

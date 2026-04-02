@@ -1,4 +1,5 @@
 using vrScraper.DB.Models;
+using vrScraper.Services.Interfaces;
 
 namespace vrScraper.Services
 {

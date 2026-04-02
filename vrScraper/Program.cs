@@ -1,7 +1,12 @@
 using Scalar.AspNetCore;
 using vrScraper.DB;
 using vrScraper.DB.Seed;
+using vrScraper.Normalization;
+using vrScraper.Normalization.Interfaces;
 using vrScraper.Services;
+using vrScraper.Services.Interfaces;
+using vrScraper.Scrapers;
+using vrScraper.Scrapers.Interfaces;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;

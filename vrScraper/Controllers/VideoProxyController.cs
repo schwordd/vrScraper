@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using vrScraper.DB;
 using vrScraper.DB.Models;
 using vrScraper.Services;
+using vrScraper.Services.Interfaces;
+using vrScraper.Scrapers.Interfaces;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net;

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using vrScraper.Services;
+using vrScraper.Services.Interfaces;
 
 namespace vrScraper.Controllers;
 

@@ -133,7 +133,9 @@
       "Bash(git log:*)",
       "Bash(git show:*)",
       "Bash(ls -la /d/Source/vrScraper/vrScraper/Services/*Recommendation*)",
-      "Bash(ls -la /d/Source/vrScraper/vrScraper/DB/Models/DbVideo*)"
+      "Bash(ls -la /d/Source/vrScraper/vrScraper/DB/Models/DbVideo*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   }

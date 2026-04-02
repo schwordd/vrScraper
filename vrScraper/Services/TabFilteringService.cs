@@ -1,5 +1,6 @@
 using vrScraper.DB;
 using vrScraper.DB.Models;
+using vrScraper.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 
