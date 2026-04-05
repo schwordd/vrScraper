@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.2.4 (2026-04-05)
+- Add automated changelog generation and README overhaul
+- Fix scrape logging, live page stop, recommendations, filter UI polish, auth guard, player improvements
+
 ## v1.2.3 (2026-04-05)
 - Restructure project: extract Scrapers/ and Normalization/ from Services/, move interfaces to subfolders, extract CharacterMappings, remove legacy CSS
 - Add focus-visible states, mobile responsiveness, reduced-motion support, design token colors, localStorage safety
