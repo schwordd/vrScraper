@@ -5,7 +5,9 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'vrScraper/VERSION'  # Ignore commits that only change the VERSION file
+      - 'vrScraper/VERSION'
+      - 'CHANGELOG.md'
+      - 'readme.md'
 
 jobs:
   release:
@@ -58,11 +60,17 @@ jobs:
         echo "Updating version file..."
         echo "$NEXT_VERSION" > vrScraper/VERSION
 
-    - name: Commit updated version file
+    - name: Generate changelog entry
+      run: python3 .github/scripts/update_changelog.py
+
+    - name: Embed changelog in README
+      run: python3 .github/scripts/embed_changelog.py
+
+    - name: Commit updated version and changelog
       env:
-        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}  # Use PAT instead of the default GITHUB_TOKEN
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
-        git add vrScraper/VERSION
+        git add vrScraper/VERSION CHANGELOG.md readme.md
         git commit -m "Update version to $NEXT_VERSION"
         git push origin master
 
@@ -96,7 +104,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
-        gh release create v${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} --title "Release v${{ env.NEXT_VERSION }}" --notes "Automated release for version v${{ env.NEXT_VERSION }}"
+        gh release create v${{ env.NEXT_VERSION }} ${{ env.ZIP_NAME }} \
+          --title "Release v${{ env.NEXT_VERSION }}" \
+          --notes-file "${{ env.RELEASE_NOTES_FILE }}"
 
     # Docker Build und Push
     - name: Login to Docker Hub

@@ -1,63 +1,3 @@
-# VRScraper
-
-VR video metadata scraper with web UI and VR headset integration (DeoVR, HereSphere).
-
-> **Important Update Notice:**
-> If you are updating from a version < 1.0.15, **rename your database file** from `deovrscraper.db` to `vrscraper.db`.
-
-## Setup
-
-### Windows
-1. Download the latest [Release](https://github.com/schwordd/vrScraper/releases) (.zip) and extract it.
-2. (Optional) Edit `appsettings.json` to set a different port than 5001.
-3. Run `vrScraper.exe`.
-4. Open `http://[YOUR-IP]:[PORT]` in your browser.
-5. Start the scraper and scrape a few pages, reload the page when finished.
-6. Leave the application running.
-
-### Docker
-```bash
-docker pull schwordd/vrscraper:latest
-docker run -d -p 8080:5001 -v ./data:/app/data --restart unless-stopped schwordd/vrscraper:latest
-```
-Access the web UI at `http://[YOUR-IP]:8080`.
-
-### Docker Compose
-```yaml
-services:
-  vrscraper:
-    image: schwordd/vrscraper:latest
-    ports:
-      - "8080:5001"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - TZ=Europe/Berlin
-    restart: unless-stopped
-```
-
-## Connecting a VR Headset
-
-### HereSphere (Recommended)
-In the HereSphere browser, open `http://[YOUR-IP]:[PORT]/heresphere`
-
-### DeoVR
-In the DeoVR browser, open `http://[YOUR-IP]:[PORT]/deovr`
-
-## Updating
-1. Backup `appsettings.json` and `vrscraper.db`.
-2. Download the latest release and replace the old files.
-3. Restore your backed-up files.
-
-## Development
-```bash
-dotnet run --project vrScraper                           # Run in dev mode
-dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
-```
-
-## Changelog
-
-<!-- CHANGELOG:START -->
 # Changelog
 
 ## Unreleased
@@ -112,5 +52,3 @@ dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
 
 ## v1.0.0 (2024-08-30)
 - Initial release
-
-<!-- CHANGELOG:END -->
