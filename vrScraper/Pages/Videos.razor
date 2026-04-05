@@ -26,44 +26,46 @@
                            placeholder="Search title..."
                            @bind="SearchQuery"
                            @bind:event="oninput" />
+                    <button class="btn btn-sm btn-clear"
+                            disabled="@string.IsNullOrEmpty(_searchQuery)"
+                            @onclick="() => SearchQuery = string.Empty" title="Clear search">
+                        <i class="icon-x"></i>
+                    </button>
                 </div>
             </span>
 
             <span class="filter-item">
-                <label>Sort:</label>
-                <select class="form-select filter-select" @bind="CurrentSortOption" title="Choose how videos are ordered">
-                    <option value="latest">Latest</option>
-                    <option value="recommended">Recommended</option>
-                    <option value="bestunwatched">Best unwatched</option>
-                    <option value="rating">Rating</option>
-                    <option value="random">Random</option>
-                    <option value="playtime">Most played time</option>
-                    <option value="playcount">Most played count</option>
-                    <option value="recentlywatched">Recently watched</option>
-                </select>
+                <MultiSelect TItem="(string Value, string Label)"
+                             Data="@_sortOptions"
+                             TextField="@(item => item.Label)"
+                             ValueField="@(item => item.Value)"
+                             Placeholder="Sort..."
+                             @bind-Value="@CurrentSortOption" />
+                <span class="btn-clear-spacer"></span>
             </span>
 
-            <span class="filter-separator"></span>
 
-            <span class="filter-item" title="Show only videos you have liked">
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyLiked" id="showLikedCheck">
-                    <label class="form-check-label" for="showLikedCheck">Liked</label>
-                </div>
-            </span>
+            <span class="filter-toggle-group">
+                <span class="filter-item" title="Show only videos you have liked">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" @bind="ShowOnlyLiked" id="showLikedCheck">
+                        <label class="form-check-label" for="showLikedCheck">Liked</label>
+                    </div>
+                </span>
 
-            <span class="filter-item" title="Show only videos you haven't watched yet">
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyUnwatched" id="showUnwatchedCheck">
-                    <label class="form-check-label" for="showUnwatchedCheck">Unwatched</label>
-                </div>
-            </span>
+                <span class="filter-item" title="Show only videos you haven't watched yet">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" @bind="ShowOnlyUnwatched" id="showUnwatchedCheck">
+                        <label class="form-check-label" for="showUnwatchedCheck">Unwatched</label>
+                    </div>
+                </span>
 
-            <span class="filter-item" title="Show only videos with playback errors (e.g. broken streams or missing files)">
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
-                    <label class="form-check-label" for="showErrorsCheck">Errors</label>
-                </div>
+                <span class="filter-item" title="Show only videos with playback errors (e.g. broken streams or missing files)">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" @bind="ShowOnlyWithErrors" id="showErrorsCheck">
+                        <label class="form-check-label" for="showErrorsCheck">Errors</label>
+                    </div>
+                </span>
             </span>
 
             <span class="filter-item-count">@TotalItems videos</span>
@@ -71,14 +73,14 @@
 
         <div class="filter-row">
             <span class="filter-item">
-                <label>Tags:</label>
-                <div class="d-flex align-items-center gap-2">
+                <div class="filter-item-controls">
                     <MultiSelect IsMultiple="true"
                                     TItem="(DbTag Tag, long Count)"
                                     Data="@SortedTags"
                                     TextField="@((item) => $"{item.Tag.Name} ({item.Count})")"
                                     ValueField="@((item) => item.Tag.Name)"
                                     ShowSearch="true"
+                                    Placeholder="Tags..."
                                     @bind-SelectedValues="@SelectedTagValues" />
                     <button class="btn btn-sm btn-clear" @onclick="ClearTags" disabled="@(SelectedTags.Count == 0)" title="Remove all selected tag filters">
                         <i class="icon-x"></i>
@@ -87,14 +89,14 @@
             </span>
 
             <span class="filter-item">
-                <label>Actresses:</label>
-                <div class="d-flex align-items-center gap-2">
+                <div class="filter-item-controls">
                     <MultiSelect IsMultiple="true"
                                     TItem="(DbStar Star, long Count)"
                                     Data="@SortedActresses"
                                     TextField="@((item) => $"{item.Star.Name} ({item.Count})")"
                                     ValueField="@((item) => item.Star.Name)"
                                     ShowSearch="true"
+                                    Placeholder="Actresses..."
                                     @bind-SelectedValues="@SelectedActressesValues" />
                     <button class="btn btn-sm btn-clear" @onclick="ClearActresses" disabled="@(SelectedActresses.Count == 0)" title="Remove all selected actress filters">
                         <i class="icon-x"></i>
@@ -105,10 +107,10 @@
             @if (AvailableSites.Count > 1)
             {
                 <span class="filter-item">
-                    <label>Site:</label>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="filter-item-controls">
                         <MultiSelect IsMultiple="true" TItem="string" Data="@AvailableSites"
                                         TextField="@((item) => item)" ValueField="@((item) => item)"
+                                        Placeholder="Site..."
                                         @bind-SelectedValues="@SelectedSitesValues" />
                         <button class="btn btn-sm btn-clear" @onclick="ClearSites" disabled="@(_selectedSites.Count == 0)" title="Remove all selected site filters">
                             <i class="icon-x"></i>
@@ -118,16 +120,13 @@
             }
 
             <span class="filter-item">
-                <label>Duration:</label>
                 <DualRangeSlider Min="0" Max="120" Step="5"
                                  @bind-MinValue="MinDurationMinutes"
                                  @bind-MaxValue="MaxDurationMinutes" />
             </span>
 
-            <span class="filter-separator"></span>
 
             <span class="filter-item watchlist-filter">
-                <label><i class="icon-bookmark"></i> Watchlist:</label>
                 @if (_isCreatingWatchlist)
                 {
                     <div class="watchlist-create-inline">
@@ -149,7 +148,7 @@
                                     Data="@WatchlistTabs"
                                     TextField="@((item) => item.Name)"
                                     ValueField="@((item) => item.Id.ToString())"
-                                    Placeholder="Select..."
+                                    Placeholder="Watchlist..."
                                     @bind-Value="@SelectedWatchlistValue" />
                     @if (_selectedWatchlistId > 0)
                     {
@@ -159,9 +158,26 @@
                             <i class="icon-filter"></i>
                         </button>
                     }
-                    <button class="btn btn-sm btn-outline-primary" @onclick="StartCreateWatchlist" title="Create a new watchlist">
-                        <i class="icon-plus"></i>
-                    </button>
+                    <div class="watchlist-menu-wrapper">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleWatchlistMenu" title="Watchlist options">
+                            <i class="icon-more-vertical"></i>
+                        </button>
+                        @if (_showWatchlistMenu)
+                        {
+                            <div class="watchlist-menu-backdrop" @onclick="() => _showWatchlistMenu = false"></div>
+                            <div class="watchlist-menu-dropdown">
+                                <button class="watchlist-menu-item" @onclick="StartCreateWatchlistFromMenu">
+                                    <i class="icon-plus"></i> New watchlist
+                                </button>
+                                @if (_selectedWatchlistId > 0)
+                                {
+                                    <button class="watchlist-menu-item watchlist-menu-item--danger" @onclick="RemoveWatchedFromWatchlistFromMenu">
+                                        <i class="icon-eye-off"></i> Remove watched
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
                 }
             </span>
         </div>
@@ -333,6 +349,18 @@
 
     private List<DbVideoItem> VideoItems => _videoItems;
     private string _currentSortOption = "latest";
+
+    private static readonly List<(string Value, string Label)> _sortOptions = new()
+    {
+        ("latest", "Latest"),
+        ("recommended", "Recommended"),
+        ("bestunwatched", "Best unwatched"),
+        ("rating", "Rating"),
+        ("random", "Random"),
+        ("playtime", "Most played time"),
+        ("playcount", "Most played count"),
+        ("recentlywatched", "Recently watched")
+    };
 
     private string _searchQuery = "";
     public string SearchQuery
@@ -671,11 +699,29 @@
 
     private bool _isCreatingWatchlist;
     private string _newWatchlistName = "";
+    private bool _showWatchlistMenu;
+
+    private void ToggleWatchlistMenu()
+    {
+        _showWatchlistMenu = !_showWatchlistMenu;
+    }
 
     private void StartCreateWatchlist()
     {
         _newWatchlistName = "";
         _isCreatingWatchlist = true;
+    }
+
+    private void StartCreateWatchlistFromMenu()
+    {
+        _showWatchlistMenu = false;
+        StartCreateWatchlist();
+    }
+
+    private async Task RemoveWatchedFromWatchlistFromMenu()
+    {
+        _showWatchlistMenu = false;
+        await RemoveWatchedFromWatchlist();
     }
 
     private async Task CreateWatchlistConfirm()
@@ -713,6 +759,28 @@
     private bool IsInSelectedWatchlist(long videoId)
     {
         return _selectedWatchlistVideoIds.Contains(videoId);
+    }
+
+    private async Task RemoveWatchedFromWatchlist()
+    {
+        if (_selectedWatchlistId == 0) return;
+
+        var watchedIds = _selectedWatchlistVideoIds
+            .Where(id => _videoItems.Any(v => v.Id == id && v.PlayCount > 0))
+            .ToHashSet();
+
+        if (watchedIds.Count == 0) return;
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Remove {watchedIds.Count} already watched video(s) from this watchlist?");
+        if (!confirmed) return;
+
+        var removed = await TabService.RemoveWatchedVideosFromWatchlist(_selectedWatchlistId, watchedIds);
+        if (removed > 0)
+        {
+            WatchlistTabs = TabService.GetWatchlistTabs();
+            UpdateWatchlistVideoIds();
+        }
     }
 
     private async Task ToggleWatchlist(long videoId)

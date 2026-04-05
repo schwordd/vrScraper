@@ -422,6 +422,21 @@ namespace vrScraper.Services
       if (scored.Count <= limit)
         return scored.OrderByDescending(s => s.Score).ToList();
 
+      // Build set of ubiquitous tags (>30% prevalence) — exclude from cluster suppression
+      double totalVideos = allItems.Count;
+      double prevalenceThreshold = totalVideos * 0.3;
+      var tagVideoCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      foreach (var video in allItems)
+        if (video.Tags != null)
+          foreach (var tag in video.Tags)
+          {
+            tagVideoCounts.TryGetValue(tag.Name, out int c);
+            tagVideoCounts[tag.Name] = c + 1;
+          }
+      var ubiquitousTags = new HashSet<string>(
+        tagVideoCounts.Where(kv => kv.Value > prevalenceThreshold).Select(kv => kv.Key),
+        StringComparer.OrdinalIgnoreCase);
+
       var sorted = scored.OrderByDescending(s => s.Score).ToList();
 
       var result = new List<ScoredVideo>();
@@ -438,8 +453,8 @@ namespace vrScraper.Services
         if (!ApplyPerformerRotation(item, starCounts, limit))
           continue;
 
-        // Tag-cluster suppression: skip if any tag is already in >70% of results (after first 20 items)
-        if (result.Count > 20 && IsTagOverRepresented(item, tagCounts, result.Count))
+        // Tag-cluster suppression: skip if any non-ubiquitous tag is already in >70% of results (after first 20 items)
+        if (result.Count > 20 && IsTagOverRepresented(item, tagCounts, result.Count, ubiquitousTags))
           continue;
 
         AddToResult(result, selectedIds, starCounts, tagCounts, item);
@@ -478,11 +493,12 @@ namespace vrScraper.Services
         }
     }
 
-    private static bool IsTagOverRepresented(ScoredVideo candidate, Dictionary<string, int> tagCounts, int resultCount)
+    private static bool IsTagOverRepresented(ScoredVideo candidate, Dictionary<string, int> tagCounts, int resultCount, HashSet<string> ubiquitousTags)
     {
       double threshold = resultCount * 0.7;
       return candidate.Video.Tags?.Any(t =>
       {
+        if (ubiquitousTags.Contains(t.Name)) return false;
         tagCounts.TryGetValue(t.Name, out int count);
         return count > threshold;
       }) ?? false;

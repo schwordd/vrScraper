@@ -50,6 +50,7 @@ namespace vrScraper.Scrapers
       // Check if any scraping is already running
       if (registry.GetAllScrapers().Any(s => s.ScrapingInProgress))
       {
+        _logger.LogDebug("Scheduled check skipped: scraping already in progress");
         return;
       }
 
@@ -61,6 +62,7 @@ namespace vrScraper.Scrapers
       {
         if (lastScrape.Date == now.Date)
         {
+          _logger.LogDebug("Scheduled check skipped: already scraped today (last: {Date})", lastScrape.ToString("yyyy-MM-dd"));
           return; // Already scraped today
         }
       }
@@ -84,22 +86,37 @@ namespace vrScraper.Scrapers
           var siteEnabledSetting = await settingService.GetSetting($"Site:{site}:Enabled");
           var siteEnabledDefault = site.Equals("eporner.com", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
           var siteEnabled = siteEnabledSetting?.Value ?? siteEnabledDefault;
-          if (!siteEnabled.Equals("true", StringComparison.OrdinalIgnoreCase)) continue;
+          if (!siteEnabled.Equals("true", StringComparison.OrdinalIgnoreCase))
+          {
+            _logger.LogDebug("Site {Site} skipped: not enabled", site);
+            continue;
+          }
 
           // Check per-site auto-scrape enabled
           var enabledSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeEnabled");
-          if (enabledSetting == null || !enabledSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase)) continue;
+          if (enabledSetting == null || !enabledSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase))
+          {
+            _logger.LogDebug("Site {Site} skipped: auto-scrape not enabled", site);
+            continue;
+          }
 
           // Check per-site scrape time
           var timeSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeTime");
           if (timeSetting == null || !TimeSpan.TryParse(timeSetting.Value, out TimeSpan siteScheduledTime))
+          {
+            _logger.LogDebug("Site {Site} skipped: no valid AutoScrapeTime setting", site);
             continue;
+          }
 
           var currentTime = now.TimeOfDay;
           var diff = (siteScheduledTime - currentTime).TotalMinutes;
           if (diff < 0) diff += 24 * 60;
           var timeDifference = Math.Min(diff, 24 * 60 - diff);
-          if (timeDifference > 60) continue; // Not time yet for this site
+          if (timeDifference > 60)
+          {
+            _logger.LogDebug("Site {Site} skipped: configured time {Configured} not within 60min of current UTC {Current}", site, siteScheduledTime, currentTime);
+            continue;
+          }
 
           // Get per-site max pages
           var maxPagesSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeMaxPages");

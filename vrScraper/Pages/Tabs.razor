@@ -65,7 +65,7 @@
             <div class="tab-list" id="custom-tabs-sortable">
                 @foreach (var tab in CustomTabs)
                 {
-                    <div class="tab-card" data-tab-id="@tab.Id">
+                    <div class="tab-card" data-tab-id="@tab.Id" id="tab-@tab.Id">
                         <div class="tab-card-header">
                             <div class="drag-handle" title="Drag to reorder">
                                 <i class="icon-grip-vertical"></i>
@@ -224,7 +224,7 @@
             <div class="tab-list" id="watchlist-tabs-sortable">
                 @foreach (var tab in WatchlistTabs)
                 {
-                    <div class="tab-card tab-card--watchlist" data-tab-id="@tab.Id">
+                    <div class="tab-card tab-card--watchlist" data-tab-id="@tab.Id" id="tab-@tab.Id">
                         <div class="tab-card-header">
                             <div class="drag-handle" title="Drag to reorder">
                                 <i class="icon-grip-vertical"></i>
@@ -324,6 +324,7 @@
     }
 
     private bool _sortableNeedsInit = true;
+    private long? _scrollToTabId;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -337,6 +338,14 @@
             _sortableNeedsInit = false;
             await JSRuntime.InvokeVoidAsync("tabSortable.init", "custom-tabs-sortable", _dotNetRef);
             await JSRuntime.InvokeVoidAsync("tabSortable.init", "watchlist-tabs-sortable", _dotNetRef);
+        }
+
+        if (_scrollToTabId.HasValue)
+        {
+            var id = _scrollToTabId.Value;
+            _scrollToTabId = null;
+            await JSRuntime.InvokeVoidAsync("eval",
+                $"document.getElementById('tab-{id}')?.scrollIntoView({{behavior:'smooth',block:'center'}})");
         }
     }
 
@@ -390,6 +399,7 @@
             };
 
         await TabService.AddTab(newTab);
+        _scrollToTabId = newTab.Id;
         await LoadTabs();
     }
 
@@ -411,6 +421,7 @@
             };
 
         await TabService.AddTab(newTab);
+        _scrollToTabId = newTab.Id;
         await LoadTabs();
     }
 

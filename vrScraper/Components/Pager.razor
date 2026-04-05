@@ -1,3 +1,5 @@
+@if (TotalPages > 1)
+{
 <div class="pager-info">
     <div class="pager">
         <button class="btn btn-sm btn-outline-primary" @onclick="OnPreviousPage" disabled="@IsFirstPage">
@@ -53,6 +55,7 @@
         <span class="text-muted small">per page</span>
     </div>
 </div>
+}
 
 @code {
     [Parameter] public int CurrentPage { get; set; }

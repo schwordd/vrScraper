@@ -4,10 +4,15 @@
     @if (IsMultiple)
     {
         <div class="multi-select-trigger" @onclick="Toggle">
-            @if (SelectedItems.Any())
+            @{ var selectedCount = SelectedItems.Count(); }
+            @if (selectedCount > MaxVisiblePills)
+            {
+                <span class="multi-select-summary">@selectedCount selected</span>
+            }
+            else if (selectedCount > 0)
             {
                 <div class="multi-select-pills">
-                    @foreach (var item in SelectedItems.Take(MaxVisiblePills))
+                    @foreach (var item in SelectedItems)
                     {
                         var val = ValueField(item);
                         <span class="multi-select-pill">
@@ -18,17 +23,13 @@
                             }
                         </span>
                     }
-                    @if (SelectedItems.Count() > MaxVisiblePills)
-                    {
-                        <span class="multi-select-pill multi-select-pill-more">+@(SelectedItems.Count() - MaxVisiblePills)</span>
-                    }
                 </div>
             }
             else
             {
                 <span class="multi-select-placeholder">@Placeholder</span>
             }
-            <span class="multi-select-arrow">&#9662;</span>
+            <svg class="multi-select-arrow" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
         </div>
     }
     else
@@ -44,7 +45,7 @@
             {
                 <span class="multi-select-placeholder">@Placeholder</span>
             }
-            <span class="multi-select-arrow">&#9662;</span>
+            <svg class="multi-select-arrow" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
         </div>
     }
 
@@ -96,7 +97,7 @@
     [Parameter] public bool ShowSearch { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public string Placeholder { get; set; } = "Select...";
-    [Parameter] public int MaxVisiblePills { get; set; } = 5;
+    [Parameter] public int MaxVisiblePills { get; set; } = 2;
 
     // Multi-select binding
     [Parameter] public IEnumerable<string>? SelectedValues { get; set; }
@@ -112,6 +113,7 @@
     private bool IsOpen { get; set; }
     private string SearchTerm { get; set; } = "";
     private ElementReference SearchInput;
+    private bool _shouldFocusSearch;
     private HashSet<string> _selectedValues = new();
 
     protected override void OnParametersSet()
@@ -134,7 +136,19 @@
     {
         if (Disabled) return;
         IsOpen = !IsOpen;
+        if (IsOpen && ShowSearch)
+            _shouldFocusSearch = true;
         if (!IsOpen) SearchTerm = "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldFocusSearch)
+        {
+            _shouldFocusSearch = false;
+            try { await SearchInput.FocusAsync(); }
+            catch { }
+        }
     }
 
     private void Close()

@@ -193,7 +193,7 @@ namespace vrScraper
       app.UseRouting();
       app.UseAuthentication();
       app.UseAuthorization();
-
+      app.UseMiddleware<vrScraper.Middleware.AuthGuardMiddleware>();
 
       // Map Blazor Hub (AllowAnonymous so login page works; Blazor handles auth via AuthorizeRouteView)
       app.MapBlazorHub().AllowAnonymous();

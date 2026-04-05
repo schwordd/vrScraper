@@ -164,6 +164,25 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
         window._vrPlayerKeyHandler = handlePlayerKeydown;
         document.addEventListener('keydown', window._vrPlayerKeyHandler, true);
 
+        // Mausrad-Handler für VR-Zoom (FOV)
+        const playerEl = player.el();
+        if (playerEl) {
+            if (window._vrWheelHandler) {
+                playerEl.removeEventListener('wheel', window._vrWheelHandler);
+            }
+            window._vrWheelHandler = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const vr = player.vr && player.vr();
+                const camera = vr && vr.camera;
+                if (camera) {
+                    camera.fov = Math.max(30, Math.min(110, camera.fov + (e.deltaY > 0 ? 3 : -3)));
+                    camera.updateProjectionMatrix();
+                }
+            };
+            playerEl.addEventListener('wheel', window._vrWheelHandler, { passive: false });
+        }
+
     } catch (error) {
         console.error('Fehler bei Player-Initialisierung:', error);
         if (dotNetRef) {
@@ -303,6 +322,12 @@ function disposeVRPlayer(keepOpen) {
         document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
         document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+
+        // Wheel-Handler entfernen
+        if (player && player.el() && window._vrWheelHandler) {
+            player.el().removeEventListener('wheel', window._vrWheelHandler);
+            window._vrWheelHandler = null;
+        }
 
         if (player) {
             player.dispose();

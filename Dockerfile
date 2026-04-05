@@ -19,5 +19,6 @@ RUN dotnet publish "vrScraper.csproj" -c Release -o /app/publish \
 
 FROM base AS final
 WORKDIR /app
+ENV TZ=Europe/Berlin
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "vrScraper.dll"]

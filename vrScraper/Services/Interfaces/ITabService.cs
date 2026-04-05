@@ -12,5 +12,6 @@ namespace vrScraper.Services.Interfaces
     List<DbVrTab> GetWatchlistTabs();
     Task AddVideoToWatchlist(long tabId, long videoId);
     Task RemoveVideoFromWatchlist(long tabId, long videoId);
+    Task<int> RemoveWatchedVideosFromWatchlist(long tabId, HashSet<long> watchedVideoIds);
   }
 }

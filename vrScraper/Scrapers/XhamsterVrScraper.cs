@@ -84,19 +84,25 @@ namespace vrScraper.Scrapers
 
       Task.Run(async () =>
       {
+        var scrapeLogService = serviceProvider.GetRequiredService<IScrapeLogService>();
+        var log = await scrapeLogService.StartLog(SiteName, IsScheduledScraping ? "Scheduled" : "Manual");
+        ScrapeResult? result = null;
         try
         {
           logger.LogInformation("Starting ScrapeXhamster task");
-          await ScrapeXhamster(start, count, _cancellationTokenSource!.Token);
+          result = await ScrapeXhamster(start, count, _cancellationTokenSource!.Token);
           logger.LogInformation("ScrapeXhamster task completed");
+          await scrapeLogService.FinishLog(log.Id, result.Pages, result.NewVideos, result.Duplicates, result.Errors, "Completed");
         }
         catch (OperationCanceledException)
         {
           logger.LogInformation("xHamster scraping process was cancelled");
+          await scrapeLogService.FinishLog(log.Id, result?.Pages ?? 0, result?.NewVideos ?? 0, result?.Duplicates ?? 0, result?.Errors ?? 0, "Cancelled");
         }
         catch (Exception ex)
         {
           logger.LogError(ex, "Error during xHamster scraping process");
+          await scrapeLogService.FinishLog(log.Id, result?.Pages ?? 0, result?.NewVideos ?? 0, result?.Duplicates ?? 0, result?.Errors ?? 0, "Error");
         }
         finally
         {
@@ -113,7 +119,7 @@ namespace vrScraper.Scrapers
       });
     }
 
-    private async Task ScrapeXhamster(int startPage, int pageCount, CancellationToken cancellationToken)
+    private async Task<ScrapeResult> ScrapeXhamster(int startPage, int pageCount, CancellationToken cancellationToken)
     {
       logger.LogInformation("ScrapeXhamster started with startPage={StartPage}, pageCount={PageCount}", startPage, pageCount);
 
@@ -185,6 +191,7 @@ namespace vrScraper.Scrapers
 
         var newInsertions = 0;
         var duplicateCount = 0;
+        var errorCount = 0;
 
         foreach (var item in allItems)
         {
@@ -263,6 +270,7 @@ namespace vrScraper.Scrapers
           }
           catch (Exception ex)
           {
+            errorCount++;
             logger.LogError(ex, "Error parsing details for video {Id}: {Title}. Skipping.", newVideos[i].Id, newVideos[i].Title);
             await vs.UpdateVideoErrorCount(newVideos[i].Id);
           }
@@ -273,6 +281,9 @@ namespace vrScraper.Scrapers
 
         await vs.Initialize();
         logger.LogInformation("xHamster scraping complete!");
+
+        var pagesScraped = currentPage - startPage;
+        return new ScrapeResult(pagesScraped, newInsertions, duplicateCount, errorCount);
       }
       catch (Exception ex)
       {

@@ -8,31 +8,50 @@
 
 .filters {
     margin-bottom: 16px;
-    padding: 8px 12px;
+    padding: var(--space-2) var(--space-3);
     width: 100%;
     position: relative;
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
 }
 
 .filter-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
     flex-wrap: wrap;
     position: relative;
+}
+
+.filter-row:first-child {
+    z-index: 1010;
+}
+
+.filter-row:last-child {
     z-index: 1000;
 }
 
 .filter-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-2);
     white-space: nowrap;
     flex-shrink: 0;
     position: relative;
+}
+
+.btn-clear-spacer {
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.filter-item-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: nowrap;
 }
 
 .filter-item label {
@@ -50,12 +69,16 @@
     background-color: var(--color-surface-sunken);
     padding: 2px 10px;
     border-radius: var(--radius-xl);
+    font-variant-numeric: tabular-nums;
+    min-width: 80px;
+    text-align: center;
 }
 
 .search-wrapper {
-    position: relative;
     display: flex;
     align-items: center;
+    gap: var(--space-2);
+    position: relative;
 }
 
 .search-icon {
@@ -76,8 +99,7 @@
 }
 
 .filter-select {
-    width: auto;
-    min-width: 160px;
+    width: 180px;
     height: 30px;
     font-size: 13px;
     padding: 4px 28px 4px 8px;
@@ -89,7 +111,7 @@
 
 
 .filter-item select.form-select,
-.filter-item button {
+.filter-item button:not(.btn-clear):not(.watchlist-menu-item) {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-sm);
@@ -101,12 +123,12 @@
     align-items: center;
 }
 
-.filter-item button {
+.filter-item button:not(.btn-clear) {
     gap: 4px;
     white-space: nowrap;
 }
 
-.filter-item button i {
+.filter-item button:not(.btn-clear) i {
     font-size: 11px;
 }
 
@@ -121,7 +143,8 @@
     align-items: center;
     gap: 4px;
     min-height: auto;
-    padding-left: 2.5em;
+    padding-left: 0;
+    padding-right: 16px;
 }
 
 .filter-item .form-check .form-check-input {
@@ -137,9 +160,86 @@
 
 .filter-separator {
     width: 1px;
-    height: 24px;
+    height: 28px;
     background-color: var(--color-border-strong);
     flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.filter-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.filter-toggle-group .filter-item label {
+    min-width: auto;
+}
+
+.watchlist-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.watchlist-menu-wrapper {
+    position: relative;
+}
+
+.watchlist-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.watchlist-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 180px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 1050;
+    padding: 4px 0;
+}
+
+.watchlist-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: 6px 12px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    color: var(--color-text);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color var(--transition-fast);
+}
+
+.watchlist-menu-item:hover {
+    background-color: var(--color-surface-sunken);
+}
+
+.watchlist-menu-item--danger {
+    color: var(--color-danger);
+}
+
+.watchlist-menu-item--danger:hover {
+    background-color: rgba(220, 38, 38, 0.08);
+}
+
+.watchlist-menu-item i {
+    font-size: 12px;
+}
+
+.filter-row button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
 }
 
 .watchlist-filter-active {
@@ -232,25 +332,30 @@
 }
 
 .btn-clear {
-    padding: 4px;
+    padding: 0;
     height: 24px;
     width: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(108, 117, 125, 0.1);
-    border: none;
-    color: var(--color-text-secondary);
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: background-color var(--transition-fast),
+                color var(--transition-fast),
+                border-color var(--transition-fast);
 }
 
 .btn-clear:hover:not(:disabled) {
-    background-color: rgba(108, 117, 125, 0.2);
+    background-color: var(--color-surface-sunken);
     color: var(--color-text-secondary);
+    border-color: var(--color-border);
 }
 
 .btn-clear:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+    visibility: hidden;
 }
 
 .btn-clear i {

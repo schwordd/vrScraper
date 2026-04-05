@@ -94,19 +94,25 @@ namespace vrScraper.Scrapers
 
       Task.Run(async () =>
       {
+        var scrapeLogService = serviceProvider.GetRequiredService<IScrapeLogService>();
+        var log = await scrapeLogService.StartLog(SiteName, IsScheduledScraping ? "Scheduled" : "Manual");
+        ScrapeResult? result = null;
         try
         {
           logger.LogInformation("Starting ScrapeEporner task");
-          await this.ScrapeEporner("https://www.eporner.com/cat/vr-porn", start, count, _cancellationTokenSource!.Token);
+          result = await this.ScrapeEporner("https://www.eporner.com/cat/vr-porn", start, count, _cancellationTokenSource!.Token);
           logger.LogInformation("ScrapeEporner task completed");
+          await scrapeLogService.FinishLog(log.Id, result.Pages, result.NewVideos, result.Duplicates, result.Errors, "Completed");
         }
         catch (OperationCanceledException)
         {
           logger.LogInformation("Scraping process was cancelled");
+          await scrapeLogService.FinishLog(log.Id, result?.Pages ?? 0, result?.NewVideos ?? 0, result?.Duplicates ?? 0, result?.Errors ?? 0, "Cancelled");
         }
         catch (Exception ex)
         {
           logger.LogError(ex, "Error during scraping process");
+          await scrapeLogService.FinishLog(log.Id, result?.Pages ?? 0, result?.NewVideos ?? 0, result?.Duplicates ?? 0, result?.Errors ?? 0, "Error");
         }
         finally
         {
@@ -114,10 +120,10 @@ namespace vrScraper.Scrapers
           this._scrapingStatus = string.Empty;
           this._currentVideoThumbnail = null;
           this._currentVideoTitle = null;
-          
+
           // Reload VideoService cache after scraping
           await vs.ReloadVideos();
-          
+
           logger.LogInformation("Scraping process finished");
         }
       });
@@ -246,7 +252,7 @@ namespace vrScraper.Scrapers
       });
     }
 
-    private async Task ScrapeEporner(string url, int startIndex, int pages = 10, CancellationToken cancellationToken = default)
+    private async Task<ScrapeResult> ScrapeEporner(string url, int startIndex, int pages = 10, CancellationToken cancellationToken = default)
     {
       logger.LogInformation("ScrapeEporner started with url={Url}, startIndex={StartIndex}, pages={Pages}", url, startIndex, pages);
 
@@ -301,6 +307,8 @@ namespace vrScraper.Scrapers
         totalList = totalList.Where(v => v.Duration == null || v.Duration.Value.TotalSeconds >= minDurationSeconds).ToList();
         logger.LogInformation($"After min-duration filter ({minDurationSeconds}s): {totalList.Count} videos remain.");
       }
+
+      var errorCount = 0;
 
       try
       {
@@ -372,6 +380,7 @@ namespace vrScraper.Scrapers
           }
           catch (Exception ex)
           {
+            errorCount++;
             logger.LogError(ex, "Error parsing details for VideoItem {Id}: {Title}. Skipping this video.",
               newInsertions[i].Id, newInsertions[i].Title);
 
@@ -391,6 +400,10 @@ namespace vrScraper.Scrapers
         logger.LogError(ex, "Error while scraping.");
         throw;
       }
+
+      var pagesScraped = index - startIndex;
+      var duplicates = totalList.Count - newInsertions.Count;
+      return new ScrapeResult(pagesScraped, newInsertions.Count, duplicates, errorCount);
     }
 
     private async Task<List<VideoItem>> ScrapeSinglePage(string url)

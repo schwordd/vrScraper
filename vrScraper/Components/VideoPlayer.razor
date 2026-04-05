@@ -69,12 +69,16 @@
                 }
 
                 <span class="video-counter">@(VideoIndex + 1) / @VideoListCount</span>
+
+                <button class="help-btn @(_shortcutsPinned ? "active" : "")" @onclick="ToggleShortcutsPinned" title="Shortcuts (H)">
+                    <i class="icon-help-circle"></i>
+                </button>
             </div>
         }
 
         @if (_showShortcutsOverlay)
         {
-            <div class="shortcuts-overlay" @key="_shortcutsKey">
+            <div class="shortcuts-overlay @(_shortcutsPinned ? "pinned" : "")" @key="_shortcutsKey">
                 <div class="shortcuts-content">
                     <div class="shortcuts-grid">
                         <span class="shortcut-key">← →</span><span>±5s</span>
@@ -86,6 +90,7 @@
                         <span class="shortcut-key">N / P</span><span>Next / Prev</span>
                         <span class="shortcut-key">L</span><span>Like</span>
                         <span class="shortcut-key">B</span><span>Bookmark</span>
+                        <span class="shortcut-key">Scroll</span><span>Zoom</span>
                         <span class="shortcut-key">H</span><span>Help</span>
                         <span class="shortcut-key">Esc</span><span>Close</span>
                     </div>
@@ -141,6 +146,7 @@
     private long? _videoId = null;
     private DotNetObjectReference<VideoPlayer>? _dotNetRef;
     private bool _showShortcutsOverlay = false;
+    private bool _shortcutsPinned = false;
     private int _shortcutsKey = 0;
     private string? _feedbackTarget = null;
     private int _feedbackKey = 0;
@@ -176,6 +182,7 @@
             // Element sichtbar machen + Shortcuts-Overlay anzeigen
             _isVisible = true;
             _showShortcutsOverlay = true;
+            _shortcutsPinned = false;
             _shortcutsKey++;
             StateHasChanged();
 
@@ -336,8 +343,22 @@
     [JSInvokable]
     public void OnKeyboardToggleHelp()
     {
-        _showShortcutsOverlay = !_showShortcutsOverlay;
-        _shortcutsKey++;
+        ToggleShortcutsPinned();
+    }
+
+    private void ToggleShortcutsPinned()
+    {
+        if (_showShortcutsOverlay)
+        {
+            _shortcutsPinned = false;
+            _showShortcutsOverlay = false;
+        }
+        else
+        {
+            _shortcutsPinned = true;
+            _showShortcutsOverlay = true;
+            _shortcutsKey++;
+        }
         StateHasChanged();
     }
 
@@ -395,6 +416,7 @@
         _errorMessage = null;
         _videoId = null;
         _showShortcutsOverlay = false;
+        _shortcutsPinned = false;
         StateHasChanged();
 
         await OnClose.InvokeAsync();

@@ -7,8 +7,8 @@ namespace vrScraper.Services
 {
   public class VideoChangedEventArgs : EventArgs
   {
-    public DbVideoItem Video { get; private set; }
-    public VideoChangedEventArgs(DbVideoItem video)
+    public DbVideoItem? Video { get; private set; }
+    public VideoChangedEventArgs(DbVideoItem? video)
     {
       Video = video;
     }
@@ -423,6 +423,8 @@ namespace vrScraper.Services
         currentVideoId = null;
         currentVideo = null;
         requestedCurrentVideoItem = null;
+
+        OnLiveVideoChanged?.Invoke(this, new VideoChangedEventArgs(null));
 
         return finishedVideo;
       }

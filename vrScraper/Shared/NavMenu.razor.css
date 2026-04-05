@@ -127,20 +127,35 @@
 @media (max-width: 1024px) and (min-width: 769px) {
     ::deep .nav-link {
         justify-content: center;
-        padding: 12px;
+        padding: 14px 0;
+        border-radius: 0;
     }
 
     ::deep .nav-text {
         display: none;
     }
 
+    ::deep .nav-badge {
+        display: none;
+    }
+
     ::deep .nav-icon {
         margin: 0;
+        font-size: 1.25rem;
+    }
+
+    .nav-menu {
+        padding: 0;
+    }
+
+    .nav-list {
+        gap: 2px;
     }
 
     .nav-logout .nav-link {
         justify-content: center;
-        padding: 12px;
+        padding: 14px 0;
+        border-radius: 0;
     }
 
     .nav-logout .nav-text {

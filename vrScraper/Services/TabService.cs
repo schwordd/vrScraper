@@ -141,5 +141,36 @@ namespace vrScraper.Services
         if (index != -1) tabs[index] = tab;
       }
     }
+
+    public async Task<int> RemoveWatchedVideosFromWatchlist(long tabId, HashSet<long> watchedVideoIds)
+    {
+      DbVrTab? tab;
+      lock (_tabsLock)
+      {
+        tab = tabs.FirstOrDefault(t => t.Id == tabId && t.Type == "WATCHLIST");
+      }
+      if (tab == null) return 0;
+
+      var videoIds = tab.VideoWhitelistList.ToList();
+      var before = videoIds.Count;
+      videoIds.RemoveAll(id => long.TryParse(id, out var vid) && watchedVideoIds.Contains(vid));
+      var removed = before - videoIds.Count;
+      if (removed == 0) return 0;
+
+      tab.VideoWhitelistList = videoIds;
+
+      using var scope = serviceProvider.CreateScope();
+      var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+      context.Tabs.Update(tab);
+      await context.SaveChangesAsync();
+
+      lock (_tabsLock)
+      {
+        var index = tabs.FindIndex(t => t.Id == tab.Id);
+        if (index != -1) tabs[index] = tab;
+      }
+
+      return removed;
+    }
   }
 }
