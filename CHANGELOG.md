@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v1.2.5 (2026-04-07)
+- Allow VR headset API endpoints through auth guard
+
 ## v1.2.4 (2026-04-05)
 - Add automated changelog generation and README overhaul
 - Fix scrape logging, live page stop, recommendations, filter UI polish, auth guard, player improvements
