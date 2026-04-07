@@ -9,6 +9,10 @@ namespace vrScraper.Middleware
     {
       "/login",
       "/api/auth",
+      "/heresphere",
+      "/deovr",
+      "/api/videoproxy",
+      "/api/events",
       "/_blazor",
       "/_framework",
       "/css",
