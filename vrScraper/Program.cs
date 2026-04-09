@@ -177,6 +177,35 @@ namespace vrScraper
             "UPDATE VideoItems SET SiteRating = SiteRating / 100.0 WHERE SiteRating > 1.0");
         if (fixedRatings > 0)
           Console.WriteLine($"Fixed {fixedRatings} video(s) with unnormalized SiteRating.");
+
+        // Merge case-insensitive tag duplicates (e.g. "Big tits" soft-tag + "Big Tits" category)
+        var allTags = context.Tags.ToList();
+        var tagGroups = allTags.GroupBy(t => t.Name.ToLowerInvariant()).Where(g => g.Count() > 1);
+        int mergedCount = 0;
+        foreach (var group in tagGroups)
+        {
+          var keep = group.OrderBy(t => t.IsSoftTag ? 1 : 0).First(); // prefer category tag
+          foreach (var dupe in group.Where(t => t.Id != keep.Id))
+          {
+            // Move VideoTags from duplicate to keeper
+            var videoTags = context.VideoTags.Where(vt => vt.TagId == dupe.Id).ToList();
+            foreach (var vt in videoTags)
+            {
+              if (!context.VideoTags.Any(existing => existing.VideoId == vt.VideoId && existing.TagId == keep.Id))
+              {
+                context.VideoTags.Add(new DB.Models.DbVideoTag { VideoId = vt.VideoId, TagId = keep.Id, IsAutoDetected = vt.IsAutoDetected });
+              }
+              context.VideoTags.Remove(vt);
+            }
+            context.Tags.Remove(dupe);
+            mergedCount++;
+          }
+        }
+        if (mergedCount > 0)
+        {
+          context.SaveChanges();
+          Console.WriteLine($"Merged {mergedCount} duplicate tag(s) (case-insensitive).");
+        }
       }
 
       // Enable CORS

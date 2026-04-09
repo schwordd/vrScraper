@@ -637,31 +637,6 @@ namespace vrScraper.Scrapers
       return source;
     }
 
-    private static readonly HashSet<string> SoftTagStopwords = new(StringComparer.OrdinalIgnoreCase)
-    {
-      "you", "your", "she", "her", "he", "him", "his", "has", "had", "have",
-      "than", "does", "did", "the", "this", "that", "and", "but", "for", "not",
-      "with", "are", "was", "were", "been", "full", "video", "hot", "completely",
-      "soft", "vr", "hd", "xxx", "porn", "sex", "new", "best", "big", "all",
-      "get", "gets", "got", "its", "just", "like", "more", "most", "only",
-      "out", "over", "some", "very", "what", "when", "who", "how", "from"
-    };
-
-    private bool IsSoftTagValid(string tag, List<DbStar> knownStars)
-    {
-      if (string.IsNullOrWhiteSpace(tag) || tag.Length < 3)
-        return false;
-
-      if (SoftTagStopwords.Contains(tag))
-        return false;
-
-      // Exact star name match (case-insensitive)
-      if (knownStars.Any(s => s.Name.Equals(tag, StringComparison.OrdinalIgnoreCase)))
-        return false;
-
-      return true;
-    }
-
     public async Task ParseDetails(DbVideoItem video, VrScraperContext context)
     {
       var (PlayerSettings, CategoryTags, SoftTags, Stars, VideoDetails) = await this.GetDetails(video);
@@ -694,7 +669,7 @@ namespace vrScraper.Scrapers
       foreach (var tagRaw in CategoryTags.Distinct().ToList())
       {
         var tagParsed = tagNorm.NormalizeTag(tagRaw);
-        var tag = await context.Tags.Where(s => s.Name == tagParsed).FirstOrDefaultAsync();
+        var tag = await context.Tags.Where(s => s.Name.ToLower() == tagParsed.ToLower()).FirstOrDefaultAsync();
         if (tag == null)
         {
           tag = new DbTag() { Name = tagParsed };
@@ -708,21 +683,38 @@ namespace vrScraper.Scrapers
       // Process soft tags (vit-tag from Eporner)
       var addedTagNames = CategoryTags.Select(t => tagNorm.NormalizeTag(t)).ToHashSet(StringComparer.OrdinalIgnoreCase);
       var knownStars = await context.Stars.ToListAsync();
+
+      // First pass: filter individual soft tags
+      var validSoftTags = new List<string>();
       foreach (var softTagRaw in SoftTags.Distinct().ToList())
       {
         var softTagParsed = tagNorm.NormalizeTag(softTagRaw);
-
-        // Skip if already added as category tag
         if (addedTagNames.Contains(softTagParsed))
           continue;
-
-        if (!IsSoftTagValid(softTagParsed, knownStars))
+        if (!Normalization.SoftTagFilter.IsValid(softTagParsed, knownStars))
         {
           logger.LogDebug("Soft tag '{Tag}' filtered out for video {VideoId}", softTagParsed, video.Id);
           continue;
         }
+        validSoftTags.Add(softTagParsed);
+      }
 
-        var tag = await context.Tags.Where(s => s.Name == softTagParsed).FirstOrDefaultAsync();
+      // Second pass: detect star-name pairs among valid single-word tags
+      var singleWordTags = validSoftTags.Where(t => !t.Contains(' ')).ToList();
+      var starNamePairs = Normalization.SoftTagFilter.FindStarNamePairs(singleWordTags, knownStars);
+      if (starNamePairs.Count > 0)
+        logger.LogDebug("Star name pairs detected for video {VideoId}: {Pairs}", video.Id, string.Join(", ", starNamePairs));
+
+      // Insert valid soft tags
+      foreach (var softTagParsed in validSoftTags)
+      {
+        if (starNamePairs.Contains(softTagParsed))
+        {
+          logger.LogDebug("Soft tag '{Tag}' is star name fragment, skipping for video {VideoId}", softTagParsed, video.Id);
+          continue;
+        }
+
+        var tag = await context.Tags.Where(s => s.Name.ToLower() == softTagParsed.ToLower()).FirstOrDefaultAsync();
         if (tag != null && tag.ApprovalStatus == TagApprovalStatus.Denied)
         {
           logger.LogDebug("Soft tag '{Tag}' is denied, skipping for video {VideoId}", softTagParsed, video.Id);

@@ -4,6 +4,7 @@
 @using vrScraper.DB.Models
 @using vrScraper.Services.Interfaces
 @using vrScraper.Components
+@using vrScraper.Normalization
 @using Microsoft.EntityFrameworkCore
 
 @inject IServiceScopeFactory ScopeFactory
@@ -23,32 +24,149 @@
     </div>
 
     <div class="tags-tabs">
-        <button class="tags-tab @(activeTab == "pending" ? "active" : "")" @onclick="() => SetTab(TabPending)">
+        <button class="tags-tab @(activeTab == TabPending ? "active" : "")" @onclick="() => SetTab(TabPending)">
             Pending
-            @if (pendingTags.Any())
+            @if (suggestions != null && suggestions.RemainingTags.Any())
             {
-                <span class="tab-badge">@pendingTags.Count</span>
+                <span class="tab-badge">@suggestions.RemainingTags.Count</span>
             }
         </button>
-        <button class="tags-tab @(activeTab == "approved" ? "active" : "")" @onclick="() => SetTab(TabApproved)">
+        <button class="tags-tab @(activeTab == TabApproved ? "active" : "")" @onclick="() => SetTab(TabApproved)">
             Approved
         </button>
-        <button class="tags-tab @(activeTab == "denied" ? "active" : "")" @onclick="() => SetTab(TabDenied)">
+        <button class="tags-tab @(activeTab == TabDenied ? "active" : "")" @onclick="() => SetTab(TabDenied)">
             Denied
         </button>
     </div>
 
-    @if (activeTab == "pending")
+    @if (activeTab == TabPending)
     {
         <div class="tags-section">
-            @if (pendingTags.Any())
+            @if (suggestions != null && suggestions.TotalSuggestions > 0)
             {
+                <div class="suggestions-header">
+                    <h5><i class="icon-lightbulb"></i> Suggested Denials (@suggestions.TotalSuggestions)</h5>
+                </div>
+
+                @if (suggestions.StopwordTags.Any())
+                {
+                    <div class="suggestion-group">
+                        <div class="suggestion-group-header" @onclick="() => ToggleSuggestionGroup(SgStopwords)">
+                            <i class="@(openSuggestionGroups.Contains(SgStopwords) ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                            <span>Stopwords</span>
+                            <span class="suggestion-count">@suggestions.StopwordTags.Count tags</span>
+                            <button class="btn-sm btn-deny" @onclick:stopPropagation="true" @onclick="() => DenyGroup(suggestions.StopwordTags.Select(t => t.Tag.Id).ToList())">Deny All</button>
+                        </div>
+                        @if (openSuggestionGroups.Contains(SgStopwords))
+                        {
+                            <div class="suggestion-group-tags">
+                                @foreach (var item in suggestions.StopwordTags)
+                                {
+                                    <span class="suggestion-tag">@item.Tag.Name <small>(@item.VideoCount)</small></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (suggestions.AllWordsStopwordTags.Any())
+                {
+                    <div class="suggestion-group">
+                        <div class="suggestion-group-header" @onclick="() => ToggleSuggestionGroup(SgAllStopwords)">
+                            <i class="@(openSuggestionGroups.Contains(SgAllStopwords) ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                            <span>All words are stopwords</span>
+                            <span class="suggestion-count">@suggestions.AllWordsStopwordTags.Count tags</span>
+                            <button class="btn-sm btn-deny" @onclick:stopPropagation="true" @onclick="() => DenyGroup(suggestions.AllWordsStopwordTags.Select(t => t.Tag.Id).ToList())">Deny All</button>
+                        </div>
+                        @if (openSuggestionGroups.Contains(SgAllStopwords))
+                        {
+                            <div class="suggestion-group-tags">
+                                @foreach (var item in suggestions.AllWordsStopwordTags)
+                                {
+                                    <span class="suggestion-tag">@item.Tag.Name <small>(@item.VideoCount)</small></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (suggestions.StarPhraseTags.Any())
+                {
+                    <div class="suggestion-group">
+                        <div class="suggestion-group-header" @onclick="() => ToggleSuggestionGroup(SgStarPhrase)">
+                            <i class="@(openSuggestionGroups.Contains(SgStarPhrase) ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                            <span>Contains star name</span>
+                            <span class="suggestion-count">@suggestions.StarPhraseTags.Count tags</span>
+                            <button class="btn-sm btn-deny" @onclick:stopPropagation="true" @onclick="() => DenyGroup(suggestions.StarPhraseTags.Select(t => t.Tag.Id).ToList())">Deny All</button>
+                        </div>
+                        @if (openSuggestionGroups.Contains(SgStarPhrase))
+                        {
+                            <div class="suggestion-group-tags">
+                                @foreach (var item in suggestions.StarPhraseTags)
+                                {
+                                    <span class="suggestion-tag">@item.Tag.Name <small>(@item.MatchedStar)</small></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (suggestions.StarFragmentTags.Any())
+                {
+                    <div class="suggestion-group">
+                        <div class="suggestion-group-header" @onclick="() => ToggleSuggestionGroup(SgStarFragment)">
+                            <i class="@(openSuggestionGroups.Contains(SgStarFragment) ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                            <span>Star name fragments</span>
+                            <span class="suggestion-count">@suggestions.StarFragmentTags.Count tags</span>
+                            <button class="btn-sm btn-deny" @onclick:stopPropagation="true" @onclick="() => DenyGroup(suggestions.StarFragmentTags.Select(t => t.Tag.Id).ToList())">Deny All</button>
+                        </div>
+                        @if (openSuggestionGroups.Contains(SgStarFragment))
+                        {
+                            <div class="suggestion-group-tags">
+                                @foreach (var item in suggestions.StarFragmentTags)
+                                {
+                                    <span class="suggestion-tag">@item.Tag.Name <small>(@item.VideoCount)</small></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (suggestions.LowConfidenceTags.Any())
+                {
+                    <div class="suggestion-group">
+                        <div class="suggestion-group-header" @onclick="() => ToggleSuggestionGroup(SgLowConf)">
+                            <i class="@(openSuggestionGroups.Contains(SgLowConf) ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                            <span>Low confidence (1 video)</span>
+                            <span class="suggestion-count">@suggestions.LowConfidenceTags.Count tags</span>
+                            <button class="btn-sm btn-deny" @onclick:stopPropagation="true" @onclick="() => DenyGroup(suggestions.LowConfidenceTags.Select(t => t.Tag.Id).ToList())">Deny All</button>
+                        </div>
+                        @if (openSuggestionGroups.Contains(SgLowConf))
+                        {
+                            <div class="suggestion-group-tags">
+                                @foreach (var item in suggestions.LowConfidenceTags)
+                                {
+                                    <span class="suggestion-tag">@item.Tag.Name</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+
+            @if (suggestions != null && suggestions.RemainingTags.Any())
+            {
+                <div class="tags-search">
+                    <input type="text" class="search-input" placeholder="Search tags..." @bind="searchQuery" @bind:event="oninput" />
+                </div>
+
                 <div class="tags-bulk-actions">
                     <button class="btn-action btn-approve" @onclick="ApproveSelected" disabled="@(!selectedTags.Any())">Approve Selected (@selectedTags.Count)</button>
                     <button class="btn-action btn-deny" @onclick="DenySelected" disabled="@(!selectedTags.Any())">Deny Selected (@selectedTags.Count)</button>
                 </div>
+
                 <div class="tags-list">
-                    @foreach (var item in pendingTags)
+                    @foreach (var item in FilteredRemainingTags)
                     {
                         <div class="tag-entry">
                             <div class="tag-item" @onclick="() => ToggleExpand(item.Tag.Id)">
@@ -78,20 +196,23 @@
                     }
                 </div>
             }
-            else
+            else if (suggestions != null && suggestions.TotalSuggestions == 0)
             {
                 <div class="tags-empty">No pending tags. New soft tags from scrapes will appear here.</div>
             }
         </div>
     }
 
-    @if (activeTab == "approved")
+    @if (activeTab == TabApproved)
     {
         <div class="tags-section">
-            @if (approvedTags.Any())
+            <div class="tags-search">
+                <input type="text" class="search-input" placeholder="Search tags..." @bind="searchQuery" @bind:event="oninput" />
+            </div>
+            @if (FilteredApprovedTags.Any())
             {
                 <div class="tags-list">
-                    @foreach (var item in approvedTags)
+                    @foreach (var item in FilteredApprovedTags)
                     {
                         <div class="tag-entry">
                             <div class="tag-item" @onclick="() => ToggleExpand(item.Tag.Id)">
@@ -126,18 +247,21 @@
             }
             else
             {
-                <div class="tags-empty">No approved tags.</div>
+                <div class="tags-empty">No approved tags found.</div>
             }
         </div>
     }
 
-    @if (activeTab == "denied")
+    @if (activeTab == TabDenied)
     {
         <div class="tags-section">
-            @if (deniedTags.Any())
+            <div class="tags-search">
+                <input type="text" class="search-input" placeholder="Search tags..." @bind="searchQuery" @bind:event="oninput" />
+            </div>
+            @if (FilteredDeniedTags.Any())
             {
                 <div class="tags-list">
-                    @foreach (var item in deniedTags)
+                    @foreach (var item in FilteredDeniedTags)
                     {
                         <div class="tag-entry">
                             <div class="tag-item" @onclick="() => ToggleExpand(item.Tag.Id)">
@@ -166,7 +290,7 @@
             }
             else
             {
-                <div class="tags-empty">No denied tags.</div>
+                <div class="tags-empty">No denied tags found.</div>
             }
         </div>
     }
@@ -177,16 +301,41 @@
     private const string TabApproved = "approved";
     private const string TabDenied = "denied";
 
+    private const string SgStopwords = "stopwords";
+    private const string SgAllStopwords = "allstopwords";
+    private const string SgStarPhrase = "starphrase";
+    private const string SgStarFragment = "starfragment";
+    private const string SgLowConf = "lowconf";
+
     private string activeTab = TabPending;
-    private List<TagInfo> pendingTags = new();
-    private List<TagInfo> approvedTags = new();
-    private List<TagInfo> deniedTags = new();
+    private List<TagItem> approvedTags = new();
+    private List<TagItem> deniedTags = new();
     private HashSet<long> selectedTags = new();
+    private SuggestedDenials? suggestions;
+    private HashSet<string> openSuggestionGroups = new();
 
     private long? expandedTagId;
     private List<DbVideoItem>? expandedVideos;
+    private string searchQuery = "";
 
-    private record TagInfo(DbTag Tag, long VideoCount);
+    private record TagItem(DbTag Tag, long VideoCount);
+
+    private List<TagItem> FilteredRemainingTags =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? suggestions?.RemainingTags.Select(t => new TagItem(t.Tag, t.VideoCount)).ToList() ?? new()
+            : suggestions?.RemainingTags
+                .Where(t => t.Tag.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
+                .Select(t => new TagItem(t.Tag, t.VideoCount)).ToList() ?? new();
+
+    private List<TagItem> FilteredApprovedTags =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? approvedTags
+            : approvedTags.Where(t => t.Tag.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private List<TagItem> FilteredDeniedTags =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? deniedTags
+            : deniedTags.Where(t => t.Tag.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -199,18 +348,29 @@
         var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
         var allTags = await context.Tags
-            .Select(t => new { Tag = t, VideoCount = (long)t.Videos.Count })
+            .GroupJoin(context.Set<DbVideoTag>(), t => t.Id, vt => vt.TagId,
+                (t, vts) => new { Tag = t, VideoCount = (long)vts.Count() })
             .OrderByDescending(t => t.VideoCount)
             .ToListAsync();
 
-        pendingTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Pending)
-            .Select(t => new TagInfo(t.Tag, t.VideoCount)).ToList();
+        var pendingTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Pending)
+            .Select(t => (t.Tag, t.VideoCount)).ToList();
         approvedTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Approved)
-            .Select(t => new TagInfo(t.Tag, t.VideoCount)).ToList();
+            .Select(t => new TagItem(t.Tag, t.VideoCount)).ToList();
         deniedTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Denied)
-            .Select(t => new TagInfo(t.Tag, t.VideoCount)).ToList();
+            .Select(t => new TagItem(t.Tag, t.VideoCount)).ToList();
+
+        // Compute suggestions for pending tags
+        var knownStars = await context.Stars.ToListAsync();
+        suggestions = SoftTagFilter.GetSuggestions(pendingTags, knownStars);
 
         selectedTags.Clear();
+    }
+
+    private void ToggleSuggestionGroup(string group)
+    {
+        if (!openSuggestionGroups.Remove(group))
+            openSuggestionGroups.Add(group);
     }
 
     private async Task ToggleExpand(long tagId)
@@ -237,6 +397,7 @@
         selectedTags.Clear();
         expandedTagId = null;
         expandedVideos = null;
+        searchQuery = "";
     }
 
     private void ToggleSelection(long tagId, bool selected)
@@ -257,6 +418,21 @@
             tag.ApprovalStatus = status;
             await context.SaveChangesAsync();
         }
+        expandedTagId = null;
+        expandedVideos = null;
+        await LoadTags();
+        await VideoService.ReloadVideos();
+    }
+
+    private async Task DenyGroup(List<long> tagIds)
+    {
+        if (!tagIds.Any()) return;
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var tags = await context.Tags.Where(t => tagIds.Contains(t.Id)).ToListAsync();
+        foreach (var tag in tags)
+            tag.ApprovalStatus = TagApprovalStatus.Denied;
+        await context.SaveChangesAsync();
         expandedTagId = null;
         expandedVideos = null;
         await LoadTags();
@@ -292,5 +468,4 @@
         await LoadTags();
         await VideoService.ReloadVideos();
     }
-
 }
