@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v1.2.6 (2026-04-09)
+- Add soft-tag scraping with approval workflow, tag management page, rescrape priority by LastScrapedUtc
+
 ## v1.2.5 (2026-04-07)
 - Allow VR headset API endpoints through auth guard
 
