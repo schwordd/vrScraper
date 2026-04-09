@@ -86,7 +86,7 @@ namespace vrScraper.Controllers
         .ToListAsync();
 
       var tags = await context.VideoTags.Where(vt => vt.VideoId == id)
-        .Join(context.Tags, vt => vt.TagId, t => t.Id, (vt, t) => new { t.Name, vt.IsAutoDetected })
+        .Join(context.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved), vt => vt.TagId, t => t.Id, (vt, t) => new { t.Name, vt.IsAutoDetected })
         .ToListAsync();
 
       return Ok(new
@@ -164,7 +164,7 @@ namespace vrScraper.Controllers
         .ToListAsync();
       var tagsBefore = await context.VideoTags
         .Where(vt => vt.VideoId == id)
-        .Join(context.Tags, vt => vt.TagId, t => t.Id, (vt, t) => new { t.Name, vt.IsAutoDetected })
+        .Join(context.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved), vt => vt.TagId, t => t.Id, (vt, t) => new { t.Name, vt.IsAutoDetected })
         .ToListAsync();
       var titleBefore = video.Title;
 
@@ -193,7 +193,7 @@ namespace vrScraper.Controllers
         .ToListAsync();
       var tagsAfter = await context.VideoTags
         .Where(vt => vt.VideoId == id)
-        .Join(context.Tags, vt => vt.TagId, t => t.Id, (vt, t) => new { t.Name, vt.IsAutoDetected })
+        .Join(context.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved), vt => vt.TagId, t => t.Id, (vt, t) => new { t.Name, vt.IsAutoDetected })
         .ToListAsync();
 
       await videoService.ReloadVideos();

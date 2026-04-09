@@ -359,7 +359,8 @@
         ("random", "Random"),
         ("playtime", "Most played time"),
         ("playcount", "Most played count"),
-        ("recentlywatched", "Recently watched")
+        ("recentlywatched", "Recently watched"),
+        ("lastscraped", "Latest (re)scrape")
     };
 
     private string _searchQuery = "";
@@ -543,6 +544,12 @@
                     .OrderByDescending(v => v.LastPlayedUtc!.Value)
                     .ToList();
             }
+            else if (_currentSortOption == "lastscraped")
+            {
+                sortedItems = filteredItems
+                    .OrderByDescending(v => v.LastScrapedUtc ?? DateTime.MinValue)
+                    .ToList();
+            }
             else
             {
                 sortedItems = filteredItems
@@ -606,7 +613,7 @@
             if (SelectedActresses.Count > 0)
                 baseItems = baseItems.Where(v => SelectedActresses.All(a => v.Stars.Any(s => s.Name == a))).ToList();
             var tagCounts = baseItems
-                .SelectMany(v => v.Tags)
+                .SelectMany(v => v.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved))
                 .GroupBy(t => t.Name)
                 .ToDictionary(g => g.Key, g => (long)g.Count());
             return AvailableTags

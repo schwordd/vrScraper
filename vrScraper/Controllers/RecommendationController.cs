@@ -32,7 +32,7 @@ namespace vrScraper.Controllers
         duration = (int)s.Video.Duration.TotalSeconds,
         rating = s.Video.SiteRating,
         score = Math.Round(s.Score * 100, 0),
-        tags = s.Video.Tags.Select(t => t.Name),
+        tags = s.Video.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved).Select(t => t.Name),
         stars = s.Video.Stars.Select(st => st.Name)
       });
 

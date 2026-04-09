@@ -14,7 +14,7 @@
         @if (LiveVideo.Tags != null)
         {
             <div class="tag-container">
-                @foreach (var tag in LiveVideo.Tags)
+                @foreach (var tag in LiveVideo.Tags.Where(t => t.ApprovalStatus == vrScraper.DB.Models.TagApprovalStatus.Approved))
                 {
                     <button type="button" class="btn btn-primary tag-pill">
                         @tag.Name

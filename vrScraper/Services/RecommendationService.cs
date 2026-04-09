@@ -41,7 +41,7 @@ namespace vrScraper.Services
 
         if (video.Tags != null)
         {
-          foreach (var tag in video.Tags)
+          foreach (var tag in video.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved))
           {
             if (!tagAffinity.ContainsKey(tag.Name))
               tagAffinity[tag.Name] = 0;
@@ -67,7 +67,7 @@ namespace vrScraper.Services
         foreach (var video in dislikedVideos)
         {
           if (video.Tags != null)
-            foreach (var tag in video.Tags)
+            foreach (var tag in video.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved))
             {
               if (!tagAffinity.ContainsKey(tag.Name))
                 tagAffinity[tag.Name] = 0;
@@ -90,7 +90,7 @@ namespace vrScraper.Services
       foreach (var video in allItems)
       {
         if (video.Tags != null)
-          foreach (var tag in video.Tags)
+          foreach (var tag in video.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved))
           {
             tagCounts.TryGetValue(tag.Name, out int c);
             tagCounts[tag.Name] = c + 1;
@@ -196,9 +196,10 @@ namespace vrScraper.Services
         int tagMatches = 0;
         string? topTag = null;
         double topTagScore = 0;
-        if (video.Tags != null && video.Tags.Count > 0)
+        var approvedTags = video.Tags?.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved).ToList();
+        if (approvedTags != null && approvedTags.Count > 0)
         {
-          foreach (var tag in video.Tags)
+          foreach (var tag in approvedTags)
           {
             if (tagAffinity.TryGetValue(tag.Name, out var affinity))
             {

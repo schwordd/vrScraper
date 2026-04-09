@@ -242,11 +242,12 @@
     private void DetermineVideoType(DbVideoItem video)
     {
         // Bestimme VR-Typ anhand der Tags
-        if (video.Tags.Any(t => t.Name.Contains("360")))
+        var approvedTags = video.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved);
+        if (approvedTags.Any(t => t.Name.Contains("360")))
         {
             _videoType = "360";
         }
-        else if (video.Tags.Any(t => t.Name.Contains("180")))
+        else if (approvedTags.Any(t => t.Name.Contains("180")))
         {
             _videoType = "180";
         }

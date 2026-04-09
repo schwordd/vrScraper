@@ -14,8 +14,8 @@ namespace vrScraper.Services
     {
       var tabs = new List<(string Name, List<DbVideoItem> Videos)>();
 
-      // Apply global tag blacklist
-      allItems = allItems.Where(item => !item.Tags.Exists(a => globalBlackList.Any(b => b == a.Name))).ToList();
+      // Apply global tag blacklist (only consider approved tags)
+      allItems = allItems.Where(item => !item.Tags.Exists(a => a.ApprovalStatus == DB.Models.TagApprovalStatus.Approved && globalBlackList.Any(b => b == a.Name))).ToList();
 
       List<string> SafeDeserializeList(string? json) {
         try { return JsonConvert.DeserializeObject<List<string>>(json ?? "[]") ?? new List<string>(); }
@@ -129,10 +129,10 @@ namespace vrScraper.Services
             var videoBl = SafeDeserializeList(t.VideoBlacklist);
 
             foreach (var item in tagsWL)
-              matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.Name == item));
+              matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved && t.Name == item));
 
             foreach (var item in tagsBL)
-              matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.Name == item) == false);
+              matchingItems = matchingItems.Where(a => a.Tags.Any(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved && t.Name == item) == false);
 
             foreach (var item in acctressWL)
               matchingItems = matchingItems.Where(a => a.Stars.Any(t => t.Name == item));

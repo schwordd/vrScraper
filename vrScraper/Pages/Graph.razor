@@ -156,7 +156,7 @@
 
         var tagStats = _allVideos
             .Where(v => v.Tags != null)
-            .SelectMany(v => v.Tags.Select(t => new { Tag = t, Video = v }))
+            .SelectMany(v => v.Tags.Where(t => t.ApprovalStatus == vrScraper.DB.Models.TagApprovalStatus.Approved).Select(t => new { Tag = t, Video = v }))
             .GroupBy(x => x.Tag.Id)
             .Select(g => new
             {
@@ -357,7 +357,7 @@
         else if (nodeId.StartsWith("tag:"))
         {
             var name = _allVideos
-                .SelectMany(v => v.Tags ?? Enumerable.Empty<DbTag>())
+                .SelectMany(v => (v.Tags ?? Enumerable.Empty<DbTag>()).Where(t => t.ApprovalStatus == TagApprovalStatus.Approved))
                 .FirstOrDefault(t => $"tag:{t.Id}" == nodeId)?.Name;
             if (name != null)
                 NavigationManager.NavigateTo($"/videos?tags={Uri.EscapeDataString(name)}");

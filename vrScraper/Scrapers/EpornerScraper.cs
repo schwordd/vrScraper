@@ -417,11 +417,11 @@ namespace vrScraper.Scrapers
       return videoItems;
     }
 
-    public async Task<(VideoPlayerSettings PlayerSettings, List<string> Tags, List<string> Stars, AdditionalVideoDetails VideoDetails)> GetDetails(DbVideoItem item)
+    public async Task<(VideoPlayerSettings PlayerSettings, List<string> CategoryTags, List<string> SoftTags, List<string> Stars, AdditionalVideoDetails VideoDetails)> GetDetails(DbVideoItem item)
     {
       var web = new HtmlWeb();
       if (string.IsNullOrEmpty(item.Link))
-        return (new VideoPlayerSettings(), [], [], new AdditionalVideoDetails());
+        return (new VideoPlayerSettings(), [], [], [], new AdditionalVideoDetails());
 
       var doc = await web.LoadFromWebAsync(item.Link);
 
@@ -513,7 +513,8 @@ namespace vrScraper.Scrapers
       }
 
       var stars = new List<string>();
-      var tags = new List<string>();
+      var categoryTags = new List<string>();
+      var softTags = new List<string>();
 
       // Stars: prefer JSON-LD actor array, fallback to /pornstar/ links in HTML
       if (videoDetails.Actors.Count > 0)
@@ -555,11 +556,19 @@ namespace vrScraper.Scrapers
       {
         foreach (var t in categories)
         {
-          tags.Add(t.InnerText);
+          categoryTags.Add(t.InnerText);
         }
       }
 
-      return (settings, tags, stars, videoDetails);
+      if (vitTag != null)
+      {
+        foreach (var t in vitTag)
+        {
+          softTags.Add(t.InnerText);
+        }
+      }
+
+      return (settings, categoryTags, softTags, stars, videoDetails);
     }
 
     public async Task<Quality?> GetBestVideoQuality(DbVideoItem item, VideoPlayerSettings settings)
@@ -592,7 +601,7 @@ namespace vrScraper.Scrapers
 
     public async Task<VideoSource?> GetSource(DbVideoItem video, VrScraperContext context)
     {
-      var (PlayerSettings, Tags, Stars, VideoDetails) = await this.GetDetails(video);
+      var (PlayerSettings, CategoryTags, SoftTags, Stars, VideoDetails) = await this.GetDetails(video);
       var quality = await this.GetBestVideoQuality(video, PlayerSettings);
 
       if (quality == null)
@@ -628,9 +637,34 @@ namespace vrScraper.Scrapers
       return source;
     }
 
+    private static readonly HashSet<string> SoftTagStopwords = new(StringComparer.OrdinalIgnoreCase)
+    {
+      "you", "your", "she", "her", "he", "him", "his", "has", "had", "have",
+      "than", "does", "did", "the", "this", "that", "and", "but", "for", "not",
+      "with", "are", "was", "were", "been", "full", "video", "hot", "completely",
+      "soft", "vr", "hd", "xxx", "porn", "sex", "new", "best", "big", "all",
+      "get", "gets", "got", "its", "just", "like", "more", "most", "only",
+      "out", "over", "some", "very", "what", "when", "who", "how", "from"
+    };
+
+    private bool IsSoftTagValid(string tag, List<DbStar> knownStars)
+    {
+      if (string.IsNullOrWhiteSpace(tag) || tag.Length < 3)
+        return false;
+
+      if (SoftTagStopwords.Contains(tag))
+        return false;
+
+      // Exact star name match (case-insensitive)
+      if (knownStars.Any(s => s.Name.Equals(tag, StringComparison.OrdinalIgnoreCase)))
+        return false;
+
+      return true;
+    }
+
     public async Task ParseDetails(DbVideoItem video, VrScraperContext context)
     {
-      var (PlayerSettings, Tags, Stars, VideoDetails) = await this.GetDetails(video);
+      var (PlayerSettings, CategoryTags, SoftTags, Stars, VideoDetails) = await this.GetDetails(video);
 
       // Clean slate: remove all existing star/tag links for this video
       var existingStarLinks = await context.VideoStars.Where(vs => vs.VideoId == video.Id).ToListAsync();
@@ -656,8 +690,8 @@ namespace vrScraper.Scrapers
         logger.LogInformation("Star {s} added for video {v}", star.Name, video.Id);
       }
 
-      // Re-add tags from source
-      foreach (var tagRaw in Tags.Distinct().ToList())
+      // Re-add category tags from source
+      foreach (var tagRaw in CategoryTags.Distinct().ToList())
       {
         var tagParsed = tagNorm.NormalizeTag(tagRaw);
         var tag = await context.Tags.Where(s => s.Name == tagParsed).FirstOrDefaultAsync();
@@ -669,6 +703,41 @@ namespace vrScraper.Scrapers
 
         context.VideoTags.Add(new DbVideoTag { Video = video, Tag = tag, IsAutoDetected = false });
         logger.LogInformation("Tag {s} added for video {v}", tag.Name, video.Id);
+      }
+
+      // Process soft tags (vit-tag from Eporner)
+      var addedTagNames = CategoryTags.Select(t => tagNorm.NormalizeTag(t)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+      var knownStars = await context.Stars.ToListAsync();
+      foreach (var softTagRaw in SoftTags.Distinct().ToList())
+      {
+        var softTagParsed = tagNorm.NormalizeTag(softTagRaw);
+
+        // Skip if already added as category tag
+        if (addedTagNames.Contains(softTagParsed))
+          continue;
+
+        if (!IsSoftTagValid(softTagParsed, knownStars))
+        {
+          logger.LogDebug("Soft tag '{Tag}' filtered out for video {VideoId}", softTagParsed, video.Id);
+          continue;
+        }
+
+        var tag = await context.Tags.Where(s => s.Name == softTagParsed).FirstOrDefaultAsync();
+        if (tag != null && tag.ApprovalStatus == TagApprovalStatus.Denied)
+        {
+          logger.LogDebug("Soft tag '{Tag}' is denied, skipping for video {VideoId}", softTagParsed, video.Id);
+          continue;
+        }
+
+        if (tag == null)
+        {
+          tag = new DbTag() { Name = softTagParsed, IsSoftTag = true, ApprovalStatus = TagApprovalStatus.Pending };
+          context.Tags.Add(tag);
+          logger.LogInformation("New soft tag '{Tag}' created (pending approval)", softTagParsed);
+        }
+
+        context.VideoTags.Add(new DbVideoTag { Video = video, Tag = tag, IsAutoDetected = false });
+        logger.LogInformation("Soft tag {s} added for video {v}", tag.Name, video.Id);
       }
 
       // Update views and rating from structured data
@@ -730,7 +799,7 @@ namespace vrScraper.Scrapers
         var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
         videoIds = await context.VideoItems
             .Where(a => a.Site == SiteName)
-            .OrderByDescending(a => a.Id)
+            .OrderBy(a => a.LastScrapedUtc)
             .Select(a => a.Id)
             .ToListAsync(cancellationToken);
       }

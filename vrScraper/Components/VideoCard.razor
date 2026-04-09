@@ -23,37 +23,40 @@
         {
             <div class="similarity-badge">@((SimilarityScore.Value * 100).ToString("F0"))%</div>
         }
-        <div class="thumbnail-overlay">
-            <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => OnDelete.InvokeAsync(Item.Id)" title="Delete video">
-                <i class="icon-trash-2"></i>
-            </button>
-            <button class="btn btn-info btn-sm similar-btn" @onclick:stopPropagation="true" @onclick="() => OnShowSimilar.InvokeAsync(Item)" title="Find similar videos">
-                <i class="icon-sparkles"></i>
-            </button>
-            <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => OnDownload.InvokeAsync(Item)" title="Download video">
-                <i class="icon-download"></i>
-            </button>
-        </div>
-        <div class="like-btn-container">
-            <button class="like-btn @(Item.Liked ? "liked" : "not-liked")"
-                    @onclick:stopPropagation="true"
-                    @onclick="() => OnToggleLike.InvokeAsync(Item)"
-                    title="@(Item.Liked ? "Remove from favorites" : "Add to favorites")">
-                <i class="icon-heart"></i>
-            </button>
-            <span class="play-count" title="Times played">
-                <i class="icon-play"></i>
-                @Item.PlayCount
-            </span>
-        </div>
-        <div class="watchlist-btn-container @(SelectedWatchlistId > 0 ? "visible" : "")">
-            <button class="watchlist-btn @(IsInWatchlist ? "in-watchlist" : "not-in-watchlist")"
-                    @onclick:stopPropagation="true"
-                    @onclick="() => OnToggleWatchlist.InvokeAsync(Item.Id)"
-                    title="@(IsInWatchlist ? "Remove from watchlist" : "Add to watchlist")">
-                <i class="icon-bookmark"></i>
-            </button>
-        </div>
+        @if (!Compact)
+        {
+            <div class="thumbnail-overlay">
+                <button class="btn btn-danger btn-sm delete-btn" @onclick:stopPropagation="true" @onclick="() => OnDelete.InvokeAsync(Item.Id)" title="Delete video">
+                    <i class="icon-trash-2"></i>
+                </button>
+                <button class="btn btn-info btn-sm similar-btn" @onclick:stopPropagation="true" @onclick="() => OnShowSimilar.InvokeAsync(Item)" title="Find similar videos">
+                    <i class="icon-sparkles"></i>
+                </button>
+                <button class="btn btn-primary btn-sm download-btn" @onclick:stopPropagation="true" @onclick="() => OnDownload.InvokeAsync(Item)" title="Download video">
+                    <i class="icon-download"></i>
+                </button>
+            </div>
+            <div class="like-btn-container">
+                <button class="like-btn @(Item.Liked ? "liked" : "not-liked")"
+                        @onclick:stopPropagation="true"
+                        @onclick="() => OnToggleLike.InvokeAsync(Item)"
+                        title="@(Item.Liked ? "Remove from favorites" : "Add to favorites")">
+                    <i class="icon-heart"></i>
+                </button>
+                <span class="play-count" title="Times played">
+                    <i class="icon-play"></i>
+                    @Item.PlayCount
+                </span>
+            </div>
+            <div class="watchlist-btn-container @(SelectedWatchlistId > 0 ? "visible" : "")">
+                <button class="watchlist-btn @(IsInWatchlist ? "in-watchlist" : "not-in-watchlist")"
+                        @onclick:stopPropagation="true"
+                        @onclick="() => OnToggleWatchlist.InvokeAsync(Item.Id)"
+                        title="@(IsInWatchlist ? "Remove from watchlist" : "Add to watchlist")">
+                    <i class="icon-bookmark"></i>
+                </button>
+            </div>
+        }
     </div>
     <h3 title="@(!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title ? Item.Title : "")">@if (!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title) { <i class="icon-sparkles ai-icon"></i> }@(Item.NormalizedTitle ?? Item.Title)</h3>
     @if (!string.IsNullOrEmpty(RecommendationReason))
@@ -76,7 +79,7 @@
     <div class="tag-container">
         @if (Item.Tags != null)
         {
-            @foreach (var tagInfo in Item.Tags)
+            @foreach (var tagInfo in Item.Tags.Where(t => t.ApprovalStatus == vrScraper.DB.Models.TagApprovalStatus.Approved))
             {
                 var isAutoTag = IsAutoDetectedTag(Item, tagInfo.Id);
                 <button type="button" class="btn btn-primary tag-pill @(isAutoTag ? "auto-detected" : "")" @onclick="() => OnAddTagFilter.InvokeAsync(tagInfo.Name)">
@@ -103,6 +106,7 @@
     [Parameter] public EventCallback<(Microsoft.AspNetCore.Components.Web.ErrorEventArgs Error, DbVideoItem Item)> OnImageError { get; set; }
     [Parameter] public double? SimilarityScore { get; set; }
     [Parameter] public string? RecommendationReason { get; set; }
+    [Parameter] public bool Compact { get; set; }
 
     private async Task OnThumbnailClick()
     {

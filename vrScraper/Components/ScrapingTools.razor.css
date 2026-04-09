@@ -178,18 +178,18 @@
 }
 
 .stat-item.bg-success {
-    color: var(--color-success);
-    background: var(--color-primary-subtle);
+    color: white;
+    background: var(--color-success, #22c55e);
 }
 
 .stat-item.bg-danger {
-    color: var(--color-danger);
-    background: var(--color-primary-subtle);
+    color: white;
+    background: var(--color-danger, #ef4444);
 }
 
 .stat-item.bg-warning {
-    color: var(--color-warning);
-    background: var(--color-primary-subtle);
+    color: #1a1a1a;
+    background: var(--color-warning, #f59e0b);
 }
 
 .stat-item i {

@@ -1,0 +1,296 @@
+@page "/tags"
+
+@using vrScraper.DB
+@using vrScraper.DB.Models
+@using vrScraper.Services.Interfaces
+@using vrScraper.Components
+@using Microsoft.EntityFrameworkCore
+
+@inject IServiceScopeFactory ScopeFactory
+@inject IVideoService VideoService
+
+<h3>Tag Management</h3>
+
+<div class="tags-container">
+
+    <div class="tags-info-box">
+        <i class="icon-info"></i>
+        <div>
+            The tags below are collected from source sites during scraping. Categories (like POV, Blowjob, VR Porn) are added automatically.
+            Additional free-form tags set by uploaders may contain useful descriptors (e.g. Cowgirl, Fishnets, Cosplay) but also noise.
+            These start as <em>Pending</em> and are hidden until you approve them. Denied tags will be skipped in future scrapes.
+        </div>
+    </div>
+
+    <div class="tags-tabs">
+        <button class="tags-tab @(activeTab == "pending" ? "active" : "")" @onclick="() => SetTab(TabPending)">
+            Pending
+            @if (pendingTags.Any())
+            {
+                <span class="tab-badge">@pendingTags.Count</span>
+            }
+        </button>
+        <button class="tags-tab @(activeTab == "approved" ? "active" : "")" @onclick="() => SetTab(TabApproved)">
+            Approved
+        </button>
+        <button class="tags-tab @(activeTab == "denied" ? "active" : "")" @onclick="() => SetTab(TabDenied)">
+            Denied
+        </button>
+    </div>
+
+    @if (activeTab == "pending")
+    {
+        <div class="tags-section">
+            @if (pendingTags.Any())
+            {
+                <div class="tags-bulk-actions">
+                    <button class="btn-action btn-approve" @onclick="ApproveSelected" disabled="@(!selectedTags.Any())">Approve Selected (@selectedTags.Count)</button>
+                    <button class="btn-action btn-deny" @onclick="DenySelected" disabled="@(!selectedTags.Any())">Deny Selected (@selectedTags.Count)</button>
+                </div>
+                <div class="tags-list">
+                    @foreach (var item in pendingTags)
+                    {
+                        <div class="tag-entry">
+                            <div class="tag-item" @onclick="() => ToggleExpand(item.Tag.Id)">
+                                <label class="tag-checkbox" @onclick:stopPropagation="true">
+                                    <input type="checkbox" checked="@selectedTags.Contains(item.Tag.Id)" @onchange="(e) => ToggleSelection(item.Tag.Id, (bool)e.Value!)" />
+                                </label>
+                                <i class="expand-icon @(expandedTagId == item.Tag.Id ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                                <span class="tag-name">@item.Tag.Name</span>
+                                <span class="tag-count">@item.VideoCount videos</span>
+                                <div class="tag-actions" @onclick:stopPropagation="true">
+                                    <button class="btn-sm btn-approve" @onclick="() => SetTagStatus(item.Tag.Id, TagApprovalStatus.Approved)">Approve</button>
+                                    <button class="btn-sm btn-deny" @onclick="() => SetTagStatus(item.Tag.Id, TagApprovalStatus.Denied)">Deny</button>
+                                </div>
+                            </div>
+                            @if (expandedTagId == item.Tag.Id && expandedVideos != null)
+                            {
+                                <div class="tag-video-preview">
+                                    <div class="video-gallery">
+                                        @foreach (var video in expandedVideos)
+                                        {
+                                            <VideoCard Item="video" Compact="true" />
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="tags-empty">No pending tags. New soft tags from scrapes will appear here.</div>
+            }
+        </div>
+    }
+
+    @if (activeTab == "approved")
+    {
+        <div class="tags-section">
+            @if (approvedTags.Any())
+            {
+                <div class="tags-list">
+                    @foreach (var item in approvedTags)
+                    {
+                        <div class="tag-entry">
+                            <div class="tag-item" @onclick="() => ToggleExpand(item.Tag.Id)">
+                                <i class="expand-icon @(expandedTagId == item.Tag.Id ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                                <span class="tag-name">@item.Tag.Name</span>
+                                @if (item.Tag.IsSoftTag)
+                                {
+                                    <span class="tag-badge soft">soft</span>
+                                }
+                                <span class="tag-count">@item.VideoCount videos</span>
+                                @if (item.Tag.IsSoftTag)
+                                {
+                                    <div class="tag-actions" @onclick:stopPropagation="true">
+                                        <button class="btn-sm btn-deny" @onclick="() => SetTagStatus(item.Tag.Id, TagApprovalStatus.Denied)">Deny</button>
+                                    </div>
+                                }
+                            </div>
+                            @if (expandedTagId == item.Tag.Id && expandedVideos != null)
+                            {
+                                <div class="tag-video-preview">
+                                    <div class="video-gallery">
+                                        @foreach (var video in expandedVideos)
+                                        {
+                                            <VideoCard Item="video" Compact="true" />
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="tags-empty">No approved tags.</div>
+            }
+        </div>
+    }
+
+    @if (activeTab == "denied")
+    {
+        <div class="tags-section">
+            @if (deniedTags.Any())
+            {
+                <div class="tags-list">
+                    @foreach (var item in deniedTags)
+                    {
+                        <div class="tag-entry">
+                            <div class="tag-item" @onclick="() => ToggleExpand(item.Tag.Id)">
+                                <i class="expand-icon @(expandedTagId == item.Tag.Id ? "icon-chevron-down" : "icon-chevron-right")"></i>
+                                <span class="tag-name">@item.Tag.Name</span>
+                                <span class="tag-count">@item.VideoCount videos</span>
+                                <div class="tag-actions" @onclick:stopPropagation="true">
+                                    <button class="btn-sm btn-approve" @onclick="() => SetTagStatus(item.Tag.Id, TagApprovalStatus.Approved)">Approve</button>
+                                    <button class="btn-sm btn-pending" @onclick="() => SetTagStatus(item.Tag.Id, TagApprovalStatus.Pending)">Reset</button>
+                                </div>
+                            </div>
+                            @if (expandedTagId == item.Tag.Id && expandedVideos != null)
+                            {
+                                <div class="tag-video-preview">
+                                    <div class="video-gallery">
+                                        @foreach (var video in expandedVideos)
+                                        {
+                                            <VideoCard Item="video" Compact="true" />
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="tags-empty">No denied tags.</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const string TabPending = "pending";
+    private const string TabApproved = "approved";
+    private const string TabDenied = "denied";
+
+    private string activeTab = TabPending;
+    private List<TagInfo> pendingTags = new();
+    private List<TagInfo> approvedTags = new();
+    private List<TagInfo> deniedTags = new();
+    private HashSet<long> selectedTags = new();
+
+    private long? expandedTagId;
+    private List<DbVideoItem>? expandedVideos;
+
+    private record TagInfo(DbTag Tag, long VideoCount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTags();
+    }
+
+    private async Task LoadTags()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+
+        var allTags = await context.Tags
+            .Select(t => new { Tag = t, VideoCount = (long)t.Videos.Count })
+            .OrderByDescending(t => t.VideoCount)
+            .ToListAsync();
+
+        pendingTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Pending)
+            .Select(t => new TagInfo(t.Tag, t.VideoCount)).ToList();
+        approvedTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Approved)
+            .Select(t => new TagInfo(t.Tag, t.VideoCount)).ToList();
+        deniedTags = allTags.Where(t => t.Tag.ApprovalStatus == TagApprovalStatus.Denied)
+            .Select(t => new TagInfo(t.Tag, t.VideoCount)).ToList();
+
+        selectedTags.Clear();
+    }
+
+    private async Task ToggleExpand(long tagId)
+    {
+        if (expandedTagId == tagId)
+        {
+            expandedTagId = null;
+            expandedVideos = null;
+            return;
+        }
+
+        expandedTagId = tagId;
+        var allVideos = await VideoService.GetVideoItems();
+        expandedVideos = allVideos
+            .Where(v => v.Tags.Any(t => t.Id == tagId))
+            .OrderBy(_ => Guid.NewGuid())
+            .Take(30)
+            .ToList();
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        selectedTags.Clear();
+        expandedTagId = null;
+        expandedVideos = null;
+    }
+
+    private void ToggleSelection(long tagId, bool selected)
+    {
+        if (selected)
+            selectedTags.Add(tagId);
+        else
+            selectedTags.Remove(tagId);
+    }
+
+    private async Task SetTagStatus(long tagId, TagApprovalStatus status)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var tag = await context.Tags.FindAsync(tagId);
+        if (tag != null)
+        {
+            tag.ApprovalStatus = status;
+            await context.SaveChangesAsync();
+        }
+        expandedTagId = null;
+        expandedVideos = null;
+        await LoadTags();
+        await VideoService.ReloadVideos();
+    }
+
+    private async Task ApproveSelected()
+    {
+        if (!selectedTags.Any()) return;
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var tags = await context.Tags.Where(t => selectedTags.Contains(t.Id)).ToListAsync();
+        foreach (var tag in tags)
+            tag.ApprovalStatus = TagApprovalStatus.Approved;
+        await context.SaveChangesAsync();
+        expandedTagId = null;
+        expandedVideos = null;
+        await LoadTags();
+        await VideoService.ReloadVideos();
+    }
+
+    private async Task DenySelected()
+    {
+        if (!selectedTags.Any()) return;
+        using var scope = ScopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var tags = await context.Tags.Where(t => selectedTags.Contains(t.Id)).ToListAsync();
+        foreach (var tag in tags)
+            tag.ApprovalStatus = TagApprovalStatus.Denied;
+        await context.SaveChangesAsync();
+        expandedTagId = null;
+        expandedVideos = null;
+        await LoadTags();
+        await VideoService.ReloadVideos();
+    }
+
+}

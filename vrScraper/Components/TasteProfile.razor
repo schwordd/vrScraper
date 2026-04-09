@@ -80,7 +80,7 @@
 
         // Build tag stats — ranked by like count, exclude ubiquitous tags (>30%)
         var tagGroups = videos
-            .SelectMany(v => v.Tags.Select(t => new { Tag = t.Name, Video = v }))
+            .SelectMany(v => v.Tags.Where(t => t.ApprovalStatus == vrScraper.DB.Models.TagApprovalStatus.Approved).Select(t => new { Tag = t.Name, Video = v }))
             .GroupBy(x => x.Tag, StringComparer.OrdinalIgnoreCase)
             .Where(g => (double)g.Count() / totalVideoCount <= 0.3)
             .Select(g =>

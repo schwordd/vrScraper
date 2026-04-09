@@ -76,7 +76,7 @@ namespace vrScraper.Controllers
         favorites = item.Liked ? 1 : 0,
         comments = 0,
         isFavorite = item.Liked,
-        tags = item.Tags.Select(t => new { name = t.Name, start = 0.0d, end = 0.0d, track = 0 })
+        tags = item.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved).Select(t => new { name = t.Name, start = 0.0d, end = 0.0d, track = 0 })
             .Concat(item.Stars.Select(s => new { name = $"Talent:{s.Name}", start = 0.0d, end = 0.0d, track = 1 }))
       });
 
@@ -135,7 +135,7 @@ namespace vrScraper.Controllers
       }
 
       var stars = foundVideo.Stars.Select(s => new { name = $"Talent:{s.Name}", start = 0.0d, end = 0.0d, track = 1 }).ToList();
-      var tags = foundVideo.Tags.Select(t => new { name = t.Name, start = 0.0d, end = 0.0d, track = 0 }).ToList();
+      var tags = foundVideo.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved).Select(t => new { name = t.Name, start = 0.0d, end = 0.0d, track = 0 }).ToList();
 
       var dateStr = foundVideo.AddedUTC?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd");
 

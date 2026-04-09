@@ -77,6 +77,7 @@ namespace vrScraper.Services
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
       var tagCounts = await context.Tags
+          .Where(tag => tag.ApprovalStatus == DB.Models.TagApprovalStatus.Approved)
           .Select(tag => new
           {
             Tag = tag,

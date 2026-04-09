@@ -15,6 +15,10 @@ namespace vrScraper.DB.Models
     [Required]
     public string Name { get; set; }
 
+    public bool IsSoftTag { get; set; }
+
+    public TagApprovalStatus ApprovalStatus { get; set; } = TagApprovalStatus.Approved;
+
     public virtual List<DbVideoItem> Videos { get; set; }
     public virtual List<DbVideoTag> VideoTags { get; set; }
   }
