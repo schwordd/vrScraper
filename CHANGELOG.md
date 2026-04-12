@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v1.2.8 (2026-04-12)
+- Honor X-Forwarded-* headers so reverse proxy deployments build correct DeoVR/HereSphere URLs
+
 ## v1.2.7 (2026-04-09)
 - Improve soft-tag filtering with suggested denials UI, case-insensitive lookups, star-phrase and stopword detection
 
