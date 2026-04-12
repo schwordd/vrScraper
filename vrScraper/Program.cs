@@ -8,6 +8,7 @@ using vrScraper.Services.Interfaces;
 using vrScraper.Scrapers;
 using vrScraper.Scrapers.Interfaces;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Serilog;
@@ -207,6 +208,17 @@ namespace vrScraper
           Console.WriteLine($"Merged {mergedCount} duplicate tag(s) (case-insensitive).");
         }
       }
+
+      // Honor X-Forwarded-* headers from reverse proxy (scheme/host used in DeoVR + HereSphere JSON URLs)
+      var forwardedOptions = new ForwardedHeadersOptions
+      {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                         | ForwardedHeaders.XForwardedProto
+                         | ForwardedHeaders.XForwardedHost
+      };
+      forwardedOptions.KnownIPNetworks.Clear();
+      forwardedOptions.KnownProxies.Clear();
+      app.UseForwardedHeaders(forwardedOptions);
 
       // Enable CORS
       app.UseCors("AllowAll");
