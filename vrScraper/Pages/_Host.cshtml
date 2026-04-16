@@ -66,5 +66,14 @@
     <!-- D3 for network graph layout -->
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
     <script src="~/js/networkGraph.js"></script>
+
+    <script>
+        window.vrScraperBrowser = {
+            getTimeZone: function () {
+                try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }
+                catch (e) { return ""; }
+            }
+        };
+    </script>
 </body>
 </html>

@@ -4,7 +4,6 @@ using vrScraper.Scrapers.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace vrScraper.Scrapers
 {
@@ -54,27 +53,30 @@ namespace vrScraper.Scrapers
         return;
       }
 
-      var now = DateTime.Now;
+      var tz = await ResolveTimeZone(settingService);
+      var nowUtc = DateTime.UtcNow;
+      var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
 
-      // Check if we already scraped today
+      // Check if we already scraped today (in configured TZ, so "today" matches the user's calendar)
       var lastScrapeSetting = await settingService.GetSetting("LastScheduledScrape");
       if (lastScrapeSetting != null && DateTime.TryParse(lastScrapeSetting.Value, out DateTime lastScrape))
       {
-        if (lastScrape.Date == now.Date)
+        if (lastScrape.Date == nowLocal.Date)
         {
-          _logger.LogDebug("Scheduled check skipped: already scraped today (last: {Date})", lastScrape.ToString("yyyy-MM-dd"));
-          return; // Already scraped today
+          _logger.LogDebug("Scheduled check skipped: already scraped today (last: {Date}, TZ: {Tz})", lastScrape.ToString("yyyy-MM-dd"), tz.Id);
+          return;
         }
       }
 
-      // Run per-site auto-scraping (each site has its own enabled/time/maxpages settings)
-      await RunScheduledScraping(registry, settingService, now, cancellationToken);
+      await RunScheduledScraping(registry, settingService, tz, nowUtc, nowLocal, cancellationToken);
     }
 
-    private async Task RunScheduledScraping(IScraperRegistry registry, ISettingService settingService, DateTime now, CancellationToken cancellationToken)
+    private async Task RunScheduledScraping(IScraperRegistry registry, ISettingService settingService, TimeZoneInfo tz, DateTime nowUtc, DateTime nowLocal, CancellationToken cancellationToken)
     {
       try
       {
+        bool anyRan = false;
+
         foreach (var scraper in registry.GetAllScrapers())
         {
           if (cancellationToken.IsCancellationRequested) break;
@@ -82,7 +84,6 @@ namespace vrScraper.Scrapers
 
           var site = scraper.SiteName;
 
-          // Check if site is globally enabled
           var siteEnabledSetting = await settingService.GetSetting($"Site:{site}:Enabled");
           var siteEnabledDefault = site.Equals("eporner.com", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
           var siteEnabled = siteEnabledSetting?.Value ?? siteEnabledDefault;
@@ -92,7 +93,6 @@ namespace vrScraper.Scrapers
             continue;
           }
 
-          // Check per-site auto-scrape enabled
           var enabledSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeEnabled");
           if (enabledSetting == null || !enabledSetting.Value.Equals("true", StringComparison.OrdinalIgnoreCase))
           {
@@ -100,36 +100,32 @@ namespace vrScraper.Scrapers
             continue;
           }
 
-          // Check per-site scrape time
           var timeSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeTime");
-          if (timeSetting == null || !TimeSpan.TryParse(timeSetting.Value, out TimeSpan siteScheduledTime))
+          if (timeSetting == null || !TimeSpan.TryParse(timeSetting.Value, out TimeSpan siteScheduledLocal))
           {
-            _logger.LogDebug("Site {Site} skipped: no valid AutoScrapeTime setting", site);
+            _logger.LogInformation("Site {Site} skipped: no valid AutoScrapeTime setting", site);
             continue;
           }
 
-          var currentTime = now.TimeOfDay;
-          var diff = (siteScheduledTime - currentTime).TotalMinutes;
-          if (diff < 0) diff += 24 * 60;
-          var timeDifference = Math.Min(diff, 24 * 60 - diff);
+          var timeDifference = MinutesUntilNextOccurrence(siteScheduledLocal, tz, nowUtc);
           if (timeDifference > 60)
           {
-            _logger.LogDebug("Site {Site} skipped: configured time {Configured} not within 60min of current UTC {Current}", site, siteScheduledTime, currentTime);
+            _logger.LogInformation("Site {Site} skipped: configured time {Configured} ({Tz}) not within 60min of now (delta {Diff:F0} min)", site, siteScheduledLocal, tz.Id, timeDifference);
             continue;
           }
 
-          // Get per-site max pages
           var maxPagesSetting = await settingService.GetSetting($"Site:{site}:AutoScrapeMaxPages");
           int maxPages = (maxPagesSetting != null && int.TryParse(maxPagesSetting.Value, out int mp)) ? mp : 50;
 
-          _logger.LogInformation("Starting auto-scrape for {Site} with max {MaxPages} pages", site, maxPages);
+          _logger.LogInformation("Starting auto-scrape for {Site} with max {MaxPages} pages (configured {Configured} {Tz})", site, maxPages, siteScheduledLocal, tz.Id);
           scraper.IsScheduledScraping = true;
           scraper.StartScraping(1, maxPages);
+          anyRan = true;
 
-          var timeout = DateTime.Now.AddHours(3);
+          var timeoutUtc = DateTime.UtcNow.AddHours(3);
           while (scraper.ScrapingInProgress && !cancellationToken.IsCancellationRequested)
           {
-            if (DateTime.Now > timeout)
+            if (DateTime.UtcNow > timeoutUtc)
             {
               _logger.LogWarning("Auto-scrape timeout for {Site}, stopping", site);
               scraper.StopScraping();
@@ -142,20 +138,61 @@ namespace vrScraper.Scrapers
           _logger.LogInformation("Auto-scrape completed for {Site}", site);
         }
 
-        // Update last scrape date
-        var lastScrapeSetting2 = await settingService.GetSetting("LastScheduledScrape");
-        if (lastScrapeSetting2 != null)
+        if (anyRan)
         {
-          lastScrapeSetting2.Value = DateTime.Now.ToString("yyyy-MM-dd");
-          await settingService.UpdateSetting(lastScrapeSetting2);
+          var lastScrapeSetting2 = await settingService.GetSetting("LastScheduledScrape");
+          if (lastScrapeSetting2 != null)
+          {
+            lastScrapeSetting2.Value = nowLocal.ToString("yyyy-MM-dd");
+            await settingService.UpdateSetting(lastScrapeSetting2);
+          }
+          _logger.LogInformation("Scheduled scraping completed for all sites");
         }
-
-        _logger.LogInformation("Scheduled scraping completed for all sites");
       }
       catch (Exception ex)
       {
         _logger.LogError(ex, "Error during scheduled scraping");
       }
+    }
+
+    private async Task<TimeZoneInfo> ResolveTimeZone(ISettingService settingService)
+    {
+      var tzSetting = await settingService.GetSetting("TimeZone");
+      var id = tzSetting?.Value;
+      if (string.IsNullOrWhiteSpace(id))
+      {
+        return TimeZoneInfo.Utc;
+      }
+      var resolved = TimeZoneResolver.TryResolve(id);
+      if (resolved != null) return resolved;
+      _logger.LogWarning("Unknown TimeZone setting '{Id}', falling back to UTC. Ensure tzdata is installed in the container.", id);
+      return TimeZoneInfo.Utc;
+    }
+
+    // Returns the absolute minutes between now (UTC) and the next (or most recent) occurrence
+    // of the local time-of-day in the given timezone. Result is in [0, 720].
+    private static double MinutesUntilNextOccurrence(TimeSpan localTimeOfDay, TimeZoneInfo tz, DateTime nowUtc)
+    {
+      var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
+      var todayLocal = DateTime.SpecifyKind(nowLocal.Date + localTimeOfDay, DateTimeKind.Unspecified);
+
+      double best = double.MaxValue;
+      foreach (var candidateLocal in new[] { todayLocal.AddDays(-1), todayLocal, todayLocal.AddDays(1) })
+      {
+        DateTime candidateUtc;
+        try
+        {
+          candidateUtc = TimeZoneInfo.ConvertTimeToUtc(candidateLocal, tz);
+        }
+        catch (ArgumentException)
+        {
+          // Time falls in a DST gap — skip
+          continue;
+        }
+        var diff = Math.Abs((candidateUtc - nowUtc).TotalMinutes);
+        if (diff < best) best = diff;
+      }
+      return best;
     }
   }
 }

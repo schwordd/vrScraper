@@ -2,6 +2,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 5001
 
+# tzdata is required so TimeZoneInfo.FindSystemTimeZoneById(...) can resolve
+# IANA zone IDs (e.g. "Europe/Berlin") that the frontend auto-detects from the browser.
+# Scheduled scraping depends on this regardless of the TZ env var or mounted /etc/localtime.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY ["vrScraper/vrScraper.csproj", "vrScraper/"]

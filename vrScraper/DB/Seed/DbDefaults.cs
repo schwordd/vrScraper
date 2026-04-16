@@ -92,6 +92,14 @@ namespace vrScraper.DB.Seed
         db.Settings.Add(new Models.DbSetting() { Key = "AuthPasswordHash", Type = "System.String", Value = "" });
       }
 
+      // Timezone used to interpret AutoScrapeTime values.
+      // Auto-populated from the browser (Intl.DateTimeFormat().resolvedOptions().timeZone)
+      // on first visit to the Settings page. Empty = fall back to UTC.
+      if (defaultSettings.Exists(a => a.Key == "TimeZone") == false)
+      {
+        db.Settings.Add(new Models.DbSetting() { Key = "TimeZone", Type = "System.String", Value = "" });
+      }
+
       db.SaveChanges();
     }
     public static void SeedDefaultTabs(VrScraperContext db)

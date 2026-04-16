@@ -787,6 +787,9 @@
         {
             WatchlistTabs = TabService.GetWatchlistTabs();
             UpdateWatchlistVideoIds();
+            _cachedRandomItems = null;
+            _cachedFilteredItems = null;
+            StateHasChanged();
         }
     }
 

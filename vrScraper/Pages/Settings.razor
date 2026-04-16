@@ -10,6 +10,7 @@
 @inject IVideoService VideoService
 @inject ISettingService SettingService
 @inject IScraperRegistry ScraperRegistry
+@inject IJSRuntime JSRuntime
 
 <h3>Settings</h3>
 
@@ -45,6 +46,18 @@
             <i class="icon-globe me-2"></i>
             Source Sites
         </h5>
+        <div class="tz-hint">
+            <div>
+                <i class="icon-clock me-1"></i>
+                Scrape times are interpreted in the timezone
+                <strong>@(string.IsNullOrEmpty(_effectiveTimeZone) ? "UTC" : _effectiveTimeZone)</strong>.
+                @if (!string.IsNullOrEmpty(_tzWarning))
+                {
+                    <span class="text-warning ms-2">(@_tzWarning)</span>
+                }
+            </div>
+            <small class="text-muted">Auto-detected from your browser. DST is handled automatically.</small>
+        </div>
         <div class="table-responsive">
             <table class="vr-table">
                 <thead>
@@ -244,10 +257,48 @@
         SetSiteSetting(site, "AutoScrapeTime", value);
     }
 
+    private string _effectiveTimeZone = "";
+    private string? _tzWarning;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadTags();
         await LoadSettings();
+        await EnsurePerSiteDefaults();
+        _effectiveTimeZone = AllSettings.FirstOrDefault(s => s.Key == "TimeZone")?.Value ?? "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        string browserTz;
+        try
+        {
+            browserTz = await JSRuntime.InvokeAsync<string>("vrScraperBrowser.getTimeZone");
+        }
+        catch
+        {
+            browserTz = "";
+        }
+
+        if (string.IsNullOrWhiteSpace(browserTz)) return;
+
+        var current = AllSettings.FirstOrDefault(s => s.Key == "TimeZone");
+        if (current != null && current.Value == browserTz) return;
+
+        // Validate the TZ is resolvable on the server — tzdata may be missing in the container.
+        if (vrScraper.Scrapers.TimeZoneResolver.TryResolve(browserTz) == null)
+        {
+            _tzWarning = $"Browser timezone '{browserTz}' not recognized by the server runtime. On Linux/Docker ensure tzdata is installed; on Windows restart the app after updating .NET. Falling back to UTC.";
+            StateHasChanged();
+            return;
+        }
+
+        await SettingService.SaveSetting("TimeZone", browserTz);
+        await LoadSettings();
+        _effectiveTimeZone = browserTz;
+        StateHasChanged();
     }
 
     private async Task LoadTags()
@@ -258,6 +309,33 @@
     private async Task LoadSettings()
     {
         AllSettings = (await SettingService.GetAllSettings()).ToList();
+    }
+
+    // Persist UI defaults for any per-site setting that has never been written to the DB.
+    // Without this, the BackgroundService sees null for keys the user never explicitly edited
+    // (e.g. AutoScrapeTime when only the AutoScrape toggle was flipped) and skips the site.
+    private async Task EnsurePerSiteDefaults()
+    {
+        var added = false;
+        foreach (var scraper in ScraperRegistry.GetAllScrapers())
+        {
+            var site = scraper.SiteName;
+            added |= await EnsureSetting(site, "Enabled", site == "eporner.com" ? "true" : "false");
+            added |= await EnsureSetting(site, "MinDuration", "0");
+            added |= await EnsureSetting(site, "AutoScrapeEnabled", "false");
+            added |= await EnsureSetting(site, "AutoScrapeTime", "02:00");
+            added |= await EnsureSetting(site, "AutoScrapeMaxPages", "50");
+            added |= await EnsureSetting(site, "AutoEnrichEnabled", "true");
+        }
+        if (added) await LoadSettings();
+    }
+
+    private async Task<bool> EnsureSetting(string site, string key, string defaultValue)
+    {
+        var fullKey = $"Site:{site}:{key}";
+        if (AllSettings.Any(s => s.Key == fullKey)) return false;
+        await SettingService.SaveSetting(fullKey, defaultValue);
+        return true;
     }
 
     // Password change fields
