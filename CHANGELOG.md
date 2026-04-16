@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v1.2.9 (2026-04-16)
+- Fix scheduled scraping timezone handling for Docker and watchlist filter refresh after bulk-remove
+
 ## v1.2.8 (2026-04-12)
 - Honor X-Forwarded-* headers so reverse proxy deployments build correct DeoVR/HereSphere URLs
 
