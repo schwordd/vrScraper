@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v1.2.10 (2026-05-04)
+- Add daily trend chart, similar-videos player context, watchlist/page-size persistence with browser-back fix, perf improvements and player layout polish
+
 ## v1.2.9 (2026-04-16)
 - Fix scheduled scraping timezone handling for Docker and watchlist filter refresh after bulk-remove
 
