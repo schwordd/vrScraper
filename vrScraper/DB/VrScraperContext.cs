@@ -15,6 +15,7 @@ namespace vrScraper.DB
     public DbSet<DbScrapeLog> ScrapeLogs { get; set; }
     public DbSet<DbPlaybackEvent> PlaybackEvents { get; set; }
     public DbSet<DbVideoEngagement> VideoEngagements { get; set; }
+    public DbSet<DbDailySnapshot> DailySnapshots { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

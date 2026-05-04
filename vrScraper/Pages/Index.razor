@@ -3,8 +3,10 @@
 @using vrScraper.Components
 @using vrScraper.DB.Models
 @using vrScraper.Services
+@using vrScraper.Services.Interfaces
 @inject IVideoService VideoService
 @inject IScrapeLogService ScrapeLogService
+@inject IDailySnapshotService DailySnapshotService
 
 <h3>Home</h3>
 
@@ -161,6 +163,10 @@
     </div>
 }
 
+<div class="vr-panel p-3 mb-3">
+    <DailyTrendChart Data="_trendData" Title="Library trend (last 30 days)" />
+</div>
+
 @code {
     private int TotalVideos;
     private int WatchedVideos;
@@ -172,6 +178,7 @@
     private string EnrichedPercent = "0%";
 
     private List<DbScrapeLog> _recentLogs = new();
+    private List<DbDailySnapshot> _trendData = new();
     private bool _tasteOpen = false;
     private bool _leaderboardOpen = false;
     private bool _scrapeLogOpen = false;
@@ -190,30 +197,46 @@
     {
         var videos = await VideoService.GetVideoItems();
 
-        TotalVideos = videos.Count;
-        WatchedVideos = videos.Count(v => v.PlayCount > 0);
-        UnwatchedVideos = videos.Count(v => v.PlayCount == 0);
-        LikedVideos = videos.Count(v => v.Liked);
+        // Single-pass aggregation. Eight separate LINQ scans over the in-memory list
+        // were noticeably slow on large libraries; one foreach is the same answer in 1/8th the work.
+        int total = 0, watched = 0, liked = 0, parsedCount = 0;
+        long totalPlays = 0;
+        long playDurationTicks = 0;
+        long durationTicks = 0;
+        var siteCounts = new Dictionary<string, int>();
+        foreach (var v in videos)
+        {
+            total++;
+            if (v.PlayCount > 0) watched++;
+            if (v.Liked) liked++;
+            if (v.ParsedDetails) parsedCount++;
+            totalPlays += v.PlayCount;
+            playDurationTicks += v.PlayDurationEst.Ticks;
+            durationTicks += v.Duration.Ticks;
+            var site = v.Site ?? "unknown";
+            siteCounts[site] = siteCounts.GetValueOrDefault(site) + 1;
+        }
 
-        var totalDuration = TimeSpan.FromTicks(videos.Sum(v => v.PlayDurationEst.Ticks));
-        var totalHours = (int)totalDuration.TotalHours;
-        var totalMinutes = totalDuration.Minutes;
-        TotalWatchTime = $"{totalHours}h {totalMinutes}m";
+        TotalVideos = total;
+        WatchedVideos = watched;
+        UnwatchedVideos = total - watched;
+        LikedVideos = liked;
+        TotalPlays = totalPlays;
 
-        TotalPlays = videos.Sum(v => v.PlayCount);
+        var totalDuration = TimeSpan.FromTicks(playDurationTicks);
+        TotalWatchTime = $"{(int)totalDuration.TotalHours}h {totalDuration.Minutes}m";
 
-        var libDuration = TimeSpan.FromTicks(videos.Sum(v => v.Duration.Ticks));
+        var libDuration = TimeSpan.FromTicks(durationTicks);
         LibrarySize = $"{(int)libDuration.TotalHours:N0}h";
 
-        EnrichedPercent = TotalVideos > 0
-            ? $"{(double)videos.Count(v => v.ParsedDetails) / TotalVideos * 100:F0}%"
+        EnrichedPercent = total > 0
+            ? $"{(double)parsedCount / total * 100:F0}%"
             : "0%";
 
-        _sourceDistribution = videos.GroupBy(v => v.Site ?? "unknown")
-            .ToDictionary(g => g.Key, g => g.Count());
-
+        _sourceDistribution = siteCounts;
 
         _recentLogs = await ScrapeLogService.GetRecentLogs(10);
+        _trendData = await DailySnapshotService.GetLastSnapshots(30);
     }
 
     private static string FormatLogDuration(DbScrapeLog log)

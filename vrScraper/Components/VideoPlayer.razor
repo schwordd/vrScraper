@@ -70,6 +70,24 @@
 
                 <span class="video-counter">@(VideoIndex + 1) / @VideoListCount</span>
 
+                @if (CurrentVideo != null && (CurrentVideo.AddedUTC.HasValue || CurrentVideo.SiteRating.HasValue))
+                {
+                    <div class="player-meta-info">
+                        @if (CurrentVideo.SiteRating.HasValue)
+                        {
+                            <span class="meta-rating" title="@($"Site rating {(CurrentVideo.SiteRating.Value * 10).ToString("F1", System.Globalization.CultureInfo.InvariantCulture)} / 10")">
+                                <i class="icon-star"></i> @((CurrentVideo.SiteRating.Value * 10).ToString("F1", System.Globalization.CultureInfo.InvariantCulture))
+                            </span>
+                        }
+                        @if (CurrentVideo.AddedUTC.HasValue)
+                        {
+                            <span class="meta-date" title="@($"Added {CurrentVideo.AddedUTC.Value.ToLocalTime():dddd, d. MMMM yyyy}")">
+                                <i class="icon-calendar"></i> @CurrentVideo.AddedUTC.Value.ToLocalTime().ToString("dd.MM.yyyy")
+                            </span>
+                        }
+                    </div>
+                }
+
                 <button class="help-btn @(_shortcutsPinned ? "active" : "")" @onclick="ToggleShortcutsPinned" title="Shortcuts (H)">
                     <i class="icon-help-circle"></i>
                 </button>

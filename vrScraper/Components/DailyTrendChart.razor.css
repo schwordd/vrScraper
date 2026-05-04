@@ -1,0 +1,42 @@
+.trend-chart-wrapper {
+    width: 100%;
+    padding: 12px;
+}
+.trend-chart-title {
+    font-size: 14px;
+    color: var(--color-text-muted, rgba(255,255,255,0.7));
+    margin-bottom: 10px;
+}
+.trend-chart-svg {
+    width: 100%;
+    height: 200px;
+    overflow: visible;
+}
+.trend-chart-svg .line {
+    fill: none;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+.trend-chart-svg .line-total { stroke: #38bdf8; }
+.trend-chart-svg .line-unwatched { stroke: #f59e0b; }
+.trend-chart-svg .line-watched { stroke: #22c55e; }
+.trend-chart-svg .axis-label { font-size: 10px; fill: rgba(255,255,255,0.5); }
+.trend-chart-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+.trend-chart-legend .legend-item { display: flex; align-items: center; gap: 6px; }
+.trend-chart-legend .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.trend-chart-legend .dot-total { background: #38bdf8; }
+.trend-chart-legend .dot-unwatched { background: #f59e0b; }
+.trend-chart-legend .dot-watched { background: #22c55e; }
+.trend-chart-legend .legend-value { color: rgba(255,255,255,0.7); }
+.trend-chart-empty {
+    padding: 40px 12px;
+    text-align: center;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+}

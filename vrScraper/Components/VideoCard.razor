@@ -2,6 +2,7 @@
 
 <div class="video-item">
     <div class="thumbnail-container @(Item.IsThumbnailNotAvailable == true ? "not-available" : "")"
+         title="@BuildMetaTooltip()"
          @onclick="OnThumbnailClick">
         @{
             if (string.IsNullOrEmpty(Item.Thumbnail))
@@ -58,7 +59,7 @@
             </div>
         }
     </div>
-    <h3 title="@(!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title ? Item.Title : "")">@if (!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title) { <i class="icon-sparkles ai-icon"></i> }@(Item.NormalizedTitle ?? Item.Title)</h3>
+    <h3 title="@BuildTitleTooltip()">@if (!string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title) { <i class="icon-sparkles ai-icon"></i> }@(Item.NormalizedTitle ?? Item.Title)</h3>
     @if (!string.IsNullOrEmpty(RecommendationReason))
     {
         <div class="recommendation-reason"><i class="icon-sparkles"></i> @RecommendationReason</div>
@@ -112,6 +113,27 @@
     {
         if (Item.IsThumbnailNotAvailable != true)
             await OnPlay.InvokeAsync(Item);
+    }
+
+    private string BuildMetaTooltip()
+    {
+        var parts = new List<string>();
+        if (Item.SiteRating.HasValue)
+            parts.Add($"Rating {(Item.SiteRating.Value * 10).ToString("F1", System.Globalization.CultureInfo.InvariantCulture)} / 10");
+        if (Item.AddedUTC.HasValue)
+            parts.Add($"Added {Item.AddedUTC.Value.ToLocalTime():dd.MM.yyyy}");
+        if (Item.Views.HasValue)
+            parts.Add($"Views {Item.Views.Value.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}");
+        return string.Join("  -  ", parts);
+    }
+
+    private string BuildTitleTooltip()
+    {
+        var hasOriginal = !string.IsNullOrEmpty(Item.NormalizedTitle) && Item.NormalizedTitle != Item.Title;
+        var meta = BuildMetaTooltip();
+        if (hasOriginal && !string.IsNullOrEmpty(meta)) return $"{Item.Title}\n{meta}";
+        if (hasOriginal) return Item.Title;
+        return meta;
     }
 
     private async Task HandleImageError(Microsoft.AspNetCore.Components.Web.ErrorEventArgs e)

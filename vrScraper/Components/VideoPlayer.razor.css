@@ -155,7 +155,8 @@
 .player-toolbar {
     position: absolute;
     top: 15px;
-    left: 15px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -212,8 +213,8 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all var(--transition-base) ease;
     padding: 0;
+    transition: all var(--transition-base) ease;
 }
 
 .player-toolbar .watchlist-btn.in-watchlist {
@@ -251,7 +252,6 @@
     align-items: center;
     justify-content: center;
     transition: color var(--transition-fast), background-color var(--transition-fast);
-    margin-left: auto;
 }
 
 .player-toolbar .help-btn:hover {
@@ -373,4 +373,26 @@
         top: 10px;
         right: 10px;
     }
+
+}
+
+.player-toolbar .player-meta-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-left: 8px;
+}
+
+.player-toolbar .player-meta-info i {
+    font-size: 13px;
+    opacity: 0.85;
+}
+
+.player-toolbar .player-meta-info .meta-rating,
+.player-toolbar .player-meta-info .meta-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }

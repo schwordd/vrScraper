@@ -271,7 +271,7 @@
                 <VideoCard Item="scored.Video"
                            SelectedWatchlistId="_selectedWatchlistId"
                            IsInWatchlist="IsInSelectedWatchlist(scored.Video.Id)"
-                           OnPlay="PlayVideo"
+                           OnPlay="PlayFromSimilar"
                            OnDelete="DeleteVideo"
                            OnShowSimilar="ShowSimilar"
                            OnDownload="DownloadVideo"
@@ -308,8 +308,8 @@
     private int _maxDurationMinutes = 120;
     private const int DurationSliderMax = 120;
 
-    public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; _cachedFilteredItems = null; SyncUrlState(); } }
-    public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; _cachedRandomItems = null; _cachedFilteredItems = null; SyncUrlState(); } }
+    public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; InvalidateFilterCaches(); SyncUrlState(); } }
+    public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; InvalidateFilterCaches(); SyncUrlState(); } }
 
     public List<string> _selectedTags = new List<string>();
     public IEnumerable<string> SelectedTagValues
@@ -373,7 +373,7 @@
             {
                 _searchQuery = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null; _cachedFilteredItems = null;
+                InvalidateFilterCaches();
                 SyncUrlState();
             }
         }
@@ -386,7 +386,19 @@
     private Random rng = new Random();
     private List<DbVideoItem>? _cachedRandomItems = null;
     private List<DbVideoItem>? _cachedFilteredItems = null;
+    private List<DbVideoItem>? _cachedBaseFilteredItems = null;
+    private List<(DbTag Tag, long Count)>? _cachedSortedTags = null;
+    private List<(DbStar Star, long Count)>? _cachedSortedActresses = null;
     private string? _lastRandomSeed = null;
+
+    private void InvalidateFilterCaches()
+    {
+        _cachedRandomItems = null;
+        _cachedFilteredItems = null;
+        _cachedBaseFilteredItems = null;
+        _cachedSortedTags = null;
+        _cachedSortedActresses = null;
+    }
 
     public bool ShowOnlyLiked
     {
@@ -397,7 +409,7 @@
             {
                 _showOnlyLiked = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null; _cachedFilteredItems = null;
+                InvalidateFilterCaches();
                 SyncUrlState();
             }
         }
@@ -412,7 +424,7 @@
             {
                 _showOnlyUnwatched = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null; _cachedFilteredItems = null;
+                InvalidateFilterCaches();
                 SyncUrlState();
             }
         }
@@ -427,7 +439,7 @@
             {
                 _showOnlyWithErrors = value;
                 CurrentPage = 1;
-                _cachedRandomItems = null; _cachedFilteredItems = null;
+                InvalidateFilterCaches();
                 SyncUrlState();
             }
         }
@@ -446,14 +458,14 @@
                 // Clear random cache when switching away from random
                 if (value != "random")
                 {
-                    _cachedRandomItems = null; _cachedFilteredItems = null;
+                    InvalidateFilterCaches();
                     _lastRandomSeed = null;
                 }
                 // Generate new random seed when switching to random
                 else if (value == "random")
                 {
                     _lastRandomSeed = Guid.NewGuid().ToString();
-                    _cachedRandomItems = null; _cachedFilteredItems = null;
+                    InvalidateFilterCaches();
                 }
                 SyncUrlState();
             }
@@ -589,11 +601,13 @@
     {
         get
         {
+            if (_cachedBaseFilteredItems != null) return _cachedBaseFilteredItems;
+
             var items = VideoItems;
             items = items.Where(item => !item.Tags.Exists(a => _globalBlackList.Any(b => b == a.Name))).ToList();
             if (_selectedSites.Any())
                 items = items.Where(v => _selectedSites.Contains(v.Site)).ToList();
-            return items
+            _cachedBaseFilteredItems = items
                 .Where(v => (!_showOnlyLiked || v.Liked) &&
                         (!_showOnlyUnwatched || v.PlayCount == 0) &&
                         (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
@@ -602,6 +616,7 @@
                         (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
                         (_maxDurationMinutes >= DurationSliderMax || v.Duration.TotalMinutes <= _maxDurationMinutes))
                 .ToList();
+            return _cachedBaseFilteredItems;
         }
     }
 
@@ -609,6 +624,8 @@
     {
         get
         {
+            if (_cachedSortedTags != null) return _cachedSortedTags;
+
             var baseItems = BaseFilteredItems;
             if (SelectedActresses.Count > 0)
                 baseItems = baseItems.Where(v => SelectedActresses.All(a => v.Stars.Any(s => s.Name == a))).ToList();
@@ -616,12 +633,13 @@
                 .SelectMany(v => v.Tags.Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved))
                 .GroupBy(t => t.Name)
                 .ToDictionary(g => g.Key, g => (long)g.Count());
-            return AvailableTags
+            _cachedSortedTags = AvailableTags
                 .Select(t => (t.Tag, Count: tagCounts.GetValueOrDefault(t.Tag.Name, 0)))
                 .Where(t => t.Count > 0 || SelectedTags.Contains(t.Tag.Name))
                 .OrderByDescending(t => SelectedTags.Contains(t.Tag.Name))
                 .ThenByDescending(t => t.Count)
                 .ToList();
+            return _cachedSortedTags;
         }
     }
 
@@ -629,6 +647,8 @@
     {
         get
         {
+            if (_cachedSortedActresses != null) return _cachedSortedActresses;
+
             var baseItems = BaseFilteredItems;
             if (SelectedTags.Count > 0)
                 baseItems = baseItems.Where(v => SelectedTags.All(t => v.Tags.Any(a => a.Name == t))).ToList();
@@ -636,12 +656,13 @@
                 .SelectMany(v => v.Stars)
                 .GroupBy(s => s.Name)
                 .ToDictionary(g => g.Key, g => (long)g.Count());
-            return AvailableActresses
+            _cachedSortedActresses = AvailableActresses
                 .Select(a => (a.Star, Count: starCounts.GetValueOrDefault(a.Star.Name, 0)))
                 .Where(a => a.Count > 0 || SelectedActresses.Contains(a.Star.Name))
                 .OrderByDescending(a => SelectedActresses.Contains(a.Star.Name))
                 .ThenByDescending(a => a.Count)
                 .ToList();
+            return _cachedSortedActresses;
         }
     }
 
@@ -654,7 +675,7 @@
     public IEnumerable<string> SelectedSitesValues
     {
         get => _selectedSites;
-        set { _selectedSites = value.ToList(); CurrentPage = 1; _cachedRandomItems = null; _cachedFilteredItems = null; SyncUrlState(); }
+        set { _selectedSites = value.ToList(); CurrentPage = 1; InvalidateFilterCaches(); SyncUrlState(); }
     }
     private void ClearSites() { SelectedSitesValues = new List<string>(); }
 
@@ -672,8 +693,15 @@
         get => _selectedWatchlistId;
         set
         {
+            if (_selectedWatchlistId == value) return;
             _selectedWatchlistId = value;
             UpdateWatchlistVideoIds();
+            InvalidateFilterCaches();
+            if (_urlSyncReady)
+            {
+                _ = JSRuntime.InvokeVoidAsync("uiStorage.set", "vr.selectedWatchlist", value);
+                SyncUrlState();
+            }
         }
     }
 
@@ -681,7 +709,8 @@
     {
         _showOnlyWatchlist = !_showOnlyWatchlist;
         CurrentPage = 1;
-        _cachedRandomItems = null; _cachedFilteredItems = null;
+        InvalidateFilterCaches();
+        SyncUrlState();
     }
 
     private void UpdateWatchlistVideoIds()
@@ -787,8 +816,7 @@
         {
             WatchlistTabs = TabService.GetWatchlistTabs();
             UpdateWatchlistVideoIds();
-            _cachedRandomItems = null;
-            _cachedFilteredItems = null;
+            InvalidateFilterCaches();
             StateHasChanged();
         }
     }
@@ -849,7 +877,7 @@
     {
         SelectedTags = e.ToHashSet();
         CurrentPage = 1;
-        _cachedRandomItems = null; _cachedFilteredItems = null;
+        InvalidateFilterCaches();
         SyncUrlState();
     }
 
@@ -857,7 +885,7 @@
     {
         SelectedActresses = e.ToHashSet();
         CurrentPage = 1;
-        _cachedRandomItems = null; _cachedFilteredItems = null;
+        InvalidateFilterCaches();
         SyncUrlState();
     }
 
@@ -865,6 +893,11 @@
     {
         PageSize = newSize;
         CurrentPage = 1; // Reset page on page size change
+        if (_urlSyncReady)
+        {
+            _ = JSRuntime.InvokeVoidAsync("uiStorage.set", "vr.pageSize", newSize);
+            SyncUrlState();
+        }
     }
 
     private void AddTagFilter(string tagName)
@@ -919,7 +952,7 @@
         if (videoToRemove != null)
         {
             _videoItems.Remove(videoToRemove);
-            _cachedFilteredItems = null; _cachedRandomItems = null;
+            InvalidateFilterCaches();
 
             // Aktualisiere die Tag- und Star-Zähler
             foreach (var tag in videoToRemove.Tags)
@@ -964,45 +997,65 @@
 
     private VideoPlayer? VideoPlayerComponent { get; set; }
     private int _currentPlayerIndex = -1;
+    // Active list the player navigates through. Either FilteredItems (default listing flow)
+    // or the similar-videos panel — set explicitly when playback starts.
+    private List<DbVideoItem> _currentPlayerList = new();
+    private bool _playerListIsFiltered = true;
 
-    private bool _playerHasNext => _currentPlayerIndex >= 0 && _currentPlayerIndex < FilteredItems.Count - 1;
+    private bool _playerHasNext => _currentPlayerIndex >= 0 && _currentPlayerIndex < _currentPlayerList.Count - 1;
     private bool _playerHasPrevious => _currentPlayerIndex > 0;
-    private int _playerListCount => FilteredItems.Count;
+    private int _playerListCount => _currentPlayerList.Count;
     private bool _playerVideoInWatchlist => _currentPlayerIndex >= 0
-        && _currentPlayerIndex < FilteredItems.Count
-        && IsInSelectedWatchlist(FilteredItems[_currentPlayerIndex].Id);
+        && _currentPlayerIndex < _currentPlayerList.Count
+        && IsInSelectedWatchlist(_currentPlayerList[_currentPlayerIndex].Id);
 
     private async Task PlayVideo(DbVideoItem item)
     {
         if (VideoPlayerComponent != null)
         {
-            _currentPlayerIndex = FilteredItems.IndexOf(item);
+            _currentPlayerList = FilteredItems;
+            _playerListIsFiltered = true;
+            _currentPlayerIndex = _currentPlayerList.IndexOf(item);
             StateHasChanged();
             await VideoPlayerComponent.ShowVideo(item);
         }
     }
 
+    private async Task PlayFromSimilar(DbVideoItem item)
+    {
+        if (VideoPlayerComponent == null || _similarVideos == null) return;
+        _currentPlayerList = _similarVideos.Select(s => s.Video).ToList();
+        _playerListIsFiltered = false;
+        _currentPlayerIndex = _currentPlayerList.IndexOf(item);
+        StateHasChanged();
+        await VideoPlayerComponent.ShowVideo(item);
+    }
+
     private void HandlePlayerClosed()
     {
         _currentPlayerIndex = -1;
+        _currentPlayerList = new List<DbVideoItem>();
+        _playerListIsFiltered = true;
     }
 
     private async Task NavigatePlayerNext()
     {
         if (!_playerHasNext || VideoPlayerComponent == null) return;
         _currentPlayerIndex++;
-        EnsurePageContainsIndex(_currentPlayerIndex);
+        if (_playerListIsFiltered)
+            EnsurePageContainsIndex(_currentPlayerIndex);
         StateHasChanged();
-        await VideoPlayerComponent.ShowVideo(FilteredItems[_currentPlayerIndex]);
+        await VideoPlayerComponent.ShowVideo(_currentPlayerList[_currentPlayerIndex]);
     }
 
     private async Task NavigatePlayerPrevious()
     {
         if (!_playerHasPrevious || VideoPlayerComponent == null) return;
         _currentPlayerIndex--;
-        EnsurePageContainsIndex(_currentPlayerIndex);
+        if (_playerListIsFiltered)
+            EnsurePageContainsIndex(_currentPlayerIndex);
         StateHasChanged();
-        await VideoPlayerComponent.ShowVideo(FilteredItems[_currentPlayerIndex]);
+        await VideoPlayerComponent.ShowVideo(_currentPlayerList[_currentPlayerIndex]);
     }
 
     private void EnsurePageContainsIndex(int index)
@@ -1068,7 +1121,10 @@
         {
             _dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("addPageKeyListener", _dotNetRef);
+            await ApplyClientDefaultsAsync();
+            NavigationManager.LocationChanged += OnLocationChanged;
             _urlSyncReady = true;
+            StateHasChanged();
         }
     }
 
@@ -1117,6 +1173,12 @@
     {
         try
         {
+            NavigationManager.LocationChanged -= OnLocationChanged;
+        }
+        catch { }
+
+        try
+        {
             if (_urlSyncReady)
                 await JSRuntime.InvokeVoidAsync("removePageKeyListener");
         }
@@ -1134,29 +1196,50 @@
     {
         var uri = new Uri(NavigationManager.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
-        if (query.Count == 0) return;
 
-        if (query.TryGetValue("q", out var q)) _searchQuery = q.ToString();
-        if (query.TryGetValue("sort", out var sort)) _currentSortOption = sort.ToString();
+        _searchQuery = query.TryGetValue("q", out var q) ? q.ToString() : "";
+        _currentSortOption = query.TryGetValue("sort", out var sort) ? sort.ToString() : "latest";
+
         if (query.TryGetValue("tags", out var tags) && !string.IsNullOrEmpty(tags))
-        {
             _selectedTags = tags.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            SelectedTags = _selectedTags.ToHashSet();
-        }
+        else
+            _selectedTags = new List<string>();
+        SelectedTags = _selectedTags.ToHashSet();
+
         if (query.TryGetValue("actresses", out var actresses) && !string.IsNullOrEmpty(actresses))
-        {
             _selectedActresses = actresses.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-            SelectedActresses = _selectedActresses.ToHashSet();
+        else
+            _selectedActresses = new List<string>();
+        SelectedActresses = _selectedActresses.ToHashSet();
+
+        _selectedSites = (query.TryGetValue("sites", out var sites) && !string.IsNullOrEmpty(sites))
+            ? sites.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList()
+            : new List<string>();
+
+        _showOnlyLiked = query.TryGetValue("liked", out var liked) && liked == "1";
+        _showOnlyUnwatched = query.TryGetValue("unwatched", out var unwatched) && unwatched == "1";
+        _showOnlyWithErrors = query.TryGetValue("errors", out var errors) && errors == "1";
+        _showOnlyWatchlist = query.TryGetValue("wlonly", out var wlo) && wlo == "1";
+
+        CurrentPage = (query.TryGetValue("page", out var page) && int.TryParse(page, out var p)) ? p : 1;
+        if (query.TryGetValue("pageSize", out var ps) && int.TryParse(ps, out var psi))
+            PageSize = psi;
+
+        _minDurationMinutes = (query.TryGetValue("minDur", out var minD) && int.TryParse(minD, out var minDi)) ? minDi : 0;
+        _maxDurationMinutes = (query.TryGetValue("maxDur", out var maxD) && int.TryParse(maxD, out var maxDi)) ? maxDi : DurationSliderMax;
+
+        if (query.TryGetValue("watchlist", out var wl) && long.TryParse(wl, out var wlid))
+        {
+            _selectedWatchlistId = wlid;
+            UpdateWatchlistVideoIds();
         }
-        if (query.TryGetValue("sites", out var sites) && !string.IsNullOrEmpty(sites))
-            _selectedSites = sites.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
-        if (query.TryGetValue("liked", out var liked)) _showOnlyLiked = liked == "1";
-        if (query.TryGetValue("unwatched", out var unwatched)) _showOnlyUnwatched = unwatched == "1";
-        if (query.TryGetValue("errors", out var errors)) _showOnlyWithErrors = errors == "1";
-        if (query.TryGetValue("page", out var page) && int.TryParse(page, out var p)) CurrentPage = p;
-        if (query.TryGetValue("pageSize", out var ps) && int.TryParse(ps, out var psi)) PageSize = psi;
-        if (query.TryGetValue("minDur", out var minD) && int.TryParse(minD, out var minDi)) _minDurationMinutes = minDi;
-        if (query.TryGetValue("maxDur", out var maxD) && int.TryParse(maxD, out var maxDi)) _maxDurationMinutes = maxDi;
+        else if (_selectedWatchlistId != 0)
+        {
+            _selectedWatchlistId = 0;
+            _selectedWatchlistVideoIds.Clear();
+        }
+
+        InvalidateFilterCaches();
     }
 
     private void SyncUrlState()
@@ -1172,12 +1255,84 @@
         if (_showOnlyLiked) queryParams["liked"] = "1";
         if (_showOnlyUnwatched) queryParams["unwatched"] = "1";
         if (_showOnlyWithErrors) queryParams["errors"] = "1";
+        if (_showOnlyWatchlist) queryParams["wlonly"] = "1";
+        if (_selectedWatchlistId > 0) queryParams["watchlist"] = _selectedWatchlistId.ToString();
         if (CurrentPage > 1) queryParams["page"] = CurrentPage.ToString();
         if (PageSize != 30) queryParams["pageSize"] = PageSize.ToString();
         if (_minDurationMinutes > 0) queryParams["minDur"] = _minDurationMinutes.ToString();
         if (_maxDurationMinutes > 0 && _maxDurationMinutes < DurationSliderMax) queryParams["maxDur"] = _maxDurationMinutes.ToString();
 
         var url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/videos", queryParams);
-        NavigationManager.NavigateTo(url, replace: true, forceLoad: false);
+        // Capture the URL we are about to push so the LocationChanged handler can ignore the echo.
+        _lastSyncedUrl = url;
+        NavigationManager.NavigateTo(url, replace: false, forceLoad: false);
+    }
+
+    private string? _lastSyncedUrl;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        // Only react to navigations on /videos. Leaving the page should not trigger a restore.
+        Uri uri;
+        try { uri = new Uri(e.Location); }
+        catch { return; }
+        if (!uri.AbsolutePath.TrimEnd('/').Equals("/videos", StringComparison.OrdinalIgnoreCase)) return;
+
+        // Ignore the echo from our own NavigateTo. Compare path+query, not the full absolute URL.
+        if (_lastSyncedUrl != null)
+        {
+            var pushedRelative = _lastSyncedUrl;
+            var nowRelative = uri.PathAndQuery;
+            if (string.Equals(pushedRelative, nowRelative, StringComparison.Ordinal))
+            {
+                _lastSyncedUrl = null;
+                return;
+            }
+        }
+
+        RestoreFiltersFromUrl();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ApplyClientDefaultsAsync()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        // PageSize: prefer URL > localStorage > 30
+        if (!query.ContainsKey("pageSize"))
+        {
+            try
+            {
+                var stored = await JSRuntime.InvokeAsync<int>("uiStorage.getInt", "vr.pageSize", 30);
+                if (stored > 0 && stored != PageSize)
+                {
+                    PageSize = stored;
+                }
+            }
+            catch { }
+        }
+
+        // Watchlist: prefer URL > localStorage > first alphabetically
+        if (!query.ContainsKey("watchlist") && _selectedWatchlistId == 0 && WatchlistTabs.Count > 0)
+        {
+            long preferredId = 0;
+            try
+            {
+                var stored = await JSRuntime.InvokeAsync<long>("uiStorage.getLong", "vr.selectedWatchlist", 0L);
+                if (stored > 0 && WatchlistTabs.Any(w => w.Id == stored))
+                    preferredId = stored;
+            }
+            catch { }
+            if (preferredId == 0)
+                preferredId = WatchlistTabs.OrderBy(w => w.Name, StringComparer.OrdinalIgnoreCase).First().Id;
+
+            if (preferredId > 0)
+            {
+                _selectedWatchlistId = preferredId;
+                UpdateWatchlistVideoIds();
+                InvalidateFilterCaches();
+            }
+        }
     }
 }

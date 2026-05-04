@@ -1,0 +1,45 @@
+@using vrScraper.DB.Models
+@using System.Globalization
+
+<div class="trend-chart-wrapper">
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <h5 class="trend-chart-title">@Title</h5>
+    }
+
+    @if (Data.Count >= 2)
+    {
+        var max = Math.Max(1, Data.Max(d => d.TotalCount));
+        var w = 600.0; var h = 200.0; var padTop = 10.0; var padBottom = 25.0;
+        var n = Data.Count;
+        string Pts(Func<DbDailySnapshot, int> sel) =>
+            string.Join(" ", Data.Select((d, i) =>
+            {
+                var x = (n == 1 ? 0 : i * (w / (n - 1)));
+                var y = h - padBottom - (sel(d) / (double)max) * (h - padTop - padBottom);
+                return $"{x.ToString("F1", CultureInfo.InvariantCulture)},{y.ToString("F1", CultureInfo.InvariantCulture)}";
+            }));
+
+        <svg viewBox="0 0 600 200" class="trend-chart-svg" preserveAspectRatio="none">
+            <polyline class="line line-total" points="@Pts(d => d.TotalCount)" />
+            <polyline class="line line-unwatched" points="@Pts(d => d.UnwatchedCount)" />
+            <polyline class="line line-watched" points="@Pts(d => d.WatchedCount)" />
+            <text x="0" y="195" class="axis-label">@Data.First().SnapshotDate.ToString("dd.MM.")</text>
+            <text x="600" y="195" text-anchor="end" class="axis-label">@Data.Last().SnapshotDate.ToString("dd.MM.")</text>
+        </svg>
+        <div class="trend-chart-legend">
+            <div class="legend-item"><span class="legend-dot dot-total"></span><span class="legend-label">Total</span><span class="legend-value">@Data.Last().TotalCount</span></div>
+            <div class="legend-item"><span class="legend-dot dot-unwatched"></span><span class="legend-label">Unwatched</span><span class="legend-value">@Data.Last().UnwatchedCount</span></div>
+            <div class="legend-item"><span class="legend-dot dot-watched"></span><span class="legend-label">Watched</span><span class="legend-value">@Data.Last().WatchedCount</span></div>
+        </div>
+    }
+    else
+    {
+        <div class="trend-chart-empty">Chart will fill in over the next few days</div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<DbDailySnapshot> Data { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "Library trend";
+}

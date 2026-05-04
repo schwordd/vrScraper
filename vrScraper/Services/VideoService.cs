@@ -76,17 +76,20 @@ namespace vrScraper.Services
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
-      var tagCounts = await context.Tags
-          .Where(tag => tag.ApprovalStatus == DB.Models.TagApprovalStatus.Approved)
-          .Select(tag => new
-          {
-            Tag = tag,
-            VideoCount = (long)tag.Videos.Count
-          })
-          .OrderByDescending(t => t.VideoCount)
+      // Single GROUP BY on the junction table — uses the (TagId) index instead of N subqueries.
+      var counts = await context.VideoTags
+          .GroupBy(vt => vt.TagId)
+          .Select(g => new { TagId = g.Key, Count = (long)g.Count() })
+          .ToDictionaryAsync(x => x.TagId, x => x.Count);
+
+      var tags = await context.Tags
+          .Where(t => t.ApprovalStatus == DB.Models.TagApprovalStatus.Approved)
           .ToListAsync();
 
-      return tagCounts.Select(a => (a.Tag, a.VideoCount)).ToList();
+      return tags
+          .Select(t => (Tag: t, Count: counts.GetValueOrDefault(t.Id, 0L)))
+          .OrderByDescending(t => t.Count)
+          .ToList();
     }
 
     public async Task<List<(DbStar Star, long Count)>> GetActorInfos()
@@ -94,16 +97,17 @@ namespace vrScraper.Services
       using var scope = serviceProvider.CreateScope();
       var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
 
-      var starCounts = await context.Stars
-          .Select(star => new
-          {
-            Star = star,
-            VideoCount = (long)star.Videos.Count
-          })
-          .OrderByDescending(t => t.VideoCount)
-          .ToListAsync();
+      var counts = await context.VideoStars
+          .GroupBy(vs => vs.StarId)
+          .Select(g => new { StarId = g.Key, Count = (long)g.Count() })
+          .ToDictionaryAsync(x => x.StarId, x => x.Count);
 
-      return starCounts.Select(a => (a.Star, a.VideoCount)).ToList();
+      var stars = await context.Stars.ToListAsync();
+
+      return stars
+          .Select(s => (Star: s, Count: counts.GetValueOrDefault(s.Id, 0L)))
+          .OrderByDescending(t => t.Count)
+          .ToList();
     }
 
 

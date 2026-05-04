@@ -123,6 +123,8 @@ namespace vrScraper
       builder.Services.AddSingleton<ITagNormalizationService, TagNormalizationService>();
       builder.Services.AddSingleton<ITitleNormalizationService, TitleNormalizationService>();
       builder.Services.AddSingleton<IThePornDbService, ThePornDbService>();
+      builder.Services.AddSingleton<IDailySnapshotService, DailySnapshotService>();
+      builder.Services.AddHostedService(sp => (DailySnapshotService)sp.GetRequiredService<IDailySnapshotService>());
       // Add scheduled scraping background service
       builder.Services.AddHostedService<ScheduledScrapingService>();
 
