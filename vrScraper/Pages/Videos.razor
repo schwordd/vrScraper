@@ -359,6 +359,7 @@
         ("random", "Random"),
         ("playtime", "Most played time"),
         ("playcount", "Most played count"),
+        ("views", "Most site views"),
         ("recentlywatched", "Recently watched"),
         ("lastscraped", "Latest (re)scrape")
     };
@@ -571,6 +572,7 @@
                         "rating" => v.SiteRating ?? 0,
                         "playtime" => v.PlayDurationEst.TotalSeconds,
                         "playcount" => v.PlayCount,
+                        "views" => v.Views ?? 0,
                         _ => (double)v.Id
                     })
                     .ToList();

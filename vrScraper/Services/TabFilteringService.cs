@@ -41,6 +41,16 @@ namespace vrScraper.Services
               var list = allItems.OrderByDescending(v => v.SiteRating).ThenByDescending(v => v.Views).ToList();
               tabs.Add((t.Name, list));
             }
+            else if (t.Name == "Most Viewed Unwatched")
+            {
+              // Locally unwatched videos (PlayCount == 0), ordered by view count from the
+              // origin/scraped site (DbVideoItem.Views) — surfaces popular-on-the-source items
+              // that we haven't watched yet locally.
+              var list = allItems.Where(a => a.PlayCount == 0 && a.Views.HasValue)
+                                 .OrderByDescending(a => a.Views!.Value)
+                                 .ToList();
+              tabs.Add((t.Name, list));
+            }
             else if (t.Name == "Random")
             {
               var list = allItems.OrderBy(a => Guid.NewGuid()).ToList();
