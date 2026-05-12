@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.2.11 (2026-05-12)
+- Add Most Site Views sort option and Most Viewed Unwatched default VR tab
+- Improve daily trend chart with proper axes, tick marks, custom tooltip and per-line auto-scaling
+
 ## v1.2.10 (2026-05-04)
 - Add daily trend chart, similar-videos player context, watchlist/page-size persistence with browser-back fix, perf improvements and player layout polish
 
