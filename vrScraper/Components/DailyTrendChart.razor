@@ -9,28 +9,108 @@
 
     @if (Data.Count >= 2)
     {
-        var max = Math.Max(1, Data.Max(d => d.TotalCount));
-        var w = 600.0; var h = 200.0; var padTop = 10.0; var padBottom = 25.0;
-        var n = Data.Count;
-        string Pts(Func<DbDailySnapshot, int> sel) =>
-            string.Join(" ", Data.Select((d, i) =>
-            {
-                var x = (n == 1 ? 0 : i * (w / (n - 1)));
-                var y = h - padBottom - (sel(d) / (double)max) * (h - padTop - padBottom);
-                return $"{x.ToString("F1", CultureInfo.InvariantCulture)},{y.ToString("F1", CultureInfo.InvariantCulture)}";
-            }));
+        <div class="chart-content">
+            <div class="y-axis-title">Videos</div>
+            <div class="chart-stack">
+                @foreach (var m in _metrics)
+                {
+                    var values = Data.Select(m.Selector).ToList();
+                    var min = values.Min();
+                    var max = values.Max();
+                    var range = Math.Max(1, max - min);
+                    var mid = (min + max) / 2;
+                    const double w = 600.0;
+                    const double h = 70.0;
+                    const double pad = 6.0;
+                    var n = Data.Count;
+                    var points = Data.Select((d, i) =>
+                    {
+                        var v = m.Selector(d);
+                        var x = n == 1 ? 0 : i * (w / (n - 1));
+                        var y = range == 0
+                            ? h / 2.0
+                            : h - pad - ((v - min) / (double)range) * (h - 2 * pad);
+                        return new { Date = d.SnapshotDate, Value = v, X = x, Y = y };
+                    }).ToList();
+                    var pointsStr = string.Join(" ", points.Select(p =>
+                        $"{p.X.ToString("F1", CultureInfo.InvariantCulture)},{p.Y.ToString("F1", CultureInfo.InvariantCulture)}"));
+                    var current = values[^1];
+                    var first = values[0];
+                    var delta = current - first;
+                    var deltaClass = delta == 0 ? "flat" : (delta > 0 ? "up" : "down");
+                    var deltaSign = delta == 0 ? "→" : (delta > 0 ? "▲" : "▼");
+                    var metricKey = m.CssKey;
 
-        <svg viewBox="0 0 600 200" class="trend-chart-svg" preserveAspectRatio="none">
-            <polyline class="line line-total" points="@Pts(d => d.TotalCount)" />
-            <polyline class="line line-unwatched" points="@Pts(d => d.UnwatchedCount)" />
-            <polyline class="line line-watched" points="@Pts(d => d.WatchedCount)" />
-            <text x="0" y="195" class="axis-label">@Data.First().SnapshotDate.ToString("dd.MM.")</text>
-            <text x="600" y="195" text-anchor="end" class="axis-label">@Data.Last().SnapshotDate.ToString("dd.MM.")</text>
-        </svg>
-        <div class="trend-chart-legend">
-            <div class="legend-item"><span class="legend-dot dot-total"></span><span class="legend-label">Total</span><span class="legend-value">@Data.Last().TotalCount</span></div>
-            <div class="legend-item"><span class="legend-dot dot-unwatched"></span><span class="legend-label">Unwatched</span><span class="legend-value">@Data.Last().UnwatchedCount</span></div>
-            <div class="legend-item"><span class="legend-dot dot-watched"></span><span class="legend-label">Watched</span><span class="legend-value">@Data.Last().WatchedCount</span></div>
+                    <div class="sparkline-row">
+                        <div class="sparkline-header">
+                            <span class="legend-dot dot-@metricKey"></span>
+                            <span class="metric-label">@m.Label</span>
+                            <span class="metric-value">@current.ToString("N0", CultureInfo.InvariantCulture)</span>
+                            <span class="metric-delta @deltaClass">@deltaSign&nbsp;@Math.Abs(delta).ToString("N0", CultureInfo.InvariantCulture)</span>
+                        </div>
+                        <div class="sparkline-body">
+                            <div class="y-axis">
+                                <span class="y-tick"><span class="y-val">@max.ToString("N0", CultureInfo.InvariantCulture)</span></span>
+                                <span class="y-tick"><span class="y-val">@mid.ToString("N0", CultureInfo.InvariantCulture)</span></span>
+                                <span class="y-tick"><span class="y-val">@min.ToString("N0", CultureInfo.InvariantCulture)</span></span>
+                            </div>
+                            <div class="svg-wrap" @onmouseleave="@(() => OnLeave(metricKey))">
+                                <svg viewBox="0 0 600 70" class="sparkline-svg" preserveAspectRatio="none">
+                                    <line class="grid" x1="0" y1="@pad.ToString("F1", CultureInfo.InvariantCulture)" x2="600" y2="@pad.ToString("F1", CultureInfo.InvariantCulture)" />
+                                    <line class="grid" x1="0" y1="@((h / 2.0).ToString("F1", CultureInfo.InvariantCulture))" x2="600" y2="@((h / 2.0).ToString("F1", CultureInfo.InvariantCulture))" />
+                                    <line class="grid" x1="0" y1="@((h - pad).ToString("F1", CultureInfo.InvariantCulture))" x2="600" y2="@((h - pad).ToString("F1", CultureInfo.InvariantCulture))" />
+                                    <polyline class="line line-@metricKey" points="@pointsStr" />
+                                </svg>
+                                @for (int i = 0; i < points.Count; i++)
+                                {
+                                    var p = points[i];
+                                    var idx = i;
+                                    var dotLeft = (p.X / w) * 100.0;
+                                    var dotTop = (p.Y / h) * 100.0;
+                                    <div class="dot-overlay dot-@metricKey"
+                                         style="left: @(dotLeft.ToString("F2", CultureInfo.InvariantCulture))%; top: @(dotTop.ToString("F2", CultureInfo.InvariantCulture))%;"
+                                         @onmouseover="@(() => OnHover(metricKey, idx))">
+                                    </div>
+                                }
+                                @if (_hoveredKey == metricKey && _hoveredIndex.HasValue && _hoveredIndex.Value < points.Count)
+                                {
+                                    var p = points[_hoveredIndex.Value];
+                                    var leftPct = (p.X / w) * 100.0;
+                                    var topPct = (p.Y / h) * 100.0;
+                                    var sideClass = leftPct < 15 ? "tt-anchor-left" : (leftPct > 85 ? "tt-anchor-right" : "tt-anchor-center");
+                                    <div class="custom-tooltip @sideClass"
+                                         style="left: @(leftPct.ToString("F2", CultureInfo.InvariantCulture))%; top: @(topPct.ToString("F2", CultureInfo.InvariantCulture))%;">
+                                        <div class="tt-date">@p.Date.ToString("dd.MM.yyyy")</div>
+                                        <div class="tt-value">
+                                            <span class="legend-dot dot-@metricKey"></span>
+                                            @m.Label: <strong>@p.Value.ToString("N0", CultureInfo.InvariantCulture)</strong>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="x-axis-row">
+                    <div class="x-axis-spacer"></div>
+                    <div class="x-axis">
+                        @{
+                            var tickCount = Math.Min(6, Data.Count);
+                            var stepReal = (Data.Count - 1) / (double)(tickCount - 1);
+                        }
+                        @for (int i = 0; i < tickCount; i++)
+                        {
+                            var idx = (int)Math.Round(i * stepReal);
+                            <div class="x-tick">
+                                <div class="x-tick-mark"></div>
+                                <div class="x-tick-label">@Data[idx].SnapshotDate.ToString("dd.MM.")</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="x-axis-title">Date</div>
+            </div>
         </div>
     }
     else
@@ -42,4 +122,31 @@
 @code {
     [Parameter] public List<DbDailySnapshot> Data { get; set; } = new();
     [Parameter] public string Title { get; set; } = "Library trend";
+
+    private string? _hoveredKey;
+    private int? _hoveredIndex;
+
+    private void OnHover(string key, int index)
+    {
+        _hoveredKey = key;
+        _hoveredIndex = index;
+    }
+
+    private void OnLeave(string key)
+    {
+        if (_hoveredKey == key)
+        {
+            _hoveredKey = null;
+            _hoveredIndex = null;
+        }
+    }
+
+    private record Metric(string Label, string CssKey, Func<DbDailySnapshot, int> Selector);
+
+    private readonly Metric[] _metrics = new[]
+    {
+        new Metric("Total",     "total",     (DbDailySnapshot d) => d.TotalCount),
+        new Metric("Unwatched", "unwatched", (DbDailySnapshot d) => d.UnwatchedCount),
+        new Metric("Watched",   "watched",   (DbDailySnapshot d) => d.WatchedCount),
+    };
 }

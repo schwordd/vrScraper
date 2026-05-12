@@ -1,42 +1,268 @@
 .trend-chart-wrapper {
     width: 100%;
-    padding: 12px;
+    padding: 12px 16px 16px 8px;
 }
 .trend-chart-title {
     font-size: 14px;
-    color: var(--color-text-muted, rgba(255,255,255,0.7));
-    margin-bottom: 10px;
+    color: var(--color-text);
+    font-weight: 600;
+    margin-bottom: 14px;
 }
-.trend-chart-svg {
+
+.chart-content {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+}
+.chart-stack {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ---------------- Axis titles ---------------- */
+.y-axis-title,
+.x-axis-title {
+    font-size: 11px;
+    color: var(--color-text);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+.y-axis-title {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    align-self: center;
+    padding: 0 6px 0 2px;
+}
+.x-axis-title {
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ---------------- Sparkline row ---------------- */
+.sparkline-row {
+    margin-bottom: 14px;
+}
+.sparkline-row:last-of-type {
+    margin-bottom: 4px;
+}
+
+.sparkline-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    margin-bottom: 6px;
+    padding-left: 64px;
+}
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.dot-total { background: #0284c7; }
+.dot-unwatched { background: #d97706; }
+.dot-watched { background: #16a34a; }
+
+.metric-label {
+    color: var(--color-text);
+    font-weight: 600;
+}
+.metric-value {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+}
+.metric-delta {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 9px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.metric-delta.up   { background: rgba(22,163,74,0.12);  color: #15803d; }
+.metric-delta.down { background: rgba(220,38,38,0.12);  color: #b91c1c; }
+.metric-delta.flat { background: var(--color-surface-sunken); color: var(--color-text-secondary); }
+
+/* ---------------- Sparkline body & Y-axis ---------------- */
+.sparkline-body {
+    display: flex;
+    align-items: stretch;
+    height: 70px;
+}
+.y-axis {
+    width: 64px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding-right: 0;
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    position: relative;
+    border-right: 1.5px solid var(--color-text-secondary);
+}
+.y-tick {
+    position: relative;
+    text-align: right;
+    padding-right: 8px;
+    line-height: 0;
+}
+.y-tick .y-val {
+    position: relative;
+    top: 0.35em;
+}
+.y-tick::after {
+    /* tick mark sticking out to the right of the axis line */
+    content: "";
+    position: absolute;
+    right: -5px;
+    top: 0;
+    width: 5px;
+    height: 1.5px;
+    background: var(--color-text-secondary);
+}
+
+/* ---------------- SVG plot area ---------------- */
+.svg-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+.sparkline-svg {
     width: 100%;
-    height: 200px;
+    height: 70px;
     overflow: visible;
+    display: block;
 }
-.trend-chart-svg .line {
+.sparkline-svg .line {
     fill: none;
     stroke-width: 2;
     vector-effect: non-scaling-stroke;
 }
-.trend-chart-svg .line-total { stroke: #38bdf8; }
-.trend-chart-svg .line-unwatched { stroke: #f59e0b; }
-.trend-chart-svg .line-watched { stroke: #22c55e; }
-.trend-chart-svg .axis-label { font-size: 10px; fill: rgba(255,255,255,0.5); }
-.trend-chart-legend {
-    display: flex;
-    gap: 16px;
-    margin-top: 8px;
-    flex-wrap: wrap;
-    font-size: 12px;
+.sparkline-svg .line-total     { stroke: #0284c7; }
+.sparkline-svg .line-unwatched { stroke: #d97706; }
+.sparkline-svg .line-watched   { stroke: #16a34a; }
+
+.sparkline-svg .grid {
+    stroke: var(--color-border);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    stroke-dasharray: 2 3;
 }
-.trend-chart-legend .legend-item { display: flex; align-items: center; gap: 6px; }
-.trend-chart-legend .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.trend-chart-legend .dot-total { background: #38bdf8; }
-.trend-chart-legend .dot-unwatched { background: #f59e0b; }
-.trend-chart-legend .dot-watched { background: #22c55e; }
-.trend-chart-legend .legend-value { color: rgba(255,255,255,0.7); }
+
+/* ---------------- Data point dots ---------------- */
+.dot-overlay {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+}
+.dot-overlay::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--color-surface);
+    transition: width 0.1s, height 0.1s;
+}
+.dot-overlay:hover::before {
+    width: 9px;
+    height: 9px;
+}
+.dot-overlay.dot-total::before     { background: #0284c7; }
+.dot-overlay.dot-unwatched::before { background: #d97706; }
+.dot-overlay.dot-watched::before   { background: #16a34a; }
+
+/* ---------------- Tooltip ---------------- */
+.custom-tooltip {
+    position: absolute;
+    transform: translate(-50%, calc(-100% - 12px));
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: var(--shadow-lg);
+    z-index: 10;
+    line-height: 1.4;
+}
+.custom-tooltip.tt-anchor-left  { transform: translate(0,    calc(-100% - 12px)); }
+.custom-tooltip.tt-anchor-right { transform: translate(-100%, calc(-100% - 12px)); }
+.custom-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border: 5px solid transparent;
+    border-top-color: #0f172a;
+}
+.custom-tooltip.tt-anchor-left::after  { left: 10px; margin-left: 0; }
+.custom-tooltip.tt-anchor-right::after { left: auto; right: 10px; margin-left: 0; }
+
+.tt-date  { color: rgba(248,250,252,0.65); font-size: 10px; margin-bottom: 2px; font-weight: 500; }
+.tt-value { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.tt-value strong { font-weight: 700; }
+
+/* ---------------- X-axis (shared, below all sparklines) ---------------- */
+.x-axis-row {
+    display: flex;
+    align-items: stretch;
+    margin-top: 4px;
+}
+.x-axis-spacer {
+    width: 64px;
+    flex-shrink: 0;
+}
+.x-axis {
+    flex: 1;
+    min-width: 0;
+    border-top: 1.5px solid var(--color-text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+}
+.x-tick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(0);
+}
+.x-tick:first-child { align-items: flex-start; transform: translateX(0); }
+.x-tick:last-child  { align-items: flex-end;   transform: translateX(0); }
+.x-tick-mark {
+    width: 1.5px;
+    height: 5px;
+    background: var(--color-text-secondary);
+}
+.x-tick-label {
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    line-height: 1;
+}
+
 .trend-chart-empty {
     padding: 40px 12px;
     text-align: center;
-    color: rgba(255,255,255,0.5);
+    color: var(--color-text-muted);
     font-size: 13px;
 }
