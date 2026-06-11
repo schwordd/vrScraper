@@ -62,6 +62,9 @@ dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
 
 ## Unreleased
 
+## v1.2.12 (2026-06-11)
+- Fix max duration slider reset by committing both range bounds atomically
+
 ## v1.2.11 (2026-05-12)
 - Add Most Site Views sort option and Most Viewed Unwatched default VR tab
 - Improve daily trend chart with proper axes, tick marks, custom tooltip and per-line auto-scaling
