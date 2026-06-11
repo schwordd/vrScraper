@@ -24,6 +24,11 @@
     [Parameter] public int MaxValue { get; set; } = 120;
     [Parameter] public EventCallback<int> MaxValueChanged { get; set; }
 
+    // Atomic commit of both bounds in a single callback. Prefer this over the
+    // separate Min/MaxValueChanged callbacks so the parent updates both values
+    // and syncs the URL exactly once per drag.
+    [Parameter] public EventCallback<(int Min, int Max)> ValuesChanged { get; set; }
+
     private string _id = $"dr-{Guid.NewGuid():N}";
     private DotNetObjectReference<DualRangeSlider>? _dotNetRef;
 
@@ -41,8 +46,18 @@
     {
         MinValue = minVal;
         MaxValue = maxVal;
-        await MinValueChanged.InvokeAsync(minVal);
-        await MaxValueChanged.InvokeAsync(maxVal);
+
+        if (ValuesChanged.HasDelegate)
+        {
+            // Single atomic update: avoids an intermediate render where one bound
+            // value is still stale (which made the max thumb spring back).
+            await ValuesChanged.InvokeAsync((minVal, maxVal));
+        }
+        else
+        {
+            await MinValueChanged.InvokeAsync(minVal);
+            await MaxValueChanged.InvokeAsync(maxVal);
+        }
     }
 
     public void Dispose()

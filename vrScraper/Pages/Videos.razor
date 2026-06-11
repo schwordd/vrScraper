@@ -121,8 +121,9 @@
 
             <span class="filter-item">
                 <DualRangeSlider Min="0" Max="120" Step="5"
-                                 @bind-MinValue="MinDurationMinutes"
-                                 @bind-MaxValue="MaxDurationMinutes" />
+                                 MinValue="_minDurationMinutes"
+                                 MaxValue="_maxDurationMinutes"
+                                 ValuesChanged="OnDurationRangeChanged" />
             </span>
 
 
@@ -308,8 +309,16 @@
     private int _maxDurationMinutes = 120;
     private const int DurationSliderMax = 120;
 
-    public int MinDurationMinutes { get => _minDurationMinutes; set { _minDurationMinutes = value; CurrentPage = 1; InvalidateFilterCaches(); SyncUrlState(); } }
-    public int MaxDurationMinutes { get => _maxDurationMinutes; set { _maxDurationMinutes = value; CurrentPage = 1; InvalidateFilterCaches(); SyncUrlState(); } }
+    private void OnDurationRangeChanged((int Min, int Max) range)
+    {
+        // Apply both bounds and sync the URL once, so a single drag never produces
+        // two navigations to different URLs (which previously reset the max bound).
+        _minDurationMinutes = range.Min;
+        _maxDurationMinutes = range.Max;
+        CurrentPage = 1;
+        InvalidateFilterCaches();
+        SyncUrlState();
+    }
 
     public List<string> _selectedTags = new List<string>();
     public IEnumerable<string> SelectedTagValues
