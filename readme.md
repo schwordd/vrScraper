@@ -62,6 +62,9 @@ dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
 
 ## Unreleased
 
+## v1.2.14 (2026-06-11)
+- Force Node24 runtime for remaining Node20-bundled actions
+
 ## v1.2.13 (2026-06-11)
 - Bump GitHub Actions to Node24-compatible versions
 
