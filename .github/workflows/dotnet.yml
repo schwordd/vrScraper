@@ -9,6 +9,10 @@ on:
       - 'CHANGELOG.md'
       - 'readme.md'
 
+env:
+  # Force Node24 runtime for actions that still bundle Node20 (docker/* majors).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     runs-on: ubuntu-latest

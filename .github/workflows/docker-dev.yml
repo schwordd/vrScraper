@@ -8,6 +8,10 @@ on:
       - '**.md'
       - 'LICENSE.txt'
 
+env:
+  # Force Node24 runtime for actions that still bundle Node20 (docker/* majors).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   docker:
     runs-on: ubuntu-latest
