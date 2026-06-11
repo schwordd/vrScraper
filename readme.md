@@ -62,6 +62,9 @@ dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
 
 ## Unreleased
 
+## v1.2.13 (2026-06-11)
+- Bump GitHub Actions to Node24-compatible versions
+
 ## v1.2.12 (2026-06-11)
 - Fix max duration slider reset by committing both range bounds atomically
 
