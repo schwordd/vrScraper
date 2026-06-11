@@ -84,7 +84,7 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Build and Publish the project
-      run: dotnet publish -c Release -r win-x64 --self-contained -o ./dist
+      run: dotnet publish vrScraper/vrScraper.csproj -c Release -r win-x64 --self-contained -o ./dist
 
     - name: Remove appsettings.Development.json
       run: |
