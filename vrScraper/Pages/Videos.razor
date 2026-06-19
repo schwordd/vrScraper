@@ -298,6 +298,7 @@
              IsInWatchlist="_playerVideoInWatchlist"
              OnNavigateNext="NavigatePlayerNext"
              OnNavigatePrevious="NavigatePlayerPrevious"
+             OnMarkWatchedAndNext="MarkWatchedAndNext"
              OnToggleLike="ToggleLike"
              OnToggleWatchlist="ToggleWatchlist" />
 
@@ -1067,6 +1068,32 @@
             EnsurePageContainsIndex(_currentPlayerIndex);
         StateHasChanged();
         await VideoPlayerComponent.ShowVideo(_currentPlayerList[_currentPlayerIndex]);
+    }
+
+    // Aktuelles Video als gesehen markieren (DB) und zum nächsten springen.
+    // Für schnelles Aussortieren von Müll: bei aktivem "Unwatched"-Filter taucht es nicht erneut auf.
+    private async Task MarkWatchedAndNext()
+    {
+        if (_currentPlayerIndex < 0 || _currentPlayerIndex >= _currentPlayerList.Count)
+            return;
+
+        var current = _currentPlayerList[_currentPlayerIndex];
+        await VideoService.MarkVideoWatched(current.Id);
+        // Auch das Listen-Objekt direkt anheben, falls es nicht dieselbe Instanz wie im Cache ist
+        if (current.PlayCount < 1)
+            current.PlayCount = 1;
+        current.LastPlayedUtc = DateTime.UtcNow;
+
+        if (_playerHasNext)
+        {
+            await NavigatePlayerNext();
+        }
+        else
+        {
+            // Kein nächstes Video: Player schließen (Liste durchgesehen)
+            if (VideoPlayerComponent != null)
+                await VideoPlayerComponent.ClosePlayerExternal();
+        }
     }
 
     private void EnsurePageContainsIndex(int index)

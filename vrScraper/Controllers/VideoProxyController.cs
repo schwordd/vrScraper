@@ -63,61 +63,127 @@ namespace vrScraper.Controllers
                     return NotFound("Kein Scraper für diese Site");
                 }
 
-                // Video-Quelle abrufen
-                var source = await scraper.GetSource(video, _context);
-                if (source == null)
-                {
-                    _logger.LogWarning("Keine Video-Quelle für Video {VideoId} gefunden", videoId);
-                    return NotFound("Video-Quelle nicht gefunden");
-                }
-
-                // Erhöhe den Play Count
-                //_videoService.SetPlayedVideo(video);
-
                 // Extrahiere Range-Header, falls vorhanden
                 string rangeHeader = Request.Headers["Range"].ToString();
                 bool hasRangeHeader = !string.IsNullOrEmpty(rangeHeader);
 
-                // Erstelle einen HttpClient mit geeigneten Headers
-                var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.Clear();
+                // Quellauflösung (Live-Scrape) und Upstream-Fetch sind beide externe
+                // Netzwerkaufrufe, die gelegentlich transient fehlschlagen. Genau das
+                // verursacht das sporadische 500 (~1/10), das nach Vor-/Zurückschalten
+                // wieder verschwindet. Deshalb hier bis zu maxAttempts wiederholen und
+                // die (kurzlebige) Quell-URL bei jedem Versuch neu auflösen.
+                const int maxAttempts = 3;
+                int lastUpstreamStatus = 0;
 
-                // Standard-Headers
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                var proxyHeaders = scraper.GetProxyHeaders();
-                foreach (var header in proxyHeaders)
-                    client.DefaultRequestHeaders.Add(header.Key, header.Value);
-                client.DefaultRequestHeaders.Add("Accept", "*/*");
-                client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
-
-                // Range-Header hinzufügen, falls vorhanden
-                if (hasRangeHeader)
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
                 {
-                    client.DefaultRequestHeaders.Add("Range", rangeHeader);
-                    _logger.LogInformation("Range-Request erkannt: {Range}", rangeHeader);
-                }
+                    // Video-Quelle abrufen (frische, ggf. signierte URL pro Versuch)
+                    VideoSource? source;
+                    try
+                    {
+                        source = await scraper.GetSource(video, _context);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "GetSource fehlgeschlagen (Versuch {Attempt}/{Max}) für Video {VideoId}", attempt, maxAttempts, videoId);
+                        source = null;
+                    }
 
-                try
-                {
-                    // Stream die Video-Datei durch
-                    response = await client.GetAsync(source.Src, HttpCompletionOption.ResponseHeadersRead);
+                    if (source == null)
+                    {
+                        if (attempt < maxAttempts)
+                        {
+                            await Task.Delay(400 * attempt);
+                            continue;
+                        }
+                        _logger.LogWarning("Keine Video-Quelle für Video {VideoId} nach {Max} Versuchen gefunden", videoId, maxAttempts);
+                        return NotFound("Video-Quelle nicht gefunden");
+                    }
+
+                    // Erstelle einen HttpClient mit geeigneten Headers
+                    var client = _httpClientFactory.CreateClient();
+                    client.DefaultRequestHeaders.Clear();
+
+                    // Standard-Headers
+                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                    var proxyHeaders = scraper.GetProxyHeaders();
+                    foreach (var header in proxyHeaders)
+                        client.DefaultRequestHeaders.Add(header.Key, header.Value);
+                    client.DefaultRequestHeaders.Add("Accept", "*/*");
+                    client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+
+                    // Range-Header hinzufügen, falls vorhanden
+                    if (hasRangeHeader)
+                    {
+                        client.DefaultRequestHeaders.Add("Range", rangeHeader);
+                        _logger.LogInformation("Range-Request erkannt: {Range}", rangeHeader);
+                    }
+
+                    try
+                    {
+                        // Stream die Video-Datei durch
+                        response = await client.GetAsync(source.Src, HttpCompletionOption.ResponseHeadersRead);
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException || ex is TaskCanceledException)
+                    {
+                        _logger.LogWarning(ex, "Fehler beim Abrufen des Videos von der Quelle (Versuch {Attempt}/{Max}): {Url}", attempt, maxAttempts, source.Src);
+                        response?.Dispose();
+                        response = null;
+                        if (attempt < maxAttempts)
+                        {
+                            await Task.Delay(400 * attempt);
+                            continue;
+                        }
+                        return StatusCode(502, "Fehler beim Abrufen des Videos von der Quelle");
+                    }
 
                     // Prüfe, ob der Request erfolgreich war
                     if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
                     {
-                        var statusCode = (int)response.StatusCode;
-                        _logger.LogWarning("Fehler beim Abrufen des Videos: StatusCode {StatusCode}", response.StatusCode);
+                        lastUpstreamStatus = (int)response.StatusCode;
+                        bool transient = lastUpstreamStatus >= 500
+                            || response.StatusCode == HttpStatusCode.TooManyRequests
+                            || response.StatusCode == HttpStatusCode.Forbidden
+                            || response.StatusCode == HttpStatusCode.RequestTimeout;
+                        _logger.LogWarning("Fehler beim Abrufen des Videos: StatusCode {StatusCode} (Versuch {Attempt}/{Max})", response.StatusCode, attempt, maxAttempts);
                         response.Dispose();
                         response = null;
-                        return StatusCode(statusCode, "Fehler beim Abrufen des Videos");
+                        if (transient && attempt < maxAttempts)
+                        {
+                            await Task.Delay(400 * attempt);
+                            continue;
+                        }
+                        return StatusCode(lastUpstreamStatus, "Fehler beim Abrufen des Videos");
                     }
-                }
-                catch (HttpRequestException ex)
-                {
-                    _logger.LogError(ex, "Fehler beim Abrufen des Videos von der Quelle: {Url}", source.Src);
-                    return StatusCode(500, "Fehler beim Abrufen des Videos von der Quelle");
+
+                    // Erfolg: Antwort durchstreamen (verlässt die Retry-Schleife per return).
+                    // Besitz des Streams geht an StreamResponse/FileStreamResult über,
+                    // deshalb lokale Referenz nullen, damit der finally-Block sie nicht disposed.
+                    var streamResult = await StreamResponse(response, hasRangeHeader);
+                    response = null;
+                    return streamResult;
                 }
 
+                // Sollte nicht erreicht werden (Schleife endet per return), aber zur Sicherheit:
+                return StatusCode(lastUpstreamStatus == 0 ? 502 : lastUpstreamStatus, "Fehler beim Abrufen des Videos");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ein Fehler ist beim Verarbeiten der Proxy-Anfrage aufgetreten");
+                return StatusCode(500, "Ein interner Serverfehler ist aufgetreten");
+            }
+            finally
+            {
+                response?.Dispose();
+            }
+        }
+
+        // Kopiert die relevanten Header der Upstream-Antwort in die Client-Antwort und
+        // streamt den Inhalt durch. Der Stream-Besitz geht an das FileStreamResult über.
+        private async Task<IActionResult> StreamResponse(HttpResponseMessage response, bool hasRangeHeader)
+        {
+            try
+            {
                 // Status-Code setzen basierend auf der Antwort
                 Response.StatusCode = (int)(hasRangeHeader && response.StatusCode == HttpStatusCode.PartialContent
                     ? HttpStatusCode.PartialContent

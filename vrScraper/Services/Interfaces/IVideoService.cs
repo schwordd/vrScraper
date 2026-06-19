@@ -14,6 +14,7 @@ namespace vrScraper.Services.Interfaces
     Task<List<(DbStar Star, long Count)>> GetActorInfos();
     Task DeleteVideo(long id);
     Task<bool> UpdateVideoLikeStatus(long id, bool liked);
+    Task<bool> MarkVideoWatched(long id);
     Task<bool> UpdateVideoErrorCount(long id);
     Task<bool> UpdateVideoRating(long id, double rating);
 

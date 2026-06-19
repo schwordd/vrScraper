@@ -1,6 +1,12 @@
 let player = null;
 let dotNetRef = null;
 let currentVideoId = null;
+let currentSourceType = 'video/mp4';
+// Transiente Quell-/Proxy-Fehler (z.B. 500 vom VideoProxy, weil der Live-Scrape
+// der Quelle gelegentlich fehlschlägt) automatisch erneut laden, bevor der
+// Player in den Error-State geht.
+let loadRetryCount = 0;
+const MAX_LOAD_RETRIES = 3;
 // Speichere die Lautstärke und Mute-Zustand in globalen Variablen
 let savedVolume = 0.7;
 let savedMuted = false;
@@ -19,9 +25,38 @@ function registerPlayerErrorCallback(dotnetRef) {
     console.log("Callback-Referenz registriert");
 }
 
+// Lädt die Proxy-Quelle erneut (mit Cache-Buster), wenn ein transienter Fehler
+// auftrat. Gibt true zurück, wenn ein Retry eingeplant wurde, sonst false.
+function retryLoadSource(reason) {
+    if (!player || currentVideoId == null) return false;
+    if (loadRetryCount >= MAX_LOAD_RETRIES) return false;
+
+    loadRetryCount++;
+    const attempt = loadRetryCount;
+    // Cache-Buster erzwingt eine frische Proxy-Anfrage (umgeht ein evtl. gecachtes 500)
+    const proxyUrl = `/api/VideoProxy/${currentVideoId}?retry=${attempt}`;
+    console.warn(`Player-Fehler (${reason}). Retry ${attempt}/${MAX_LOAD_RETRIES}:`, proxyUrl);
+
+    setTimeout(() => {
+        if (!player) return;
+        try {
+            player.error(null); // Fehlerzustand löschen
+            player.src({ src: proxyUrl, type: currentSourceType });
+            player.load();
+            player.play().catch(() => { /* nächster 'error' triggert ggf. weiteren Retry */ });
+        } catch (e) {
+            console.error('Retry-Laden fehlgeschlagen:', e);
+        }
+    }, 600 * attempt);
+
+    return true;
+}
+
 function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, vrType, videoId) {
     console.log("Initialisiere VR-Player:", videoElementId, sourceUrl, vrType);
     currentVideoId = videoId;
+    currentSourceType = sourceType || 'video/mp4';
+    loadRetryCount = 0;
     window._vrPlayerOpen = true;
 
     try {
@@ -135,6 +170,8 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
 
             this.play()
                 .catch(error => {
+                    // Wiedergabe-Start scheiterte: ggf. transienter Quellfehler -> erneut versuchen
+                    if (retryLoadSource('play() rejected: ' + (error && error.message || ''))) return;
                     console.error('Fehler beim Starten der Wiedergabe:', error);
                     if (dotNetRef) {
                         dotNetRef.invokeMethodAsync('OnPlayerError', error.message || 'Unknown playback error');
@@ -142,11 +179,23 @@ function initializeVRPlayer(videoElementId, sourceUrl, sourceType, videoTitle, v
                 });
         });
 
+        // Nach erfolgreichem Laden Retry-Zähler zurücksetzen, damit ein späterer
+        // (mittiger) Fehler wieder frische Versuche bekommt.
+        player.on('playing', function() { loadRetryCount = 0; });
+        player.on('loadeddata', function() { loadRetryCount = 0; });
+
         // Fehlerbehandlung für Player
-        player.on('error', function(error) {
-            console.error('Player-Fehler:', error);
+        player.on('error', function() {
+            const err = player.error && player.error();
+            const code = err ? err.code : 0;
+            // MEDIA_ERR_NETWORK(2), MEDIA_ERR_DECODE(3), MEDIA_ERR_SRC_NOT_SUPPORTED(4)
+            // entstehen hier typischerweise durch einen transienten Proxy-/Quellfehler.
+            if ((code === 2 || code === 3 || code === 4) && retryLoadSource('media error ' + code)) {
+                return;
+            }
+            console.error('Player-Fehler:', err);
             if (dotNetRef) {
-                const errorMsg = player.error_ ? player.error_.message : 'Unknown error';
+                const errorMsg = err ? err.message : 'Unknown error';
                 dotNetRef.invokeMethodAsync('OnPlayerError', errorMsg);
             }
         });
@@ -238,6 +287,11 @@ function handlePlayerKeydown(e) {
         case 'p':
         case 'P':
             if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardPrevious');
+            break;
+        case 'x':
+        case 'X':
+            // Als gesehen markieren UND weiter zum nächsten Video
+            if (dotNetRef) dotNetRef.invokeMethodAsync('OnKeyboardMarkWatchedNext');
             break;
         case 'l':
         case 'L':

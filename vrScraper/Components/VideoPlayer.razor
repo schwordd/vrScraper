@@ -68,6 +68,13 @@
                     </button>
                 }
 
+                <button class="watched-next-btn @(CurrentVideo?.PlayCount > 0 ? "watched" : "not-watched") @(_feedbackTarget == "watched" ? "pulse" : "")"
+                        @key="@($"watched-{_feedbackKey}")"
+                        @onclick="ClickMarkWatchedAndNext"
+                        title="@(CurrentVideo?.PlayCount > 0 ? "Already seen — next (X)" : "Mark seen & next (X)")">
+                    <i class="icon-circle-check"></i>
+                </button>
+
                 <span class="video-counter">@(VideoIndex + 1) / @VideoListCount</span>
 
                 @if (CurrentVideo != null && (CurrentVideo.AddedUTC.HasValue || CurrentVideo.SiteRating.HasValue))
@@ -106,6 +113,7 @@
                         <span class="shortcut-key">M</span><span>Mute</span>
                         <span class="shortcut-key">F</span><span>Fullscreen</span>
                         <span class="shortcut-key">N / P</span><span>Next / Prev</span>
+                        <span class="shortcut-key">X</span><span>Seen + Next</span>
                         <span class="shortcut-key">L</span><span>Like</span>
                         <span class="shortcut-key">B</span><span>Bookmark</span>
                         <span class="shortcut-key">Scroll</span><span>Zoom</span>
@@ -148,6 +156,9 @@
 
     [Parameter]
     public EventCallback OnNavigatePrevious { get; set; }
+
+    [Parameter]
+    public EventCallback OnMarkWatchedAndNext { get; set; }
 
     [Parameter]
     public EventCallback<DbVideoItem> OnToggleLike { get; set; }
@@ -194,6 +205,7 @@
             _errorMessage = null;
             _isLoading = true;
             _isNavigating = false;
+            _feedbackTarget = null;
             this.CurrentVideo = video;
             _videoId = video.Id;
 
@@ -220,6 +232,11 @@
                 StateHasChanged();
                 return;
             }
+
+            // Button-Zustände an die DB-Realität angleichen, damit Like/Watched
+            // schon beim Öffnen des Players korrekt sind (Listen-Objekt kann veraltet sein).
+            CurrentVideo.Liked = foundVideo.Liked;
+            CurrentVideo.PlayCount = foundVideo.PlayCount;
 
             var scraper = scraperRegistry.GetScraperForSite(foundVideo.Site);
             if (scraper == null)
@@ -330,6 +347,17 @@
     }
 
     [JSInvokable]
+    public async Task OnKeyboardMarkWatchedNext()
+    {
+        if (_isNavigating) return;
+        _isNavigating = true;
+        _feedbackTarget = "watched";
+        _feedbackKey++;
+        StateHasChanged();
+        await OnMarkWatchedAndNext.InvokeAsync();
+    }
+
+    [JSInvokable]
     public async Task OnKeyboardToggleLike()
     {
         if (CurrentVideo != null)
@@ -395,6 +423,16 @@
         await OnNavigatePrevious.InvokeAsync();
     }
 
+    private async Task ClickMarkWatchedAndNext()
+    {
+        if (_isNavigating) return;
+        _isNavigating = true;
+        _feedbackTarget = "watched";
+        _feedbackKey++;
+        StateHasChanged();
+        await OnMarkWatchedAndNext.InvokeAsync();
+    }
+
     private async Task ClickToggleLike()
     {
         if (CurrentVideo != null)
@@ -415,6 +453,13 @@
             _feedbackKey++;
             StateHasChanged();
         }
+    }
+
+    // Erlaubt dem Parent, den Player programmatisch zu schließen (z.B. nach
+    // "gesehen + next", wenn kein weiteres Video mehr folgt).
+    public async Task ClosePlayerExternal()
+    {
+        await ClosePlayer();
     }
 
     private async Task ClosePlayer()

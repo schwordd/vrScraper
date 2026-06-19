@@ -239,6 +239,52 @@
     font-size: 18px;
 }
 
+.player-toolbar .watched-next-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: all var(--transition-base) ease;
+}
+
+/* Bereits gesehen: gefüllter grüner Haken */
+.player-toolbar .watched-next-btn.watched {
+    background-color: rgba(22, 163, 74, 0.85);
+    color: #fff;
+}
+
+/* Noch nicht gesehen: gedämpft */
+.player-toolbar .watched-next-btn.not-watched {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.player-toolbar .watched-next-btn:hover {
+    transform: scale(1.15);
+    color: #fff;
+}
+
+.player-toolbar .watched-next-btn.not-watched:hover {
+    background-color: rgba(59, 130, 246, 0.6);
+}
+
+.player-toolbar .watched-next-btn.watched:hover {
+    background-color: rgba(22, 163, 74, 1);
+}
+
+.player-toolbar .watched-next-btn.pulse {
+    animation: btnPulse 0.4s ease;
+}
+
+.player-toolbar .watched-next-btn i {
+    font-size: 18px;
+}
+
 .player-toolbar .help-btn {
     width: 36px;
     height: 36px;

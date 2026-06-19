@@ -297,6 +297,51 @@ namespace vrScraper.Services
       }
     }
 
+    // Markiert ein Video als "gesehen", ohne es tatsächlich abzuspielen.
+    // "Gesehen" ist im System als PlayCount > 0 definiert (Unwatched-Filter = PlayCount == 0),
+    // daher PlayCount auf mindestens 1 anheben und LastPlayedUtc setzen. So taucht z.B.
+    // schnell weggeklickter Müll bei aktivem "Unwatched"-Filter nicht erneut auf.
+    public async Task<bool> MarkVideoWatched(long id)
+    {
+      try
+      {
+        using var scope = serviceProvider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<VrScraperContext>();
+        var dbVid = await context.VideoItems.FirstOrDefaultAsync(a => a.Id == id);
+
+        if (dbVid == null)
+          return false;
+
+        if (dbVid.PlayCount < 1)
+          dbVid.PlayCount = 1;
+        dbVid.LastPlayedUtc = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+
+        // Speicher-Cache aktualisieren, damit Filter/Sortierung sofort greifen
+        _videoLock.EnterWriteLock();
+        try
+        {
+          var memVid = this.videoItems.FirstOrDefault(a => a.Id == id);
+          if (memVid != null)
+          {
+            if (memVid.PlayCount < 1)
+              memVid.PlayCount = 1;
+            memVid.LastPlayedUtc = dbVid.LastPlayedUtc;
+          }
+        }
+        finally { _videoLock.ExitWriteLock(); }
+
+        logger.LogInformation("Video {id} als gesehen markiert (PlayCount={count})", id, dbVid.PlayCount);
+        return true;
+      }
+      catch (Exception ex)
+      {
+        logger.LogWarning(ex, "MarkVideoWatched fehlgeschlagen für Video {id}", id);
+        return false;
+      }
+    }
+
     public async Task<bool> UpdateVideoRating(long id, double rating)
     {
       using var scope = serviceProvider.CreateScope();
