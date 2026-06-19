@@ -62,6 +62,10 @@ dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
 
 ## Unreleased
 
+## v1.2.15 (2026-06-19)
+- Fix sporadic player load error via proxy/source retries; add mark-seen+next with live button states
+- Target csproj in publish step to avoid solution-level output warning
+
 ## v1.2.14 (2026-06-11)
 - Force Node24 runtime for remaining Node20-bundled actions
 
