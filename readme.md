@@ -62,6 +62,9 @@ dotnet ef migrations add [NAME] -o ./DB/Migrations       # Add migration
 
 ## Unreleased
 
+## v1.2.16 (2026-07-13)
+- Add watchlist exclude filters, hover video preview with camera pan, mark-as-seen button on cards and auto-refiltering grid
+
 ## v1.2.15 (2026-06-19)
 - Fix sporadic player load error via proxy/source retries; add mark-seen+next with live button states
 - Target csproj in publish step to avoid solution-level output warning
