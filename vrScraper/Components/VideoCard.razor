@@ -3,6 +3,8 @@
 <div class="video-item">
     <div class="thumbnail-container @(Item.IsThumbnailNotAvailable == true ? "not-available" : "")"
          title="@BuildMetaTooltip()"
+         data-preview-id="@PreviewId"
+         data-preview-seconds="@((int)Item.Duration.TotalSeconds)"
          @onclick="OnThumbnailClick">
         @{
             if (string.IsNullOrEmpty(Item.Thumbnail))
@@ -13,6 +15,11 @@
         <img src="@(string.IsNullOrEmpty(Item.Thumbnail) ? "/images/thumbnail-not-available.svg" : Item.Thumbnail)"
              alt="@Item.Title"
              @onerror="HandleImageError" />
+        @if (PreviewId != null)
+        {
+            @* Quelle wird erst beim Hover per hoverPreview.js gesetzt. *@
+            <video class="hover-preview" muted playsinline preload="none" tabindex="-1"></video>
+        }
         @if (Item.IsThumbnailNotAvailable != true)
         {
             <div class="play-overlay">
@@ -49,13 +56,23 @@
                     @Item.PlayCount
                 </span>
             </div>
-            <div class="watchlist-btn-container @(SelectedWatchlistId > 0 ? "visible" : "")">
-                <button class="watchlist-btn @(IsInWatchlist ? "in-watchlist" : "not-in-watchlist")"
+            <div class="card-actions-top-right">
+                <button class="seen-btn @(IsSeen ? "seen" : "not-seen")"
                         @onclick:stopPropagation="true"
-                        @onclick="() => OnToggleWatchlist.InvokeAsync(Item.Id)"
-                        title="@(IsInWatchlist ? "Remove from watchlist" : "Add to watchlist")">
-                    <i class="icon-bookmark"></i>
+                        @onclick="() => OnMarkSeen.InvokeAsync(Item)"
+                        disabled="@IsSeen"
+                        title="@(IsSeen ? "Already seen" : "Mark as seen")">
+                    <i class="icon-eye"></i>
                 </button>
+                @if (SelectedWatchlistId > 0)
+                {
+                    <button class="watchlist-btn @(IsInWatchlist ? "in-watchlist" : "not-in-watchlist")"
+                            @onclick:stopPropagation="true"
+                            @onclick="() => OnToggleWatchlist.InvokeAsync(Item.Id)"
+                            title="@(IsInWatchlist ? "Remove from watchlist" : "Add to watchlist")">
+                        <i class="icon-bookmark"></i>
+                    </button>
+                }
             </div>
         }
     </div>
@@ -102,12 +119,20 @@
     [Parameter] public EventCallback<DbVideoItem> OnDownload { get; set; }
     [Parameter] public EventCallback<DbVideoItem> OnToggleLike { get; set; }
     [Parameter] public EventCallback<long> OnToggleWatchlist { get; set; }
+    [Parameter] public EventCallback<DbVideoItem> OnMarkSeen { get; set; }
     [Parameter] public EventCallback<string> OnAddStarFilter { get; set; }
     [Parameter] public EventCallback<string> OnAddTagFilter { get; set; }
     [Parameter] public EventCallback<(Microsoft.AspNetCore.Components.Web.ErrorEventArgs Error, DbVideoItem Item)> OnImageError { get; set; }
     [Parameter] public double? SimilarityScore { get; set; }
     [Parameter] public string? RecommendationReason { get; set; }
     [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool EnableHoverPreview { get; set; } = true;
+
+    private string? PreviewId => EnableHoverPreview && Item.IsThumbnailNotAvailable != true
+        ? Item.Id.ToString()
+        : null;
+
+    private bool IsSeen => Item.PlayCount > 0;
 
     private async Task OnThumbnailClick()
     {

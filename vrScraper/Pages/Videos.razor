@@ -151,14 +151,29 @@
                                     ValueField="@((item) => item.Id.ToString())"
                                     Placeholder="Watchlist..."
                                     @bind-Value="@SelectedWatchlistValue" />
-                    @if (_selectedWatchlistId > 0)
-                    {
-                        <button class="btn btn-sm @(_showOnlyWatchlist ? "btn-success watchlist-filter-active" : "btn-outline-success")"
-                                @onclick="() => ToggleShowOnlyWatchlist()"
-                                title="@(_showOnlyWatchlist ? "Showing only watchlist videos — click to show all" : "Show only videos in this watchlist")">
-                            <i class="icon-filter"></i>
+                    <div class="watchlist-menu-wrapper">
+                        <button class="btn btn-sm @WatchlistFilterButtonClass"
+                                @onclick="ToggleWatchlistFilterMenu"
+                                title="@WatchlistFilterTitle">
+                            <i class="@WatchlistFilterIcon"></i>
                         </button>
-                    }
+                        @if (_showWatchlistFilterMenu)
+                        {
+                            <div class="watchlist-menu-backdrop" @onclick="() => _showWatchlistFilterMenu = false"></div>
+                            <div class="watchlist-menu-dropdown">
+                                @foreach (var mode in WatchlistFilterModes)
+                                {
+                                    var needsSelection = mode is WatchlistFilterMode.Only or WatchlistFilterMode.ExcludeCurrent;
+                                    var isDisabled = needsSelection && _selectedWatchlistId == 0;
+                                    <button class="watchlist-menu-item @(_watchlistFilterMode == mode ? "watchlist-menu-item--active" : "")"
+                                            disabled="@isDisabled"
+                                            @onclick="() => SetWatchlistFilterMode(mode)">
+                                        <i class="@WatchlistFilterModeIcon(mode)"></i> @WatchlistFilterModeLabel(mode)
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
                     <div class="watchlist-menu-wrapper">
                         <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleWatchlistMenu" title="Watchlist options">
                             <i class="icon-more-vertical"></i>
@@ -198,11 +213,17 @@
         else if (!PagedItems.Any())
         {
             <div class="empty-state">
-                @if (_showOnlyWatchlist && _selectedWatchlistId > 0 && !_selectedWatchlistVideoIds.Any())
+                @if (_watchlistFilterMode == WatchlistFilterMode.Only && _selectedWatchlistId > 0 && !_selectedWatchlistVideoIds.Any())
                 {
                     <i class="icon-bookmark"></i>
                     <p>This watchlist is empty.</p>
                     <span>Add videos by selecting a watchlist and clicking the bookmark icon on any video.</span>
+                }
+                else if (_watchlistFilterMode is WatchlistFilterMode.ExcludeCurrent or WatchlistFilterMode.ExcludeAny && FilteredItems.Count == 0)
+                {
+                    <i class="icon-bookmark-x"></i>
+                    <p>Every video is on a watchlist.</p>
+                    <span>Nothing left after excluding watchlisted videos.</span>
                 }
                 else if (_showOnlyLiked && FilteredItems.Count == 0)
                 {
@@ -244,6 +265,7 @@
                                OnDownload="DownloadVideo"
                                OnToggleLike="ToggleLike"
                                OnToggleWatchlist="ToggleWatchlist"
+                               OnMarkSeen="MarkVideoSeen"
                                OnAddStarFilter="AddStarFilter"
                                OnAddTagFilter="AddTagFilter"
                                OnImageError="HandleImageErrorFromCard" />
@@ -278,6 +300,7 @@
                            OnDownload="DownloadVideo"
                            OnToggleLike="ToggleLike"
                            OnToggleWatchlist="ToggleWatchlist"
+                           OnMarkSeen="MarkVideoSeen"
                            OnAddStarFilter="AddStarFilter"
                            OnAddTagFilter="AddTagFilter"
                            OnImageError="HandleImageErrorFromCard"
@@ -393,13 +416,14 @@
     private bool _showOnlyLiked;
     private bool _showOnlyUnwatched;
     private bool _showOnlyWithErrors;
-    private bool _showOnlyWatchlist;
+    private WatchlistFilterMode _watchlistFilterMode = WatchlistFilterMode.Off;
     private Random rng = new Random();
     private List<DbVideoItem>? _cachedRandomItems = null;
     private List<DbVideoItem>? _cachedFilteredItems = null;
     private List<DbVideoItem>? _cachedBaseFilteredItems = null;
     private List<(DbTag Tag, long Count)>? _cachedSortedTags = null;
     private List<(DbStar Star, long Count)>? _cachedSortedActresses = null;
+    private HashSet<long>? _cachedAllWatchlistVideoIds = null;
     private string? _lastRandomSeed = null;
 
     private void InvalidateFilterCaches()
@@ -409,6 +433,7 @@
         _cachedBaseFilteredItems = null;
         _cachedSortedTags = null;
         _cachedSortedActresses = null;
+        _cachedAllWatchlistVideoIds = null;
     }
 
     public bool ShowOnlyLiked
@@ -498,28 +523,10 @@
                 return _cachedFilteredItems;
             }
             
-            var items = VideoItems;
+            // "items" bleibt die global gefilterte Menge - "bestunwatched" mittelt darueber.
+            var items = VideoItems.Where(PassesGlobalFilters).ToList();
 
-            // Apply global tag blacklist
-            items = items.Where(item => !item.Tags.Exists(a => _globalBlackList.Any(b => b == a.Name))).ToList();
-
-            // Apply site filter
-            if (_selectedSites.Any())
-            {
-                items = items.Where(v => _selectedSites.Contains(v.Site)).ToList();
-            }
-
-            // Apply filters
-            var filteredItems = items
-                .Where(v => (!_showOnlyLiked || v.Liked) &&
-                        (!_showOnlyUnwatched || v.PlayCount == 0) &&
-                        (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
-                        (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
-                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || (v.NormalizedTitle != null && v.NormalizedTitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
-                        (SelectedTags.Count == 0 || SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) &&
-                        (SelectedActresses.Count == 0 || SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))) &&
-                        (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
-                        (_maxDurationMinutes >= DurationSliderMax || v.Duration.TotalMinutes <= _maxDurationMinutes));
+            var filteredItems = items.Where(v => PassesUserFilters(v) && PassesFacetFilters(v));
 
             // Apply sorting
             List<DbVideoItem> sortedItems;
@@ -615,22 +622,47 @@
         {
             if (_cachedBaseFilteredItems != null) return _cachedBaseFilteredItems;
 
-            var items = VideoItems;
-            items = items.Where(item => !item.Tags.Exists(a => _globalBlackList.Any(b => b == a.Name))).ToList();
-            if (_selectedSites.Any())
-                items = items.Where(v => _selectedSites.Contains(v.Site)).ToList();
-            _cachedBaseFilteredItems = items
-                .Where(v => (!_showOnlyLiked || v.Liked) &&
-                        (!_showOnlyUnwatched || v.PlayCount == 0) &&
-                        (!_showOnlyWithErrors || (v.ErrorCount ?? 0) > 0) &&
-                        (!_showOnlyWatchlist || _selectedWatchlistVideoIds.Contains(v.Id)) &&
-                        (string.IsNullOrEmpty(_searchQuery) || v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) || (v.NormalizedTitle != null && v.NormalizedTitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
-                        (_minDurationMinutes <= 0 || v.Duration.TotalMinutes >= _minDurationMinutes) &&
-                        (_maxDurationMinutes >= DurationSliderMax || v.Duration.TotalMinutes <= _maxDurationMinutes))
+            // Bewusst ohne Tag-/Darstellerinnen-Auswahl: daraus werden die Facetten-Zaehler
+            // gebildet, die genau diese Auswahl anbieten sollen.
+            _cachedBaseFilteredItems = VideoItems
+                .Where(v => PassesGlobalFilters(v) && PassesUserFilters(v))
                 .ToList();
             return _cachedBaseFilteredItems;
         }
     }
+
+    // Blacklist und Site-Auswahl - gelten immer, unabhaengig von den UI-Filtern.
+    private bool PassesGlobalFilters(DbVideoItem v)
+    {
+        if (v.Tags.Exists(a => _globalBlackList.Any(b => b == a.Name))) return false;
+        if (_selectedSites.Any() && !_selectedSites.Contains(v.Site)) return false;
+        return true;
+    }
+
+    private bool PassesUserFilters(DbVideoItem v)
+    {
+        if (_showOnlyLiked && !v.Liked) return false;
+        if (_showOnlyUnwatched && v.PlayCount != 0) return false;
+        if (_showOnlyWithErrors && (v.ErrorCount ?? 0) == 0) return false;
+        if (!PassesWatchlistFilter(v)) return false;
+        if (!string.IsNullOrEmpty(_searchQuery)
+            && !v.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)
+            && !(v.NormalizedTitle != null && v.NormalizedTitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)))
+            return false;
+        if (_minDurationMinutes > 0 && v.Duration.TotalMinutes < _minDurationMinutes) return false;
+        if (_maxDurationMinutes < DurationSliderMax && v.Duration.TotalMinutes > _maxDurationMinutes) return false;
+        return true;
+    }
+
+    private bool PassesFacetFilters(DbVideoItem v)
+    {
+        if (SelectedTags.Count > 0 && !SelectedTags.All(t => v.Tags.Any(a => a.Name == t))) return false;
+        if (SelectedActresses.Count > 0 && !SelectedActresses.All(t => v.Stars.Any(a => a.Name == t))) return false;
+        return true;
+    }
+
+    private bool MatchesFilters(DbVideoItem v) =>
+        PassesGlobalFilters(v) && PassesUserFilters(v) && PassesFacetFilters(v);
 
     private List<(DbTag Tag, long Count)> SortedTags
     {
@@ -708,6 +740,9 @@
             if (_selectedWatchlistId == value) return;
             _selectedWatchlistId = value;
             UpdateWatchlistVideoIds();
+            // Modi, die sich auf die aktuelle Watchlist beziehen, sind ohne Auswahl bedeutungslos.
+            if (value == 0 && _watchlistFilterMode is WatchlistFilterMode.Only or WatchlistFilterMode.ExcludeCurrent)
+                _watchlistFilterMode = WatchlistFilterMode.Off;
             InvalidateFilterCaches();
             if (_urlSyncReady)
             {
@@ -717,13 +752,86 @@
         }
     }
 
-    private void ToggleShowOnlyWatchlist()
+    private enum WatchlistFilterMode
     {
-        _showOnlyWatchlist = !_showOnlyWatchlist;
+        Off,
+        Only,
+        ExcludeCurrent,
+        ExcludeAny
+    }
+
+    private static readonly WatchlistFilterMode[] WatchlistFilterModes =
+        Enum.GetValues<WatchlistFilterMode>();
+
+    private bool _showWatchlistFilterMenu;
+
+    /// <summary>Video-Ids aller Watchlists zusammen — Basis fuer <see cref="WatchlistFilterMode.ExcludeAny"/>.</summary>
+    private HashSet<long> AllWatchlistVideoIds =>
+        _cachedAllWatchlistVideoIds ??= WatchlistTabs
+            .SelectMany(t => t.VideoWhitelistList)
+            .Select(v => Convert.ToInt64(v))
+            .ToHashSet();
+
+    private bool PassesWatchlistFilter(DbVideoItem v) => _watchlistFilterMode switch
+    {
+        WatchlistFilterMode.Only => _selectedWatchlistVideoIds.Contains(v.Id),
+        WatchlistFilterMode.ExcludeCurrent => !_selectedWatchlistVideoIds.Contains(v.Id),
+        WatchlistFilterMode.ExcludeAny => !AllWatchlistVideoIds.Contains(v.Id),
+        _ => true
+    };
+
+    private void ToggleWatchlistFilterMenu()
+    {
+        _showWatchlistFilterMenu = !_showWatchlistFilterMenu;
+    }
+
+    private void SetWatchlistFilterMode(WatchlistFilterMode mode)
+    {
+        _showWatchlistFilterMenu = false;
+        if (_watchlistFilterMode == mode) return;
+
+        _watchlistFilterMode = mode;
         CurrentPage = 1;
         InvalidateFilterCaches();
         SyncUrlState();
     }
+
+    private static string WatchlistFilterModeLabel(WatchlistFilterMode mode) => mode switch
+    {
+        WatchlistFilterMode.Only => "Only this watchlist",
+        WatchlistFilterMode.ExcludeCurrent => "Exclude this watchlist",
+        WatchlistFilterMode.ExcludeAny => "Exclude all watchlists",
+        _ => "No watchlist filter"
+    };
+
+    private static string WatchlistFilterModeIcon(WatchlistFilterMode mode) => mode switch
+    {
+        WatchlistFilterMode.Only => "icon-bookmark",
+        WatchlistFilterMode.ExcludeCurrent => "icon-bookmark-x",
+        WatchlistFilterMode.ExcludeAny => "icon-bookmark-minus",
+        _ => "icon-filter-x"
+    };
+
+    private string WatchlistFilterIcon => WatchlistFilterModeIcon(_watchlistFilterMode) switch
+    {
+        "icon-filter-x" => "icon-filter",
+        var icon => icon
+    };
+
+    private string WatchlistFilterButtonClass => _watchlistFilterMode switch
+    {
+        WatchlistFilterMode.Only => "btn-success watchlist-filter-active",
+        WatchlistFilterMode.ExcludeCurrent or WatchlistFilterMode.ExcludeAny => "btn-danger watchlist-filter-active",
+        _ => "btn-outline-success"
+    };
+
+    private string WatchlistFilterTitle => _watchlistFilterMode switch
+    {
+        WatchlistFilterMode.Only => "Showing only videos in this watchlist",
+        WatchlistFilterMode.ExcludeCurrent => "Hiding videos in this watchlist",
+        WatchlistFilterMode.ExcludeAny => "Hiding videos on any watchlist",
+        _ => "Watchlist filter"
+    };
 
     private void UpdateWatchlistVideoIds()
     {
@@ -849,7 +957,15 @@
         }
 
         WatchlistTabs = TabService.GetWatchlistTabs();
-        StateHasChanged();
+        // Die Gesamtmenge aller Watchlist-Videos hat sich geaendert - sonst wuerde der
+        // ExcludeAny-Filter unten noch mit dem alten Stand pruefen.
+        _cachedAllWatchlistVideoIds = null;
+
+        var item = VideoItems.FirstOrDefault(v => v.Id == videoId);
+        if (item != null)
+            RefreshViewAfterItemChange(item);
+        else
+            StateHasChanged();
     }
 
     protected override async Task OnInitializedAsync()
@@ -1096,6 +1212,50 @@
         }
     }
 
+    // Video direkt auf der Kachel als gesehen markieren - ohne es zu oeffnen.
+    // Bewusst einseitig (wie im Player): ein Zuruecksetzen wuerde einen echten
+    // PlayCount ueberschreiben.
+    private async Task MarkVideoSeen(DbVideoItem item)
+    {
+        if (item.PlayCount > 0) return;
+
+        await VideoService.MarkVideoWatched(item.Id);
+        // Auch das Listen-Objekt anheben, falls es nicht dieselbe Instanz wie im Cache ist.
+        if (item.PlayCount < 1)
+            item.PlayCount = 1;
+        item.LastPlayedUtc = DateTime.UtcNow;
+
+        RefreshViewAfterItemChange(item);
+    }
+
+    // Nach einer Aenderung an einem einzelnen Video: faellt es durch die aktiven Filter,
+    // wird die Ansicht neu aufgebaut, damit die Kachel verschwindet. Passt es weiterhin,
+    // reicht ein Re-Render - der Neuaufbau kostet so viel wie ein Filterklick und waere
+    // hier umsonst.
+    private void RefreshViewAfterItemChange(DbVideoItem item)
+    {
+        // "bestunwatched" filtert zusaetzlich zur Sortierung auf ungesehen, das faengt
+        // MatchesFilters nicht ab.
+        var stillVisible = MatchesFilters(item) && _currentSortOption != "bestunwatched";
+        if (stillVisible)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        InvalidateFilterCaches();
+
+        // War es das letzte Item der Seite, laege die aktuelle Seite jetzt hinter dem Ende.
+        var pages = TotalPages;
+        if (CurrentPage > pages)
+        {
+            CurrentPage = Math.Max(1, pages);
+            SyncUrlState();
+        }
+
+        StateHasChanged();
+    }
+
     private void EnsurePageContainsIndex(int index)
     {
         var targetPage = (index / PageSize) + 1;
@@ -1113,7 +1273,7 @@
         // Like-Status in der Datenbank aktualisieren
         await VideoService.UpdateVideoLikeStatus(item.Id, item.Liked);
 
-        StateHasChanged();
+        RefreshViewAfterItemChange(item);
     }
 
     private async Task HandleImageError(Microsoft.AspNetCore.Components.Web.ErrorEventArgs e, DbVideoItem item)
@@ -1257,7 +1417,7 @@
         _showOnlyLiked = query.TryGetValue("liked", out var liked) && liked == "1";
         _showOnlyUnwatched = query.TryGetValue("unwatched", out var unwatched) && unwatched == "1";
         _showOnlyWithErrors = query.TryGetValue("errors", out var errors) && errors == "1";
-        _showOnlyWatchlist = query.TryGetValue("wlonly", out var wlo) && wlo == "1";
+        _watchlistFilterMode = ParseWatchlistFilterMode(query);
 
         CurrentPage = (query.TryGetValue("page", out var page) && int.TryParse(page, out var p)) ? p : 1;
         if (query.TryGetValue("pageSize", out var ps) && int.TryParse(ps, out var psi))
@@ -1277,7 +1437,38 @@
             _selectedWatchlistVideoIds.Clear();
         }
 
+        if (_selectedWatchlistId == 0 && _watchlistFilterMode is WatchlistFilterMode.Only or WatchlistFilterMode.ExcludeCurrent)
+            _watchlistFilterMode = WatchlistFilterMode.Off;
+
         InvalidateFilterCaches();
+    }
+
+    private static string WatchlistFilterModeToQuery(WatchlistFilterMode mode) => mode switch
+    {
+        WatchlistFilterMode.Only => "only",
+        WatchlistFilterMode.ExcludeCurrent => "excl",
+        WatchlistFilterMode.ExcludeAny => "exclall",
+        _ => "off"
+    };
+
+    private static WatchlistFilterMode ParseWatchlistFilterMode(
+        Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query)
+    {
+        if (query.TryGetValue("wlmode", out var mode))
+        {
+            return mode.ToString() switch
+            {
+                "only" => WatchlistFilterMode.Only,
+                "excl" => WatchlistFilterMode.ExcludeCurrent,
+                "exclall" => WatchlistFilterMode.ExcludeAny,
+                _ => WatchlistFilterMode.Off
+            };
+        }
+
+        // Legacy-Links aus der Zeit vor den Ausschluss-Modi.
+        return query.TryGetValue("wlonly", out var wlo) && wlo == "1"
+            ? WatchlistFilterMode.Only
+            : WatchlistFilterMode.Off;
     }
 
     private void SyncUrlState()
@@ -1293,7 +1484,7 @@
         if (_showOnlyLiked) queryParams["liked"] = "1";
         if (_showOnlyUnwatched) queryParams["unwatched"] = "1";
         if (_showOnlyWithErrors) queryParams["errors"] = "1";
-        if (_showOnlyWatchlist) queryParams["wlonly"] = "1";
+        if (_watchlistFilterMode != WatchlistFilterMode.Off) queryParams["wlmode"] = WatchlistFilterModeToQuery(_watchlistFilterMode);
         if (_selectedWatchlistId > 0) queryParams["watchlist"] = _selectedWatchlistId.ToString();
         if (CurrentPage > 1) queryParams["page"] = CurrentPage.ToString();
         if (PageSize != 30) queryParams["pageSize"] = PageSize.ToString();

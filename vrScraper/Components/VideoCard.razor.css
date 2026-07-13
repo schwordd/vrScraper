@@ -102,10 +102,70 @@
     opacity: 0;
     transition: opacity var(--transition-base) ease-in-out;
     padding: 8px;
+    z-index: 2; /* ueber der Hover-Vorschau (z-index 1) */
 }
 
 .thumbnail-container:hover .thumbnail-overlay {
     opacity: 1;
+}
+
+/* Waehrend der Vorschau soll das Bild sichtbar bleiben: der volle Scrim weicht einem
+   Verlauf am unteren Rand, die Buttons werden nur angedeutet und kommen erst beim
+   Hover ganz nach vorn. */
+.thumbnail-container.preview-active .thumbnail-overlay {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 45%);
+}
+
+.thumbnail-container.preview-active .thumbnail-overlay .btn {
+    opacity: 0.3;
+    transition: opacity var(--transition-base) ease-in-out;
+}
+
+.thumbnail-container.preview-active .thumbnail-overlay .btn:hover {
+    opacity: 1;
+}
+
+/* Die Quellen sind durchgaengig Stereo-SBS. Ungecroppt saehe man beide Augen
+   nebeneinander, dazu die volle Fischaugen-Verzerrung. Deshalb wird das Video so
+   breit skaliert, dass nur das linke Auge in der Kachel liegt, und zusaetzlich
+   gezoomt, damit der stark verzerrte Rand ausserhalb bleibt.
+   Bei Zoom Z gilt: width = 200% * Z, left = (1 - Z) / 2 * 100%.
+   height:auto haelt das native Seitenverhaeltnis, der Ueberstand wird geclippt.
+   Z bestimmt zugleich den Schwenkbereich des Kameraschwenks: der Ausschnitt kann
+   um (Z - 1) / 2 der Kachelbreite nach links und rechts wandern. */
+.hover-preview {
+    position: absolute;
+    top: 50%;
+    left: -50%;   /* Z = 2 */
+    width: 400%;
+    height: auto;
+    transform: translateY(-50%);
+    background: #000;
+    opacity: 0;
+    z-index: 1;
+    pointer-events: none;
+    /* transform wird beim Hover per JS gesetzt (Kameraschwenk). Die Daempfung macht
+       hoverPreview.js selbst - eine CSS-Transition wuerde sich damit ueberlagern. */
+    transition: opacity var(--transition-base) ease-in-out;
+    will-change: transform;
+}
+
+.hover-preview.active {
+    opacity: 1;
+}
+
+/* Play-Symbol waehrend der Vorschau ausblenden, es verdeckt sonst das Bild. */
+.thumbnail-container.preview-active:hover .play-overlay {
+    opacity: 0;
+}
+
+.thumbnail-container.preview-loading .play-overlay i {
+    animation: preview-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes preview-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.9; }
 }
 
 .duration-badge {
@@ -271,16 +331,44 @@
     font-size: 14px;
 }
 
-.watchlist-btn-container {
+.card-actions-top-right {
     position: absolute;
     top: 8px;
     right: 8px;
     z-index: 5;
-    display: none;
+    display: flex;
+    gap: 8px;
 }
 
-.watchlist-btn-container.visible {
-    display: block;
+.seen-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-base) ease;
+    padding: 0;
+}
+
+.seen-btn.seen {
+    background-color: var(--color-info);
+    color: white;
+    cursor: default;
+}
+
+.seen-btn.not-seen {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.seen-btn.not-seen:hover {
+    transform: scale(1.1);
+}
+
+.seen-btn i {
+    font-size: 16px;
 }
 
 .watchlist-btn {

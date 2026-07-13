@@ -233,6 +233,20 @@
     background-color: rgba(220, 38, 38, 0.08);
 }
 
+.watchlist-menu-item--active {
+    font-weight: 600;
+    background-color: var(--color-surface-sunken);
+}
+
+.watchlist-menu-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.watchlist-menu-item:disabled:hover {
+    background-color: transparent;
+}
+
 .watchlist-menu-item i {
     font-size: 12px;
 }
@@ -245,6 +259,11 @@
 .watchlist-filter-active {
     box-shadow: 0 0 0 3px rgba(var(--bs-success-rgb), 0.45);
     animation: watchlist-pulse 2s ease-in-out infinite;
+}
+
+.btn-danger.watchlist-filter-active {
+    box-shadow: 0 0 0 3px rgba(var(--bs-danger-rgb), 0.45);
+    animation: none;
 }
 
 @keyframes watchlist-pulse {
